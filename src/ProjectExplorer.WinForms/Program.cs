@@ -17,29 +17,15 @@ internal static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-        // ── License check ──────────────────────────────────────────────────
-        var licenseManager = new LicenseManager();
-        var license = licenseManager.GetCurrentLicense();
-
-        if (!license.IsUsable)
-        {
-            // Trial expired — force registration dialog before showing the app
-            using var reg = new RegistrationDialog(licenseManager, license);
-            reg.ShowDialog();
-            license = reg.ResultLicense;
-
-            if (!license.IsUsable)
-            {
-                // User closed without activating — exit
-                return;
-            }
-        }
-
         // ── Set up services ────────────────────────────────────────────────
         var repository     = new JsonProjectRepository();
         var projectManager = new ProjectManager(repository);
 
         projectManager.InitializeAsync().GetAwaiter().GetResult();
+
+        // ── License check ──────────────────────────────────────────────────
+        var licenseManager = new LicenseManager();
+        var license = licenseManager.GetCurrentLicense(projectManager.Projects);
 
         IShellIconProvider shellIconProvider = new ShellIconProvider();
 

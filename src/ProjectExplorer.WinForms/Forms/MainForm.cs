@@ -90,17 +90,60 @@ public partial class MainForm : Form
         UpdateLicenseUi();
     }
 
+    private void RefreshLicense() =>
+        _license = _licenseManager.GetCurrentLicense(_projectManager.Projects);
+
     private void UpdateLicenseUi()
     {
         switch (_license.State)
         {
-            case LicenseState.Trial:
-                lblStatus.Text = $"Trial — {_license.TrialDaysRemaining} day(s) remaining  |  Help > Register to activate";
+            case LicenseState.Free:
+                lblStatus.Text = $"Free — {_license.ProjectCount}/{_license.ProjectLimit} projects, " +
+                                 $"{_license.LeafNodeCount}/{_license.LeafNodeLimit} references  |  Help > Register";
+                break;
+            case LicenseState.LimitReached:
+                lblStatus.Text = $"Free limit reached ({_license.LeafNodeCount} references, {_license.ProjectCount} projects)  |  Help > Register to unlock";
                 break;
             case LicenseState.Licensed:
                 lblStatus.Text = $"Licensed to {_license.Email}";
                 break;
         }
+    }
+
+    /// <summary>
+    /// Returns true if the action can proceed. If the free limit would be
+    /// breached, shows a prompt and returns false.
+    /// </summary>
+    private bool CheckLeafLimit(string actionDescription)
+    {
+        if (_license.State == LicenseState.Licensed) return true;
+        RefreshLicense();
+        if (_license.LeafNodeCount < _license.LeafNodeLimit) return true;
+
+        var result = MessageBox.Show(
+            $"You've reached the free limit of {_license.LeafNodeLimit} folder/web references.\n\n" +
+            $"Register Project Nest to add unlimited references.",
+            $"Free Limit Reached — {actionDescription}",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+
+        if (result == DialogResult.OK) OpenRegistrationDialog();
+        return false;
+    }
+
+    private bool CheckProjectLimit()
+    {
+        if (_license.State == LicenseState.Licensed) return true;
+        RefreshLicense();
+        if (_license.ProjectCount < _license.ProjectLimit) return true;
+
+        var result = MessageBox.Show(
+            $"You've reached the free limit of {_license.ProjectLimit} projects.\n\n" +
+            $"Register Project Nest to create unlimited projects.",
+            "Free Limit Reached — New Project",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+
+        if (result == DialogResult.OK) OpenRegistrationDialog();
+        return false;
     }
 
     private void OpenRegistrationDialog()
@@ -795,6 +838,8 @@ public partial class MainForm : Form
 
     private async void MenuFileNewProject_Click(object? sender, EventArgs e)
     {
+        if (!CheckProjectLimit()) return;
+
         using var dialog = new InputDialog("Create New Project", "Project name:", "New Project");
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
@@ -802,6 +847,8 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(name))
             {
                 await _projectManager.CreateProjectAsync(name);
+                RefreshLicense();
+                UpdateLicenseUi();
                 RefreshTreeView();
             }
         }
@@ -835,6 +882,8 @@ public partial class MainForm : Form
             return;
         }
 
+        if (!CheckLeafLimit("Add Folder")) return;
+
         using var dialog = new FolderBrowserDialog
         {
             Description = "Select a folder to add to the project",
@@ -844,12 +893,16 @@ public partial class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             await _projectManager.AddFolderReferenceAsync(_currentProject.Id, dialog.SelectedPath);
+            RefreshLicense();
+            UpdateLicenseUi();
             RefreshTreeView();
         }
     }
 
     private async Task ShowAddWebResourceDialog(Guid projectId, Guid? parentCollectionId)
     {
+        if (!CheckLeafLimit("Add Web Resource")) return;
+
         using var dialog = new WebResourceDialog();
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
@@ -860,6 +913,8 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(url))
             {
                 await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId);
+                RefreshLicense();
+                UpdateLicenseUi();
                 RefreshTreeView();
             }
         }
@@ -926,10 +981,13 @@ public partial class MainForm : Form
             });
             menu.Items.Add("Add Folder...", null, async (s, e) =>
             {
+                if (!CheckLeafLimit("Add Folder")) return;
                 using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, collectionId);
+                    RefreshLicense();
+                    UpdateLicenseUi();
                     RefreshTreeView();
                 }
             });

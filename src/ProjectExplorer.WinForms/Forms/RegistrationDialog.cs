@@ -135,7 +135,7 @@ public class RegistrationDialog : Form
         if (string.IsNullOrEmpty(key)) return;
 
         btnActivate.Enabled = false;
-        var result = _licenseManager.Activate(key);
+        var result = _licenseManager.Activate(key, Enumerable.Empty<Project>());
         ResultLicense = result;
         RefreshStatus(result);
         btnActivate.Enabled = true;
@@ -168,15 +168,16 @@ public class RegistrationDialog : Form
                 btnActivate.Enabled = false;
                 break;
 
-            case LicenseState.Trial:
-                lblStatus.Text = $"⏳  Trial version — {info.TrialDaysRemaining} day(s) remaining.\n" +
-                                  "   Enter a license key below to unlock the full version.";
+            case LicenseState.Free:
+                lblStatus.Text = $"⭐  Free version — {info.ProjectCount}/{info.ProjectLimit} projects, " +
+                                 $"{info.LeafNodeCount}/{info.LeafNodeLimit} references used.\n" +
+                                  "   Enter a license key below to unlock unlimited access.";
                 lblStatus.ForeColor = Color.FromArgb(180, 100, 0);
                 break;
 
-            case LicenseState.TrialExpired:
-                lblStatus.Text = "⚠  Your 30-day trial has expired.\n" +
-                                  "   Purchase a license key to continue using Project Nest.";
+            case LicenseState.LimitReached:
+                lblStatus.Text = $"⚠  Free limit reached — {info.LeafNodeCount} references across {info.ProjectCount} projects.\n" +
+                                  "   Purchase a license key to add more projects and references.";
                 lblStatus.ForeColor = Color.Firebrick;
                 break;
 
