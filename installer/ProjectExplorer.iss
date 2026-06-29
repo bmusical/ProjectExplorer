@@ -1,4 +1,4 @@
-; Inno Setup 7 script for Project Nest
+; Inno Setup 6 script for Project Nest
 ; Build the app first:
 ;   dotnet publish src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj
 ;     /p:PublishProfile=win-x64-release
