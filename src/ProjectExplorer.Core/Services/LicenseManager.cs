@@ -6,7 +6,7 @@ using ProjectExplorer.Core.Models;
 namespace ProjectExplorer.Core.Services;
 
 /// <summary>
-/// Manages free-tier limits and license key verification for Project Nest.
+/// Manages free-tier limits and license key verification for Project Nest Explorer.
 ///
 /// Free tier: up to 3 projects and 25 leaf nodes (FolderReferences + WebResources)
 /// total across all projects. Collections are not counted — they are just containers.

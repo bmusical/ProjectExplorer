@@ -9,7 +9,7 @@ public class AboutForm : Form
 
     private void InitializeComponent()
     {
-        this.Text = "About Project Nest";
+        this.Text = "About Project Nest Explorer";
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
@@ -27,7 +27,7 @@ public class AboutForm : Form
 
         var lblAppName = new Label
         {
-            Text = "Project Nest",
+            Text = "Project Nest Explorer",
             Font = new Font("Segoe UI", 18f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
