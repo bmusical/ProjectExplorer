@@ -18,9 +18,14 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 Write-Host "==> Publishing Project Nest $Version (win-x64, self-contained)..." -ForegroundColor Cyan
 
 dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj" `
-    /p:PublishProfile=win-x64-release `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    /p:PublishSingleFile=true `
+    /p:PublishReadyToRun=true `
+    /p:IncludeNativeLibrariesForSelfExtract=true `
     /p:Version=$Version `
-    -c Release
+    /p:PublishDir="$repoRoot\publish\\"
 
 if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish failed"; exit 1 }
 
