@@ -120,7 +120,7 @@ partial class MainForm
             menuProjectNewCollection, menuProjectAddFolder
         });
 
-        this.menuHelpAbout = new ToolStripMenuItem { Text = "&About Project Explorer..." };
+        this.menuHelpAbout = new ToolStripMenuItem { Text = "&About Project Nest..." };
         this.menuHelp = new ToolStripMenuItem { Text = "&Help" };
         this.menuHelp.DropDownItems.Add(menuHelpAbout);
 
@@ -211,7 +211,7 @@ partial class MainForm
         });
         this.MainMenuStrip = this.menuStrip;
 
-        this.Text = "Project Explorer";
+        this.Text = "Project Nest";
         this.Size = new Size(1200, 750);
         this.MinimumSize = new Size(800, 500);
         this.StartPosition = FormStartPosition.CenterScreen;

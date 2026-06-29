@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
-Write-Host "==> Publishing ProjectExplorer $Version (win-x64, self-contained)..." -ForegroundColor Cyan
+Write-Host "==> Publishing Project Nest $Version (win-x64, self-contained)..." -ForegroundColor Cyan
 
 dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj" `
     /p:PublishProfile=win-x64-release `
@@ -34,4 +34,4 @@ $issFile = "$PSScriptRoot\ProjectExplorer.iss"
 
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
 
-Write-Host "==> Done! Installer is in installer\installer-output\" -ForegroundColor Green
+Write-Host "==> Done! Installer is in installer\installer-output\ProjectNest-$Version-Setup.exe" -ForegroundColor Green

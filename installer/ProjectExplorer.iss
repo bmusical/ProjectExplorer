@@ -1,13 +1,13 @@
-; Inno Setup 7 script for Project Explorer
+; Inno Setup 7 script for Project Nest
 ; Build the app first:
 ;   dotnet publish src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj
 ;     /p:PublishProfile=win-x64-release
 ; Output lands in publish\ at the repo root, then run this script.
 
-#define AppName      "Project Explorer"
+#define AppName      "Project Nest"
 #define AppVersion   "1.0.0"
 #define AppPublisher "HxM Blazor Software LLC"
-#define AppExeName   "ProjectExplorer.WinForms.exe"
+#define AppExeName   "ProjectNest.exe"
 #define AppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 
 [Setup]
@@ -21,7 +21,7 @@ AppUpdatesURL=
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputDir=..\installer-output
-OutputBaseFilename=ProjectExplorer-{#AppVersion}-Setup
+OutputBaseFilename=ProjectNest-{#AppVersion}-Setup
 SetupIconFile=
 Compression=lzma2/ultra64
 SolidCompression=yes
