@@ -162,6 +162,7 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 | **Folder watcher** | Flag FolderReferences whose paths no longer exist (drive unmounted, folder renamed). |
 | **Export / share a project** | Export a project definition as a `.peproj` JSON file to hand off to a colleague. |
 | **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously. |
+| **Localization (i18n)** | Externalize all UI strings to `.resx` resource files — the standard .NET pattern. WinForms supports this well via `System.ComponentModel` and the Visual Studio resource designer. Worth doing before the codebase grows further; retrofitting i18n onto 1000+ line forms is significantly harder than starting clean. Target languages TBD based on user feedback, but European and East Asian languages are the most likely first candidates given the creative/technical professional audience. |
 
 ### Far-term (needs user validation first)
 
