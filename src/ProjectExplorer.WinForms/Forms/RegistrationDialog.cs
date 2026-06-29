@@ -8,11 +8,11 @@ public class RegistrationDialog : Form
     private readonly LicenseManager _licenseManager;
     private readonly LicenseInfo _current;
 
-    private readonly Label lblStatus;
-    private readonly TextBox txtKey;
-    private readonly Button btnActivate;
-    private readonly Button btnClose;
-    private readonly LinkLabel lnkBuy;
+    private Label lblStatus = null!;
+    private TextBox txtKey = null!;
+    private Button btnActivate = null!;
+    private Button btnClose = null!;
+    private LinkLabel lnkBuy = null!;
 
     public LicenseInfo ResultLicense { get; private set; }
 
