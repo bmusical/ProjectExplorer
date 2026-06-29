@@ -1022,6 +1022,9 @@ public partial class MainForm : Form
 
         if (GetProjectIdFromTag(dragTag) != GetProjectIdFromTag(targetTag)) return false;
 
+        // Prevent dropping onto the current parent (already there — no move would happen)
+        if (ReferenceEquals(targetNode, draggedNode.Parent)) return false;
+
         // Prevent dropping onto a descendant of the dragged node
         var ancestor = targetNode.Parent;
         while (ancestor != null)
