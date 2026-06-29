@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProjectExplorer.Core/ProjectExplorer.Core.csproj" />
+    <Project Path="src/ProjectExplorer.Shell/ProjectExplorer.Shell.csproj" />
+    <Project Path="src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ProjectExplorer.Tests/ProjectExplorer.Tests.csproj" />
+  </Folder>
+</Solution>
