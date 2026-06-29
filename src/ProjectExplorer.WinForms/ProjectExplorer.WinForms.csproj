@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoUpdater.NET" Version="1.9.2" />
+    <PackageReference Include="Autoupdater.NET.Official" Version="1.9.2" />
   </ItemGroup>
 
 </Project>
