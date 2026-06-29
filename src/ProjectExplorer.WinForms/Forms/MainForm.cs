@@ -4,6 +4,7 @@ using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
 using ProjectExplorer.WinForms.Helpers;
+using LicenseState = ProjectExplorer.Core.Models.LicenseState;
 
 namespace ProjectExplorer.WinForms;
 
@@ -11,6 +12,8 @@ public partial class MainForm : Form
 {
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
+    private readonly LicenseManager _licenseManager;
+    private LicenseInfo _license;
 
     // Navigation history
     private readonly Stack<string> _backStack = new();
@@ -51,10 +54,13 @@ public partial class MainForm : Form
     private const string TagWebResource = "WebResource:";
     private const string TagRealFolder = "RealFolder:";
 
-    public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider)
+    public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
+                    LicenseManager licenseManager, LicenseInfo license)
     {
-        _projectManager = projectManager;
+        _projectManager    = projectManager;
         _shellIconProvider = shellIconProvider;
+        _licenseManager    = licenseManager;
+        _license           = license;
 
         InitializeComponent();
 
@@ -77,12 +83,32 @@ public partial class MainForm : Form
     {
         base.OnLoad(e);
 
-        // Configure SplitContainer constraints here - the form is now laid out
-        // and splitMain has its actual width, so validation won't fail.
-        // Order matters: set SplitterDistance to a safe value FIRST, then min sizes.
         splitMain.SplitterDistance = Math.Max(300, splitMain.Width / 4);
         splitMain.Panel1MinSize = 150;
         splitMain.Panel2MinSize = 150;
+
+        UpdateLicenseUi();
+    }
+
+    private void UpdateLicenseUi()
+    {
+        switch (_license.State)
+        {
+            case LicenseState.Trial:
+                lblStatus.Text = $"Trial — {_license.TrialDaysRemaining} day(s) remaining  |  Help > Register to activate";
+                break;
+            case LicenseState.Licensed:
+                lblStatus.Text = $"Licensed to {_license.Email}";
+                break;
+        }
+    }
+
+    private void OpenRegistrationDialog()
+    {
+        using var dlg = new RegistrationDialog(_licenseManager, _license);
+        dlg.ShowDialog(this);
+        _license = dlg.ResultLicense;
+        UpdateLicenseUi();
     }
 
     protected override void OnShown(EventArgs e)
