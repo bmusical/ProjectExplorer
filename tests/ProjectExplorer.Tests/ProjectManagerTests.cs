@@ -227,4 +227,65 @@ public class ProjectManagerTests
             try { Directory.Delete(dir, true); } catch { }
         }
     }
+
+    [Fact]
+    public async Task MoveChild_CollectionIntoSiblingCollection_Works()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var collA = await mgr.CreateCollectionAsync(project.Id, "A");
+        var collB = await mgr.CreateCollectionAsync(project.Id, "B");
+
+        await mgr.MoveChildAsync(project.Id, collA.Id, collB.Id);
+
+        var loaded = mgr.GetProject(project.Id)!;
+        Assert.Single(loaded.Children);
+        var movedParent = loaded.FindCollection(collB.Id)!;
+        Assert.Single(movedParent.Children);
+        Assert.Equal(collA.Id, movedParent.Children[0].Id);
+        Assert.Equal(collB.Id, movedParent.Children[0].ParentId);
+    }
+
+    [Fact]
+    public async Task MoveChild_FolderReferenceToProjectRoot_Works()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "C");
+        var fr = await mgr.AddFolderReferenceAsync(project.Id, @"C:\Code", coll.Id);
+
+        await mgr.MoveChildAsync(project.Id, fr.Id, null);
+
+        var loaded = mgr.GetProject(project.Id)!;
+        var rootFr = loaded.Children.FirstOrDefault(c => c.Id == fr.Id);
+        Assert.NotNull(rootFr);
+        Assert.Equal(project.Id, rootFr!.ParentId);
+    }
+
+    [Fact]
+    public async Task MoveChild_CollectionIntoOwnDescendant_Throws()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var parent = await mgr.CreateCollectionAsync(project.Id, "Parent");
+        var child = await mgr.CreateCollectionAsync(project.Id, "Child", parent.Id);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => mgr.MoveChildAsync(project.Id, parent.Id, child.Id));
+    }
+
+    [Fact]
+    public async Task MoveChild_UpdatesParentId()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var collA = await mgr.CreateCollectionAsync(project.Id, "A");
+        var collB = await mgr.CreateCollectionAsync(project.Id, "B");
+
+        await mgr.MoveChildAsync(project.Id, collA.Id, collB.Id);
+
+        var loaded = mgr.GetProject(project.Id)!;
+        var moved = loaded.FindCollection(collA.Id)!;
+        Assert.Equal(collB.Id, moved.ParentId);
+    }
 }
