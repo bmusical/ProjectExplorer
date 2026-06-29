@@ -21,4 +21,8 @@
     <ProjectReference Include="..\ProjectExplorer.Shell\ProjectExplorer.Shell.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AutoUpdater.NET" Version="1.9.2" />
+  </ItemGroup>
+
 </Project>

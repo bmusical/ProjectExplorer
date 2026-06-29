@@ -1,3 +1,4 @@
+using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Interfaces;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
@@ -9,6 +10,10 @@ namespace ProjectExplorer.WinForms;
 
 internal static class Program
 {
+    // Hosted on GitHub Releases — update this URL when you move to a custom domain
+    private const string UpdateCheckUrl =
+        "https://raw.githubusercontent.com/bmusical/ProjectExplorer/main/updates/updates.xml";
+
     [STAThread]
     static void Main()
     {
@@ -38,6 +43,23 @@ internal static class Program
 
         var mainForm = new MainForm(projectManager, shellIconProvider, licenseManager, license);
         mainForm.ListViewItemSorter = new ListViewColumnSorter();
+
+        // Check for updates ~5 seconds after startup so the main window is visible first
+        mainForm.Shown += (s, e) =>
+        {
+            var timer = new System.Windows.Forms.Timer { Interval = 5000 };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                AutoUpdater.AppTitle = "Project Nest";
+                AutoUpdater.RunUpdateAsAdmin = false;  // PrivilegesRequired=lowest install
+                AutoUpdater.ShowSkipButton = true;
+                AutoUpdater.ShowRemindLaterButton = true;
+                AutoUpdater.Start(UpdateCheckUrl);
+            };
+            timer.Start();
+        };
 
         Application.Run(mainForm);
     }
