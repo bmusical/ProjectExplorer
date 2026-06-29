@@ -418,6 +418,7 @@ public partial class MainForm : Form
 
     private void PopulateProjectList()
     {
+        listView.Columns[3].Text = "Date Modified";
         foreach (var project in _projectManager.Projects)
         {
             var item = new ListViewItem(project.Name, "Project")
@@ -434,6 +435,7 @@ public partial class MainForm : Form
     private void PopulateProjectContents()
     {
         if (_currentProject == null) return;
+        listView.Columns[3].Text = "URL";
 
         foreach (var child in _currentProject.Children.OrderBy(c => c.SortOrder))
         {
@@ -446,6 +448,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is FolderReference fr)
@@ -457,6 +460,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is WebResource wr)
@@ -468,6 +472,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
+                item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
             }
         }
@@ -476,6 +481,7 @@ public partial class MainForm : Form
     private void PopulateCollectionContents(Guid collectionId)
     {
         if (_currentProject == null) return;
+        listView.Columns[3].Text = "URL";
         var collection = _currentProject.FindCollection(collectionId);
         if (collection == null) return;
 
@@ -490,6 +496,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is FolderReference fr)
@@ -501,6 +508,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is WebResource wr)
@@ -512,6 +520,7 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
+                item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
             }
         }
@@ -520,6 +529,7 @@ public partial class MainForm : Form
     private void PopulateFileList(string path)
     {
         if (!Directory.Exists(path)) return;
+        listView.Columns[3].Text = "Date Modified";
 
         try
         {

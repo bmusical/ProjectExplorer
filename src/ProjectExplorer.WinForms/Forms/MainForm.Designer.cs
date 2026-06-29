@@ -173,7 +173,8 @@ partial class MainForm
             new ColumnHeader { Text = "Name", Width = 250 },
             new ColumnHeader { Text = "Size", Width = 100, TextAlign = HorizontalAlignment.Right },
             new ColumnHeader { Text = "Type", Width = 150 },
-            new ColumnHeader { Text = "Date Modified", Width = 150 }
+            new ColumnHeader { Text = "Date Modified", Width = 150 },
+            new ColumnHeader { Text = "Description", Width = 250 }
         });
 
         this.listView.DoubleClick += ListView_DoubleClick;
