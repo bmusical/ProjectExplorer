@@ -1,4 +1,4 @@
-; Inno Setup script for Project Explorer
+; Inno Setup 7 script for Project Explorer
 ; Build the app first:
 ;   dotnet publish src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj
 ;     /p:PublishProfile=win-x64-release
@@ -6,7 +6,7 @@
 
 #define AppName      "Project Explorer"
 #define AppVersion   "1.0.0"
-#define AppPublisher "HxM"
+#define AppPublisher "HxM Blazor Software LLC"
 #define AppExeName   "ProjectExplorer.WinForms.exe"
 #define AppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 
@@ -14,6 +14,7 @@
 AppId={#AppId}
 AppName={#AppName}
 AppVersion={#AppVersion}
+AppPublisher={#AppPublisher}
 AppPublisherURL=
 AppSupportURL=
 AppUpdatesURL=
@@ -25,15 +26,20 @@ SetupIconFile=
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+; Inno Setup 7: unified privilege model
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0.17763
 ; Windows 10 1809+ required (needed for .NET 10 self-contained)
 
+; Inno Setup 7: show changelog/notes page in wizard (optional — leave blank to skip)
+; InfoAfterFile=..\CHANGELOG.txt
+
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
+VersionInfoCopyright=Copyright (C) 2025 HxM Blazor Software LLC
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -47,14 +53,13 @@ Name: "startupicon"; Description: "Start automatically with Windows"; GroupDescr
 Source: "..\publish\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#AppName}";       Filename: "{app}\{#AppExeName}"
+Name: "{group}\{#AppName}";           Filename: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
-Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startupicon
+Name: "{commondesktop}\{#AppName}";   Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{userstartup}\{#AppName}";     Filename: "{app}\{#AppExeName}"; Tasks: startupicon
 
 [Registry]
-; Store install path so future versions can find the previous install
-Root: HKCU; Subkey: "Software\{#AppPublisher}\{#AppName}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\HxM Blazor Software LLC\{#AppName}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
