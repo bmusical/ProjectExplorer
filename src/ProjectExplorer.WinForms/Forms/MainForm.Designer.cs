@@ -9,6 +9,7 @@ partial class MainForm
     private ToolStripButton btnBack;
     private ToolStripButton btnForward;
     private ToolStripButton btnUp;
+    private ToolStripButton btnOpenExplorer;
     private ToolStripTextBox txtAddress;
 
     // Main splitter
@@ -73,6 +74,7 @@ partial class MainForm
         this.btnBack = new ToolStripButton { Text = "←", ToolTipText = "Back", Enabled = false };
         this.btnForward = new ToolStripButton { Text = "→", ToolTipText = "Forward", Enabled = false };
         this.btnUp = new ToolStripButton { Text = "↑", ToolTipText = "Up" };
+        this.btnOpenExplorer = new ToolStripButton { Text = "📁", ToolTipText = "Open in Explorer", Enabled = false };
         this.txtAddress = new ToolStripTextBox
         {
             Name = "txtAddress",
@@ -82,7 +84,7 @@ partial class MainForm
 
         this.toolStripNav = new ToolStrip
         {
-            Items = { this.btnBack, this.btnForward, this.btnUp, this.txtAddress },
+            Items = { this.btnBack, this.btnForward, this.btnUp, this.btnOpenExplorer, this.txtAddress },
             Dock = DockStyle.Top,
             GripStyle = ToolStripGripStyle.Hidden,
             Padding = new Padding(4, 2, 4, 2)
@@ -91,6 +93,7 @@ partial class MainForm
         this.btnBack.Click += BtnBack_Click;
         this.btnForward.Click += BtnForward_Click;
         this.btnUp.Click += BtnUp_Click;
+        this.btnOpenExplorer.Click += BtnOpenExplorer_Click;
 
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };

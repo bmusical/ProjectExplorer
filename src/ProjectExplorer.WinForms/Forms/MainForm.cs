@@ -269,6 +269,7 @@ public partial class MainForm : Form
         listView.EndUpdate();
         UpdateAddressBar();
         UpdateStatusBar();
+        UpdateToolbarButtons();
     }
 
     private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
@@ -579,6 +580,14 @@ public partial class MainForm : Form
         }
     }
 
+    private void BtnOpenExplorer_Click(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_currentPath) && Directory.Exists(_currentPath))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_currentPath) { UseShellExecute = true });
+        }
+    }
+
     private void AddressBar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
@@ -603,13 +612,12 @@ public partial class MainForm : Form
         listView.EndUpdate();
         UpdateAddressBar();
         UpdateStatusBar();
+        UpdateToolbarButtons();
     }
 
     private void UpdateAddressBar()
     {
         txtAddress.Text = _currentPath;
-        btnBack.Enabled = _backStack.Count > 0;
-        btnForward.Enabled = _forwardStack.Count > 0;
     }
 
     private void UpdateStatusBar()
@@ -618,6 +626,16 @@ public partial class MainForm : Form
         lblStatus.Text = count == 1 ? "1 item" : $"{count} items";
         if (!string.IsNullOrEmpty(_currentPath))
             lblStatus.Text += $"  |  {_currentPath}";
+    }
+
+    private void UpdateToolbarButtons()
+    {
+        // Enable Explorer button when viewing a real folder path
+        btnOpenExplorer.Enabled = !string.IsNullOrEmpty(_currentPath) && Directory.Exists(_currentPath);
+
+        // Update navigation buttons
+        btnBack.Enabled = _backStack.Count > 0;
+        btnForward.Enabled = _forwardStack.Count > 0;
     }
 
     // ── List View Events ──
@@ -949,6 +967,18 @@ public partial class MainForm : Form
                 {
                     await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
                     InitializeTreeView();
+                }
+            });
+        }
+
+        if (tag.StartsWith(TagRealFolder))
+        {
+            var path = tag.Substring(TagRealFolder.Length);
+            menu.Items.Add("Open in Explorer", null, (s, e) =>
+            {
+                if (Directory.Exists(path))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
                 }
             });
         }
