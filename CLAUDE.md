@@ -60,3 +60,33 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 ### Adding a New Child Type
 
 The pattern established by `WebResource` (commit `257e642`) is: add model → add `ChildType` enum value → handle in `JsonProjectRepository` deserialization switch → add `ProjectManager` CRUD methods → wire up context menu and dialog in `MainForm` → add tests.
+
+## Planned Feature: Drag-and-Drop Node Moving
+
+The TreeView needs to support dragging any node (Collection, FolderReference, WebResource) and dropping it onto a different parent Collection or a Project root to reparent it.
+
+### Core service method needed
+
+`ProjectManager` needs a `MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId)` method:
+
+1. Locate the child via `project.FindParentList(childId)` — remove it from the source list.
+2. Resolve the destination list: `project.FindCollection(newParentCollectionId)?.Children` or `project.Children` for project root.
+3. Guard against circular references when moving a Collection into one of its own descendants — use `project.HasCircularReferences()` after tentatively inserting, then roll back if true.
+4. Set `child.ParentId = newParentCollectionId ?? project.Id` and append to destination list.
+5. Save via `_repository.SaveProjectAsync(project)`.
+
+### WinForms wiring (MainForm.cs)
+
+- Set `treeView.AllowDrop = true`.
+- Handle `ItemDrag` → call `treeView.DoDragDrop(e.Item, DragDropEffects.Move)`.
+- Handle `DragEnter` → set `e.Effect = DragDropEffects.Move` when the data is a `TreeNode`.
+- Handle `DragOver` → auto-scroll and highlight the node under the cursor via `treeView.GetNodeAt(...)`.
+- Handle `DragDrop` → extract the dragged node's tag (e.g. `"Collection:<guid>"`), parse the target node's tag for the new parent id, call `await MoveChildAsync(...)`, then rebuild the affected tree branches.
+- Reject drops that would move a Project node or drop onto a non-Collection target (FolderReference, WebResource).
+
+### Tests to add
+
+- Move a Collection into a sibling Collection.
+- Move a FolderReference to the project root.
+- Reject moving a Collection into its own descendant (circular reference guard).
+- Verify `ParentId` is updated correctly after move.

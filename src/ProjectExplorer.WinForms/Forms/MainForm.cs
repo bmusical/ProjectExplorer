@@ -19,6 +19,9 @@ public partial class MainForm : Form
     private Project? _currentProject;
     private string _currentPath = string.Empty;
 
+    // Drag-drop state
+    private TreeNode? _dragHighlightNode;
+
     /// <summary>
     /// Allows external code to set the ListView's item sorter.
     /// </summary>
@@ -145,6 +148,18 @@ public partial class MainForm : Form
 
         rootNode.Expand();
         treeView.EndUpdate();
+
+        treeView.AllowDrop = true;
+        treeView.ItemDrag -= TreeView_ItemDrag;
+        treeView.DragEnter -= TreeView_DragEnter;
+        treeView.DragOver -= TreeView_DragOver;
+        treeView.DragDrop -= TreeView_DragDrop;
+        treeView.DragLeave -= TreeView_DragLeave;
+        treeView.ItemDrag += TreeView_ItemDrag;
+        treeView.DragEnter += TreeView_DragEnter;
+        treeView.DragOver += TreeView_DragOver;
+        treeView.DragDrop += TreeView_DragDrop;
+        treeView.DragLeave += TreeView_DragLeave;
     }
 
     private void AddProjectNode(TreeNode parent, Project project)
@@ -987,6 +1002,141 @@ public partial class MainForm : Form
         {
             menu.Show(treeView, location);
         }
+    }
+
+    // ── Drag and Drop ──
+
+    private void TreeView_ItemDrag(object? sender, ItemDragEventArgs e)
+    {
+        if (e.Item is not TreeNode node) return;
+        var tag = node.Tag?.ToString() ?? "";
+        if (!tag.StartsWith(TagCollection) && !tag.StartsWith(TagFolderRef) && !tag.StartsWith(TagWebResource))
+            return;
+        treeView.DoDragDrop(node, DragDropEffects.Move);
+    }
+
+    private void TreeView_DragEnter(object? sender, DragEventArgs e)
+    {
+        e.Effect = e.Data?.GetDataPresent(typeof(TreeNode)) == true
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+    }
+
+    private void TreeView_DragOver(object? sender, DragEventArgs e)
+    {
+        if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode)
+        {
+            e.Effect = DragDropEffects.None;
+            return;
+        }
+
+        var pt = treeView.PointToClient(new Point(e.X, e.Y));
+        var targetNode = treeView.GetNodeAt(pt);
+
+        if (targetNode == null || !IsValidDropTarget(draggedNode, targetNode))
+        {
+            e.Effect = DragDropEffects.None;
+            ClearDragHighlight();
+            return;
+        }
+
+        e.Effect = DragDropEffects.Move;
+
+        if (!ReferenceEquals(targetNode, _dragHighlightNode))
+        {
+            ClearDragHighlight();
+            _dragHighlightNode = targetNode;
+            targetNode.BackColor = SystemColors.Highlight;
+            targetNode.ForeColor = SystemColors.HighlightText;
+        }
+    }
+
+    private void TreeView_DragLeave(object? sender, EventArgs e) => ClearDragHighlight();
+
+    private async void TreeView_DragDrop(object? sender, DragEventArgs e)
+    {
+        ClearDragHighlight();
+
+        if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode) return;
+
+        var pt = treeView.PointToClient(new Point(e.X, e.Y));
+        var targetNode = treeView.GetNodeAt(pt);
+        if (targetNode == null || !IsValidDropTarget(draggedNode, targetNode)) return;
+
+        var dragTag = draggedNode.Tag?.ToString() ?? "";
+        var targetTag = targetNode.Tag?.ToString() ?? "";
+
+        var projectId = GetProjectIdFromTag(dragTag);
+        var childId = GetChildIdFromTag(dragTag);
+        var newParentId = GetCollectionIdFromTag(targetTag);
+
+        try
+        {
+            await _projectManager.MoveChildAsync(projectId, childId, newParentId);
+            InitializeTreeView();
+            SelectTreeNodeByTag(dragTag);
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(ex.Message, "Cannot Move", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ClearDragHighlight()
+    {
+        if (_dragHighlightNode != null)
+        {
+            _dragHighlightNode.BackColor = Color.Empty;
+            _dragHighlightNode.ForeColor = Color.Empty;
+            _dragHighlightNode = null;
+        }
+    }
+
+    private bool IsValidDropTarget(TreeNode draggedNode, TreeNode targetNode)
+    {
+        if (ReferenceEquals(draggedNode, targetNode)) return false;
+
+        var dragTag = draggedNode.Tag?.ToString() ?? "";
+        var targetTag = targetNode.Tag?.ToString() ?? "";
+
+        if (!targetTag.StartsWith(TagCollection) && !targetTag.StartsWith(TagProject)) return false;
+        if (!dragTag.StartsWith(TagCollection) && !dragTag.StartsWith(TagFolderRef) && !dragTag.StartsWith(TagWebResource)) return false;
+
+        if (GetProjectIdFromTag(dragTag) != GetProjectIdFromTag(targetTag)) return false;
+
+        // Prevent dropping onto a descendant of the dragged node
+        var ancestor = targetNode.Parent;
+        while (ancestor != null)
+        {
+            if (ReferenceEquals(ancestor, draggedNode)) return false;
+            ancestor = ancestor.Parent;
+        }
+
+        return true;
+    }
+
+    private static Guid GetProjectIdFromTag(string tag)
+    {
+        if (tag.StartsWith(TagProject)) return Guid.Parse(tag[TagProject.Length..]);
+        if (tag.StartsWith(TagCollection)) return Guid.Parse(tag[TagCollection.Length..].Split(':')[0]);
+        if (tag.StartsWith(TagFolderRef)) return Guid.Parse(tag[TagFolderRef.Length..].Split(':')[0]);
+        if (tag.StartsWith(TagWebResource)) return Guid.Parse(tag[TagWebResource.Length..].Split(':')[0]);
+        return Guid.Empty;
+    }
+
+    private static Guid GetChildIdFromTag(string tag)
+    {
+        if (tag.StartsWith(TagCollection)) return Guid.Parse(tag[TagCollection.Length..].Split(':')[1]);
+        if (tag.StartsWith(TagFolderRef)) return Guid.Parse(tag[TagFolderRef.Length..].Split(':')[1]);
+        if (tag.StartsWith(TagWebResource)) return Guid.Parse(tag[TagWebResource.Length..].Split(':')[1]);
+        return Guid.Empty;
+    }
+
+    private static Guid? GetCollectionIdFromTag(string tag)
+    {
+        if (tag.StartsWith(TagCollection))
+            return Guid.Parse(tag[TagCollection.Length..].Split(':')[1]);
+        return null;
     }
 
     // ── Helpers ──

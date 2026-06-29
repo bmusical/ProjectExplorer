@@ -237,6 +237,47 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    // ── Move (reparent) ──
+
+    public async Task MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+
+        var sourceList = project.FindParentList(childId)
+            ?? throw new InvalidOperationException($"Child {childId} not found in project.");
+        var child = sourceList.First(c => c.Id == childId);
+
+        var destList = newParentCollectionId.HasValue
+            ? project.FindCollection(newParentCollectionId.Value)?.Children
+                ?? throw new InvalidOperationException($"Destination collection {newParentCollectionId} not found.")
+            : project.Children;
+
+        if (ReferenceEquals(sourceList, destList)) return;
+
+        var originalParentId = child.ParentId;
+        var originalSortOrder = child.SortOrder;
+
+        sourceList.Remove(child);
+        child.ParentId = newParentCollectionId ?? project.Id;
+        child.SortOrder = destList.Count;
+        destList.Add(child);
+
+        if (project.HasCircularReferences())
+        {
+            destList.Remove(child);
+            child.ParentId = originalParentId;
+            child.SortOrder = originalSortOrder;
+            sourceList.Add(child);
+            var restored = sourceList.OrderBy(c => c.SortOrder).ToList();
+            sourceList.Clear();
+            sourceList.AddRange(restored);
+            throw new InvalidOperationException("Cannot move a collection into one of its own descendants.");
+        }
+
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     // ── Helpers ──
 
     private static int GetNextSortOrder(Project project, Guid? parentCollectionId)
