@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
@@ -144,6 +145,23 @@ public partial class MainForm : Form
 
         if (result == DialogResult.OK) OpenRegistrationDialog();
         return false;
+    }
+
+    private const string UpdateCheckUrl =
+        "https://raw.githubusercontent.com/bmusical/ProjectExplorer/main/updates/updates.xml";
+
+    /// <param name="silent">
+    /// true = only show dialog when an update is available (startup background check).
+    /// false = always show result, including "you're up to date" (menu-triggered check).
+    /// </param>
+    public void CheckForUpdates(bool silent)
+    {
+        AutoUpdater.AppTitle = "Project Nest";
+        AutoUpdater.RunUpdateAsAdmin = false;
+        AutoUpdater.ShowSkipButton = true;
+        AutoUpdater.ShowRemindLaterButton = true;
+        AutoUpdater.ReportErrors = !silent;   // shows "up to date" dialog when user asks manually
+        AutoUpdater.Start(UpdateCheckUrl);
     }
 
     private void OpenRegistrationDialog()

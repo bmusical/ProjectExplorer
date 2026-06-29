@@ -1,4 +1,3 @@
-using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Interfaces;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
@@ -10,10 +9,6 @@ namespace ProjectExplorer.WinForms;
 
 internal static class Program
 {
-    // Hosted on GitHub Releases — update this URL when you move to a custom domain
-    private const string UpdateCheckUrl =
-        "https://raw.githubusercontent.com/bmusical/ProjectExplorer/main/updates/updates.xml";
-
     [STAThread]
     static void Main()
     {
@@ -52,11 +47,7 @@ internal static class Program
             {
                 timer.Stop();
                 timer.Dispose();
-                AutoUpdater.AppTitle = "Project Nest";
-                AutoUpdater.RunUpdateAsAdmin = false;  // PrivilegesRequired=lowest install
-                AutoUpdater.ShowSkipButton = true;
-                AutoUpdater.ShowRemindLaterButton = true;
-                AutoUpdater.Start(UpdateCheckUrl);
+                mainForm.CheckForUpdates(silent: true);
             };
             timer.Start();
         };
