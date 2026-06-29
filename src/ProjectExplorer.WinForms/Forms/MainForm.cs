@@ -418,6 +418,7 @@ public partial class MainForm : Form
 
     private void PopulateProjectList()
     {
+        listView.Columns[3].Text = "Date Modified";
         foreach (var project in _projectManager.Projects)
         {
             var item = new ListViewItem(project.Name, "Project")
@@ -434,6 +435,7 @@ public partial class MainForm : Form
     private void PopulateProjectContents()
     {
         if (_currentProject == null) return;
+        listView.Columns[3].Text = "URL";
 
         foreach (var child in _currentProject.Children.OrderBy(c => c.SortOrder))
         {
@@ -479,6 +481,7 @@ public partial class MainForm : Form
     private void PopulateCollectionContents(Guid collectionId)
     {
         if (_currentProject == null) return;
+        listView.Columns[3].Text = "URL";
         var collection = _currentProject.FindCollection(collectionId);
         if (collection == null) return;
 
@@ -526,6 +529,7 @@ public partial class MainForm : Form
     private void PopulateFileList(string path)
     {
         if (!Directory.Exists(path)) return;
+        listView.Columns[3].Text = "Date Modified";
 
         try
         {
