@@ -28,14 +28,14 @@ if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish failed"; exit 1 }
 
 $iscc = Get-Command iscc -ErrorAction SilentlyContinue
 if (-not $iscc) {
-    $iscc = "C:\Program Files (x86)\Inno Setup 7\iscc.exe"
+    $iscc = "C:\Program Files (x86)\Inno Setup 6\iscc.exe"
     if (-not (Test-Path $iscc)) {
-        Write-Error "iscc.exe not found. Install Inno Setup 7 from https://jrsoftware.org/isinfo.php"
+        Write-Error "iscc.exe not found. Install Inno Setup 6 from https://jrsoftware.org/isinfo.php"
         exit 1
     }
 }
 
-Write-Host "==> Running Inno Setup 7 compiler..." -ForegroundColor Cyan
+Write-Host "==> Running Inno Setup 6 compiler..." -ForegroundColor Cyan
 
 $issFile  = "$PSScriptRoot\ProjectExplorer.iss"
 $setupExe = "$PSScriptRoot\installer-output\ProjectNest-$Version-Setup.exe"
