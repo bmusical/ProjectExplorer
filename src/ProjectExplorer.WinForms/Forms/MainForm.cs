@@ -333,6 +333,54 @@ public partial class MainForm : Form
         }
     }
 
+    private void TreeView_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.F2 && treeView.SelectedNode != null)
+        {
+            var tag = treeView.SelectedNode.Tag?.ToString() ?? "";
+            if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection))
+            {
+                treeView.SelectedNode.BeginEdit();
+                e.Handled = true;
+            }
+        }
+    }
+
+    private void TreeView_AfterLabelEdit(object? sender, NodeLabelEditEventArgs e)
+    {
+        // Always cancel the built-in label update; we manage node text manually after the async save.
+        e.CancelEdit = true;
+        if (e.Label == null || e.Node == null) return; // Escape pressed — no change
+        var newName = e.Label.Trim();
+        if (string.IsNullOrEmpty(newName)) return;
+        _ = PerformRenameAsync(e.Node, e.Node.Tag?.ToString() ?? "", newName);
+    }
+
+    private async Task PerformRenameAsync(TreeNode node, string tag, string newName)
+    {
+        try
+        {
+            if (tag.StartsWith(TagProject))
+            {
+                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+                await _projectManager.RenameProjectAsync(projectId, newName);
+                node.Text = newName;
+            }
+            else if (tag.StartsWith(TagCollection))
+            {
+                var parts = tag.Substring(TagCollection.Length).Split(':');
+                var projectId = Guid.Parse(parts[0]);
+                var collectionId = Guid.Parse(parts[1]);
+                await _projectManager.RenameCollectionAsync(projectId, collectionId, newName);
+                node.Text = newName;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Rename failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     // ── List View Population ──
 
     private void PopulateProjectList()
@@ -753,6 +801,8 @@ public partial class MainForm : Form
                 await ShowAddWebResourceDialog(projectId, null);
             });
             menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
+            menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Delete Project", null, async (s, e) =>
             {
                 var projectId = Guid.Parse(tag.Substring(TagProject.Length));
@@ -801,6 +851,8 @@ public partial class MainForm : Form
             {
                 await ShowAddWebResourceDialog(projectId, collectionId);
             });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Delete Collection", null, async (s, e) =>
             {
