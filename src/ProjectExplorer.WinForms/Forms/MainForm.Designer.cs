@@ -140,12 +140,15 @@ partial class MainForm
             ShowPlusMinus = true,
             ShowLines = true,
             ShowNodeToolTips = true,
+            LabelEdit = true,
             ImageList = imageListSmall,
             StateImageList = imageListSmall
         };
         this.treeView.AfterSelect += TreeView_AfterSelect;
         this.treeView.BeforeExpand += TreeView_BeforeExpand;
         this.treeView.NodeMouseClick += TreeView_NodeMouseClick;
+        this.treeView.KeyDown += TreeView_KeyDown;
+        this.treeView.AfterLabelEdit += TreeView_AfterLabelEdit;
 
         // ── List View ──
         this.listView = new ListView
