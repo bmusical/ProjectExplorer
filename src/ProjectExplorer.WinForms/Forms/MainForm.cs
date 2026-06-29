@@ -443,7 +443,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagCollection + $"{_currentProject.Id}:{coll.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
                 listView.Items.Add(item);
@@ -454,7 +454,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagFolderRef + $"{_currentProject.Id}:{fr.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
                 listView.Items.Add(item);
@@ -487,7 +487,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagCollection + $"{_currentProject.Id}:{coll.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
                 listView.Items.Add(item);
@@ -498,7 +498,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagFolderRef + $"{_currentProject.Id}:{fr.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
                 listView.Items.Add(item);
