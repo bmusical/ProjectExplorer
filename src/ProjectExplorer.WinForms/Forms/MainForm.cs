@@ -123,7 +123,7 @@ public partial class MainForm : Form
 
         var result = MessageBox.Show(
             $"You've reached the free limit of {_license.LeafNodeLimit} folder/web references.\n\n" +
-            $"Register Project Nest to add unlimited references.",
+            $"Register Project Nest Explorer to add unlimited references.",
             $"Free Limit Reached — {actionDescription}",
             MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
 
@@ -139,7 +139,7 @@ public partial class MainForm : Form
 
         var result = MessageBox.Show(
             $"You've reached the free limit of {_license.ProjectLimit} projects.\n\n" +
-            $"Register Project Nest to create unlimited projects.",
+            $"Register Project Nest Explorer to create unlimited projects.",
             "Free Limit Reached — New Project",
             MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
 
@@ -156,7 +156,7 @@ public partial class MainForm : Form
     /// </param>
     public void CheckForUpdates(bool silent)
     {
-        AutoUpdater.AppTitle = "Project Nest";
+        AutoUpdater.AppTitle = "Project Nest Explorer";
         AutoUpdater.RunUpdateAsAdmin = false;
         AutoUpdater.ShowSkipButton = true;
         AutoUpdater.ShowRemindLaterButton = true;

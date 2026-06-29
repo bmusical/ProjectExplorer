@@ -124,7 +124,7 @@ partial class MainForm
 
         this.menuHelpRegister       = new ToolStripMenuItem { Text = "&Register / License..." };
         this.menuHelpCheckForUpdates = new ToolStripMenuItem { Text = "Check for &Updates..." };
-        this.menuHelpAbout           = new ToolStripMenuItem { Text = "&About Project Nest..." };
+        this.menuHelpAbout           = new ToolStripMenuItem { Text = "&About Project Nest Explorer..." };
         this.menuHelp = new ToolStripMenuItem { Text = "&Help" };
         this.menuHelp.DropDownItems.AddRange(new ToolStripItem[]
         {
@@ -222,7 +222,7 @@ partial class MainForm
         });
         this.MainMenuStrip = this.menuStrip;
 
-        this.Text = "Project Nest";
+        this.Text = "Project Nest Explorer";
         this.Size = new Size(1200, 750);
         this.MinimumSize = new Size(800, 500);
         this.StartPosition = FormStartPosition.CenterScreen;

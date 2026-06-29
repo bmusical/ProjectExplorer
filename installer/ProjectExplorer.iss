@@ -1,10 +1,10 @@
-; Inno Setup 6 script for Project Nest
+; Inno Setup 6 script for Project Nest Explorer
 ; Build the app first:
 ;   dotnet publish src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj
 ;     /p:PublishProfile=win-x64-release
 ; Output lands in publish\ at the repo root, then run this script.
 
-#define AppName      "Project Nest"
+#define AppName      "Project Nest Explorer"
 #define AppVersion   "1.0.0"
 #define AppPublisher "HxM Blazor Software LLC"
 #define AppExeName   "ProjectNest.exe"
