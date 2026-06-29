@@ -86,7 +86,7 @@ public sealed class LicenseManager
         var (valid, email, date) = VerifyKey(key);
 
         if (!valid)
-            return GetCurrentLicense(projects) with { State = LicenseState.Invalid };
+            return new LicenseInfo { State = LicenseState.Invalid };
 
         Directory.CreateDirectory(_storageDir);
         File.WriteAllText(_licenseFile,

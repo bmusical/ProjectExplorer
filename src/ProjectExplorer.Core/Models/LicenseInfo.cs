@@ -8,7 +8,7 @@ public enum LicenseState
     Invalid     // key present but signature failed
 }
 
-public sealed class LicenseInfo
+public sealed record LicenseInfo
 {
     public LicenseState State { get; init; }
     public string? Email { get; init; }
