@@ -67,6 +67,47 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 
 The pattern established by `WebResource` (commit `257e642`) is: add model → add `ChildType` enum value → handle in `JsonProjectRepository` deserialization switch → add `ProjectManager` CRUD methods → wire up context menu and dialog in `MainForm` → add tests.
 
+## Distribution / Installer
+
+The app targets Windows desktop users. Distribution plan:
+
+- **Packaging**: Publish as a self-contained single-file executable via `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`. Output goes to `publish/`.
+- **Installer**: Use [Inno Setup](https://jrsoftware.org/isinfo.php) (free, well-established) to wrap the published exe into a standard Windows installer (`ProjectExplorerSetup.exe`). The Inno Setup script lives at `installer/ProjectExplorer.iss`.
+- **No store dependency**: Ship as a direct download — no Microsoft Store submission required for initial release.
+- **Auto-update**: Not planned for v1; revisit after initial user feedback.
+
+## Target Users
+
+Understanding who uses this shapes which features matter most:
+
+| Persona | Pain point ProjectExplorer solves |
+|---|---|
+| **Software developers** | Many projects, each with source dirs, build output, docs, deployment folders, and reference URLs scattered across drives |
+| **Graphic / photo / video artists** | Large asset libraries across multiple drives; project folders, reference image folders, client delivery folders all need fast access |
+| **CAD / 3D / game artists** | Deep folder hierarchies for assets, textures, exports; switching between multiple client projects daily |
+| **Freelancers (any discipline)** | Per-client project trees that mix local folders and web resources (briefs, portals, shared drives) |
+| **Power users / IT professionals** | Admin toolkits, server paths, runbook URLs — one organized panel instead of bookmarks + Explorer windows |
+
+Common thread: **people who context-switch between multiple projects** and hate re-navigating the same folder trees every session.
+
+## Planned Feature: Open Command Prompt Here
+
+Right-click on any **FolderReference** (or a Collection that contains folder references) and choose **"Open CMD here"** / **"Open PowerShell here"** to launch a terminal pre-`cd`'d to that folder.
+
+### Implementation notes
+
+- Context menu item added in `MainForm.cs` for `FolderReference` nodes (both TreeView right-click and ListView right-click).
+- Launch via `Process.Start(new ProcessStartInfo { FileName = "cmd.exe", WorkingDirectory = folderRef.Path, UseShellExecute = true })`.
+- For PowerShell: swap `FileName` for `"powershell.exe"` (or `"pwsh.exe"` if installed).
+- Guard with `Directory.Exists(folderRef.Path)` before launching; show a friendly error if the path no longer exists.
+- Consider a settings option for preferred shell (CMD vs PowerShell) — store in `%APPDATA%\ProjectExplorer\settings.json`.
+- No new model changes needed; purely a UI/shell layer addition.
+
+### Tests to add
+
+- Unit test that `ProjectManager` is not involved (shell launch is fire-and-forget in the UI layer — no service test needed).
+- Manual test: verify working directory is correct, verify graceful error when path is missing.
+
 ## Planned Feature: Drag-and-Drop Node Moving
 
 The TreeView needs to support dragging any node (Collection, FolderReference, WebResource) and dropping it onto a different parent Collection or a Project root to reparent it.
@@ -96,3 +137,37 @@ The TreeView needs to support dragging any node (Collection, FolderReference, We
 - Move a FolderReference to the project root.
 - Reject moving a Collection into its own descendant (circular reference guard).
 - Verify `ParentId` is updated correctly after move.
+
+## Roadmap
+
+Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and unambiguously useful; **Far** items need more user signal before committing to them.
+
+### Near-term
+
+| Feature | Notes |
+|---|---|
+| **Open CMD / PowerShell here** | Right-click on FolderReference → launch terminal in that folder. See planned feature section above. |
+| **Drag-and-drop node moving** | Reparent any child by dragging within the TreeView. See planned feature section above. |
+| **Reveal in Explorer** | Right-click FolderReference → `Process.Start("explorer.exe", path)`. Two-liner, high value. |
+| **Copy path to clipboard** | Right-click FolderReference or WebResource → copy path/URL. Trivial to add. |
+| **Import from clipboard / text** | Paste a folder path or URL and have ProjectExplorer auto-create the right child type. |
+| **Keyboard navigation** | Arrow keys in TreeView already work; add Enter to open, F2 to rename, Del to delete. |
+
+### Medium-term
+
+| Feature | Notes |
+|---|---|
+| **Search / filter** | Filter the TreeView or ListView by name across all projects. Critical once collections grow large. |
+| **Recently opened** | Track last-accessed folders/URLs per project session; surface in a "Recent" panel. |
+| **Folder watcher** | Flag FolderReferences whose paths no longer exist (drive unmounted, folder renamed). |
+| **Export / share a project** | Export a project definition as a `.peproj` JSON file to hand off to a colleague. |
+| **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously. |
+
+### Far-term (needs user validation first)
+
+| Feature | Notes |
+|---|---|
+| **File preview pane** | Show thumbnails or text preview for the selected folder's contents inline. High complexity, benefit depends on persona. |
+| **Cloud sync** | Sync `projects.json` via OneDrive / Dropbox path. Simple if users manage it themselves; complex if we build sync. |
+| **Plugin / extension model** | Allow third-party child types (e.g. "Git repo" with branch info). Premature until core is stable. |
+| **macOS / Linux port** | Requires replacing WinForms + Shell P/Invoke. Revisit if demand emerges from non-Windows users. |
