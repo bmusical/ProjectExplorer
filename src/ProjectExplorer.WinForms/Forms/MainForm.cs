@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
@@ -21,6 +22,17 @@ public partial class MainForm : Form
 
     // Drag-drop state
     private TreeNode? _dragHighlightNode;
+
+    // Tree UI state persistence
+    private static readonly string _uiSettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ProjectExplorer", "uisettings.json");
+
+    private sealed class TreeUiSettings
+    {
+        public List<string> ExpandedTags { get; set; } = new();
+        public string? SelectedTag { get; set; }
+    }
 
     /// <summary>
     /// Allows external code to set the ListView's item sorter.
@@ -53,7 +65,12 @@ public partial class MainForm : Form
         }
 
         LoadDefaultIcons();
+        var persistedState = LoadTreeState();
         InitializeTreeView();
+        treeView.BeginUpdate();
+        RestoreTreeState(treeView.Nodes, new HashSet<string>(persistedState.ExpandedTags), persistedState.SelectedTag);
+        treeView.EndUpdate();
+        treeView.SelectedNode?.EnsureVisible();
     }
 
     protected override void OnLoad(EventArgs e)
@@ -749,7 +766,7 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(name))
             {
                 await _projectManager.CreateProjectAsync(name);
-                InitializeTreeView(); // Refresh tree
+                RefreshTreeView();
             }
         }
     }
@@ -769,7 +786,7 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(name))
             {
                 await _projectManager.CreateCollectionAsync(_currentProject.Id, name);
-                InitializeTreeView();
+                RefreshTreeView();
             }
         }
     }
@@ -791,7 +808,7 @@ public partial class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             await _projectManager.AddFolderReferenceAsync(_currentProject.Id, dialog.SelectedPath);
-            InitializeTreeView();
+            RefreshTreeView();
         }
     }
 
@@ -807,7 +824,7 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(url))
             {
                 await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId);
-                InitializeTreeView();
+                RefreshTreeView();
             }
         }
     }
@@ -847,7 +864,7 @@ public partial class MainForm : Form
                 {
                     await _projectManager.DeleteProjectAsync(projectId);
                     _currentProject = null;
-                    InitializeTreeView();
+                    RefreshTreeView();
                 }
             });
         }
@@ -867,7 +884,7 @@ public partial class MainForm : Form
                     if (!string.IsNullOrEmpty(name))
                     {
                         await _projectManager.CreateCollectionAsync(projectId, name, collectionId);
-                        InitializeTreeView();
+                        RefreshTreeView();
                     }
                 }
             });
@@ -877,7 +894,7 @@ public partial class MainForm : Form
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, collectionId);
-                    InitializeTreeView();
+                    RefreshTreeView();
                 }
             });
             menu.Items.Add("Add Web Resource...", null, async (s, e) =>
@@ -894,7 +911,7 @@ public partial class MainForm : Form
                 if (result == DialogResult.Yes)
                 {
                     await _projectManager.DeleteCollectionAsync(projectId, collectionId);
-                    InitializeTreeView();
+                    RefreshTreeView();
                 }
             });
         }
@@ -920,7 +937,7 @@ public partial class MainForm : Form
                             folderRefId,
                             newDescription: string.IsNullOrEmpty(description) ? null : description
                         );
-                        InitializeTreeView();
+                        RefreshTreeView();
                     }
                 }
             });
@@ -932,7 +949,7 @@ public partial class MainForm : Form
                 if (result == DialogResult.Yes)
                 {
                     await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                    InitializeTreeView();
+                    RefreshTreeView();
                 }
             });
             menu.Items.Add("Open in Explorer", null, (s, e) =>
@@ -968,7 +985,7 @@ public partial class MainForm : Form
                             dlg.ResourceUrl.Trim(),
                             string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
                         );
-                        InitializeTreeView();
+                        RefreshTreeView();
                     }
                 }
             });
@@ -981,7 +998,7 @@ public partial class MainForm : Form
                 if (result == DialogResult.Yes)
                 {
                     await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                    InitializeTreeView();
+                    RefreshTreeView();
                 }
             });
         }
@@ -1002,6 +1019,85 @@ public partial class MainForm : Form
         {
             menu.Show(treeView, location);
         }
+    }
+
+    // ── Tree State Preservation ──
+
+    private void RefreshTreeView()
+    {
+        var expandedTags = CaptureExpandedTags();
+        var selectedTag = treeView.SelectedNode?.Tag?.ToString();
+        InitializeTreeView();
+        treeView.BeginUpdate();
+        RestoreTreeState(treeView.Nodes, expandedTags, selectedTag);
+        treeView.EndUpdate();
+        treeView.SelectedNode?.EnsureVisible();
+    }
+
+    private HashSet<string> CaptureExpandedTags()
+    {
+        var tags = new HashSet<string>();
+        CollectExpandedTags(treeView.Nodes, tags);
+        return tags;
+    }
+
+    private static void CollectExpandedTags(TreeNodeCollection nodes, HashSet<string> tags)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (node.IsExpanded && node.Tag is string tag)
+                tags.Add(tag);
+            CollectExpandedTags(node.Nodes, tags);
+        }
+    }
+
+    private void RestoreTreeState(TreeNodeCollection nodes, HashSet<string> expandedTags, string? selectedTag)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            var tag = node.Tag?.ToString();
+            if (tag != null && expandedTags.Contains(tag))
+                node.Expand();
+            if (tag != null && tag == selectedTag)
+                treeView.SelectedNode = node;
+            if (node.Nodes.Count > 0)
+                RestoreTreeState(node.Nodes, expandedTags, selectedTag);
+        }
+    }
+
+    private void SaveTreeState()
+    {
+        try
+        {
+            var settings = new TreeUiSettings
+            {
+                ExpandedTags = CaptureExpandedTags().ToList(),
+                SelectedTag = treeView.SelectedNode?.Tag?.ToString()
+            };
+            Directory.CreateDirectory(Path.GetDirectoryName(_uiSettingsPath)!);
+            File.WriteAllText(_uiSettingsPath, JsonSerializer.Serialize(settings));
+        }
+        catch { /* non-critical */ }
+    }
+
+    private TreeUiSettings LoadTreeState()
+    {
+        try
+        {
+            if (File.Exists(_uiSettingsPath))
+            {
+                var json = File.ReadAllText(_uiSettingsPath);
+                return JsonSerializer.Deserialize<TreeUiSettings>(json) ?? new TreeUiSettings();
+            }
+        }
+        catch { /* non-critical */ }
+        return new TreeUiSettings();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        SaveTreeState();
+        base.OnFormClosing(e);
     }
 
     // ── Drag and Drop ──
@@ -1073,7 +1169,7 @@ public partial class MainForm : Form
         try
         {
             await _projectManager.MoveChildAsync(projectId, childId, newParentId);
-            InitializeTreeView();
+            RefreshTreeView();
             SelectTreeNodeByTag(dragTag);
         }
         catch (InvalidOperationException ex)
