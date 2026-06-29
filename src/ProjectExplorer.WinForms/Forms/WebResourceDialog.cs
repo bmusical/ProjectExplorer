@@ -25,7 +25,7 @@ public class WebResourceDialog : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 280);
+        this.Size = new Size(480, title == "Edit Web Resource" ? 290 : 280);
 
         lblName = new Label
         {

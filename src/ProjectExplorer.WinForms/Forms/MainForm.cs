@@ -465,7 +465,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(wr.Description ?? "");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
                 listView.Items.Add(item);
@@ -509,7 +509,7 @@ public partial class MainForm : Form
                 {
                     Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
                 };
-                item.SubItems.Add("");
+                item.SubItems.Add(wr.Description ?? "");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
                 listView.Items.Add(item);
