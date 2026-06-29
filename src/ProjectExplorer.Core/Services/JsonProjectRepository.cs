@@ -112,6 +112,8 @@ public class JsonProjectRepository : IProjectRepository
                 arr.Add(SerializeCollection(coll));
             else if (child is FolderReference fr)
                 arr.Add(SerializeFolderReference(fr));
+            else if (child is WebResource wr)
+                arr.Add(SerializeWebResource(wr));
         }
         return arr;
     }
@@ -151,13 +153,38 @@ public class JsonProjectRepository : IProjectRepository
             ["parentId"] = fr.ParentId.ToString(),
             ["sortOrder"] = fr.SortOrder,
             ["realPath"] = fr.RealPath,
-            ["displayName"] = fr.DisplayName
+            ["displayName"] = fr.DisplayName,
+            ["description"] = fr.Description
         };
 
         if (fr.Metadata.Count > 0)
         {
             var meta = new JsonObject();
             foreach (var kvp in fr.Metadata)
+                meta[kvp.Key] = kvp.Value;
+            obj["metadata"] = meta;
+        }
+
+        return obj;
+    }
+
+    private static JsonObject SerializeWebResource(WebResource wr)
+    {
+        var obj = new JsonObject
+        {
+            ["childType"] = "webResource",
+            ["id"] = wr.Id.ToString(),
+            ["parentId"] = wr.ParentId.ToString(),
+            ["sortOrder"] = wr.SortOrder,
+            ["url"] = wr.Url,
+            ["displayName"] = wr.DisplayName,
+            ["description"] = wr.Description
+        };
+
+        if (wr.Metadata.Count > 0)
+        {
+            var meta = new JsonObject();
+            foreach (var kvp in wr.Metadata)
                 meta[kvp.Key] = kvp.Value;
             obj["metadata"] = meta;
         }
@@ -205,6 +232,7 @@ public class JsonProjectRepository : IProjectRepository
         {
             "collection" => ParseCollection(node),
             "folderReference" => ParseFolderReference(node),
+            "webResource" => ParseWebResource(node),
             _ => null
         };
     }
@@ -251,7 +279,8 @@ public class JsonProjectRepository : IProjectRepository
             ParentId = Guid.TryParse(node["parentId"]?.GetValue<string>(), out var pid) ? pid : Guid.Empty,
             SortOrder = node["sortOrder"]?.GetValue<int>() ?? 0,
             RealPath = node["realPath"]?.GetValue<string>() ?? "",
-            DisplayName = node["displayName"]?.GetValue<string>()
+            DisplayName = node["displayName"]?.GetValue<string>(),
+            Description = node["description"]?.GetValue<string>()
         };
 
         var metaObj = node["metadata"]?.AsObject();
@@ -262,5 +291,27 @@ public class JsonProjectRepository : IProjectRepository
         }
 
         return fr;
+    }
+
+    private static WebResource ParseWebResource(JsonNode node)
+    {
+        var wr = new WebResource
+        {
+            Id = Guid.TryParse(node["id"]?.GetValue<string>(), out var id) ? id : Guid.NewGuid(),
+            ParentId = Guid.TryParse(node["parentId"]?.GetValue<string>(), out var pid) ? pid : Guid.Empty,
+            SortOrder = node["sortOrder"]?.GetValue<int>() ?? 0,
+            Url = node["url"]?.GetValue<string>() ?? "",
+            DisplayName = node["displayName"]?.GetValue<string>(),
+            Description = node["description"]?.GetValue<string>()
+        };
+
+        var metaObj = node["metadata"]?.AsObject();
+        if (metaObj != null)
+        {
+            foreach (var kvp in metaObj)
+                wr.Metadata[kvp.Key] = kvp.Value?.GetValue<string>() ?? "";
+        }
+
+        return wr;
     }
 }

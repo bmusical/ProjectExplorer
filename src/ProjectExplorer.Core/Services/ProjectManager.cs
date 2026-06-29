@@ -143,7 +143,7 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
-    public async Task UpdateFolderReferenceAsync(Guid projectId, Guid folderRefId, string? newDisplayName = null, string? newPath = null)
+    public async Task UpdateFolderReferenceAsync(Guid projectId, Guid folderRefId, string? newDisplayName = null, string? newPath = null, string? newDescription = null)
     {
         var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
         var parentList = project.FindParentList(folderRefId) ?? throw new InvalidOperationException($"Cannot find parent list for folder reference {folderRefId}.");
@@ -152,6 +152,58 @@ public class ProjectManager
 
         if (newDisplayName != null) folderRef.DisplayName = newDisplayName;
         if (newPath != null) folderRef.RealPath = newPath;
+        if (newDescription != null) folderRef.Description = newDescription;
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
+    // ── WebResource CRUD ──
+
+    public async Task<WebResource> AddWebResourceAsync(Guid projectId, string url, string? displayName = null, string? description = null, Guid? parentCollectionId = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+
+        var webResource = new WebResource
+        {
+            Url = url,
+            DisplayName = displayName,
+            Description = description,
+            ParentId = parentCollectionId ?? project.Id,
+            SortOrder = GetNextSortOrder(project, parentCollectionId)
+        };
+
+        var parentList = parentCollectionId.HasValue
+            ? project.FindCollection(parentCollectionId.Value)?.Children
+            : project.Children;
+
+        if (parentList == null)
+            throw new InvalidOperationException($"Parent collection {parentCollectionId} not found.");
+
+        parentList.Add(webResource);
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+        return webResource;
+    }
+
+    public async Task RemoveWebResourceAsync(Guid projectId, Guid webResourceId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var parentList = project.FindParentList(webResourceId) ?? throw new InvalidOperationException($"Cannot find parent list for web resource {webResourceId}.");
+        parentList.RemoveAll(c => c.Id == webResourceId);
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
+    public async Task UpdateWebResourceAsync(Guid projectId, Guid webResourceId, string? newDisplayName = null, string? newUrl = null, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var parentList = project.FindParentList(webResourceId) ?? throw new InvalidOperationException($"Cannot find parent list for web resource {webResourceId}.");
+        var webResource = parentList.FirstOrDefault(c => c.Id == webResourceId) as WebResource
+            ?? throw new InvalidOperationException($"Web resource {webResourceId} not found.");
+
+        if (newDisplayName != null) webResource.DisplayName = newDisplayName;
+        if (newUrl != null) webResource.Url = newUrl;
+        if (newDescription != null) webResource.Description = newDescription;
         project.Modified = DateTime.UtcNow;
         await _repository.SaveProjectAsync(project);
     }

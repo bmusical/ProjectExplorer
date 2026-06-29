@@ -6,5 +6,6 @@ namespace ProjectExplorer.Core.Models;
 public enum ChildType
 {
     Collection,
-    FolderReference
+    FolderReference,
+    WebResource
 }

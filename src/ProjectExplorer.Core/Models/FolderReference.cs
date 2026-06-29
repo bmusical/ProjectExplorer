@@ -15,6 +15,11 @@ public class FolderReference : ProjectChild
     public string RealPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional description explaining the purpose or contents of this folder.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
     /// Returns the effective display name: DisplayName override if set,
     /// otherwise the folder name extracted from RealPath.
     /// Handles both Windows and POSIX path separators for cross-platform compatibility.

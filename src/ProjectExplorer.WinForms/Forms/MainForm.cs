@@ -33,6 +33,7 @@ public partial class MainForm : Form
     private const string TagProject = "Project:";
     private const string TagCollection = "Collection:";
     private const string TagFolderRef = "FolderRef:";
+    private const string TagWebResource = "WebResource:";
     private const string TagRealFolder = "RealFolder:";
 
     public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider)
@@ -100,6 +101,10 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
             imageListLarge.Images.Add("Project", SystemIcons.Application.ToBitmap());
             imageListLarge.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
+
+            // WebResource icon (use globe/network icon)
+            imageListSmall.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
+            imageListLarge.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
         }
         catch
         {
@@ -108,10 +113,12 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("FolderOpen", SystemIcons.Information.ToBitmap());
             imageListSmall.Images.Add("Project", SystemIcons.Application.ToBitmap());
             imageListSmall.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
+            imageListSmall.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
             imageListLarge.Images.Add("Folder", SystemIcons.Information.ToBitmap());
             imageListLarge.Images.Add("FolderOpen", SystemIcons.Information.ToBitmap());
             imageListLarge.Images.Add("Project", SystemIcons.Application.ToBitmap());
             imageListLarge.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
+            imageListLarge.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
         }
     }
 
@@ -181,6 +188,7 @@ public partial class MainForm : Form
             var refNode = new TreeNode(folderRef.EffectiveName)
             {
                 Tag = TagFolderRef + $"{project.Id}:{folderRef.Id}",
+                ToolTipText = folderRef.Description ?? folderRef.RealPath,
                 ImageIndex = GetImageIndex("Folder"),
                 SelectedImageIndex = GetImageIndex("FolderOpen")
             };
@@ -191,6 +199,17 @@ public partial class MainForm : Form
             {
                 refNode.Nodes.Add(new TreeNode("...") { Tag = "Dummy" });
             }
+        }
+        else if (child is WebResource webResource)
+        {
+            var webNode = new TreeNode(webResource.EffectiveName)
+            {
+                Tag = TagWebResource + $"{project.Id}:{webResource.Id}",
+                ToolTipText = webResource.Description ?? webResource.Url,
+                ImageIndex = GetImageIndex("WebResource"),
+                SelectedImageIndex = GetImageIndex("WebResource")
+            };
+            parent.Nodes.Add(webNode);
         }
     }
 
@@ -359,6 +378,17 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 listView.Items.Add(item);
             }
+            else if (child is WebResource wr)
+            {
+                var item = new ListViewItem(wr.EffectiveName, "WebResource")
+                {
+                    Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
+                };
+                item.SubItems.Add("");
+                item.SubItems.Add("Web Resource");
+                item.SubItems.Add(wr.Url);
+                listView.Items.Add(item);
+            }
         }
     }
 
@@ -390,6 +420,17 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
+                listView.Items.Add(item);
+            }
+            else if (child is WebResource wr)
+            {
+                var item = new ListViewItem(wr.EffectiveName, "WebResource")
+                {
+                    Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
+                };
+                item.SubItems.Add("");
+                item.SubItems.Add("Web Resource");
+                item.SubItems.Add(wr.Url);
                 listView.Items.Add(item);
             }
         }
@@ -545,6 +586,11 @@ public partial class MainForm : Form
             // Find and select the corresponding tree node
             SelectTreeNodeByTag(tag);
         }
+        else if (tag.StartsWith(TagWebResource))
+        {
+            // Launch web resource in default browser
+            LaunchWebResource(tag);
+        }
         else if (tag.StartsWith(TagRealFolder))
         {
             var path = tag.Substring(TagRealFolder.Length);
@@ -668,6 +714,23 @@ public partial class MainForm : Form
         }
     }
 
+    private async Task ShowAddWebResourceDialog(Guid projectId, Guid? parentCollectionId)
+    {
+        using var dialog = new WebResourceDialog();
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            var url = dialog.ResourceUrl.Trim();
+            var name = string.IsNullOrWhiteSpace(dialog.ResourceName) ? null : dialog.ResourceName.Trim();
+            var description = string.IsNullOrWhiteSpace(dialog.ResourceDescription) ? null : dialog.ResourceDescription.Trim();
+
+            if (!string.IsNullOrEmpty(url))
+            {
+                await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId);
+                InitializeTreeView();
+            }
+        }
+    }
+
     // ── Context Menu ──
 
     private void ShowTreeViewContextMenu(TreeNode node, Point location)
@@ -684,6 +747,11 @@ public partial class MainForm : Form
         {
             menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
             menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
+            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
+            {
+                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+                await ShowAddWebResourceDialog(projectId, null);
+            });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Delete Project", null, async (s, e) =>
             {
@@ -729,6 +797,10 @@ public partial class MainForm : Form
                     InitializeTreeView();
                 }
             });
+            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
+            {
+                await ShowAddWebResourceDialog(projectId, collectionId);
+            });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Delete Collection", null, async (s, e) =>
             {
@@ -744,11 +816,32 @@ public partial class MainForm : Form
 
         if (tag.StartsWith(TagFolderRef))
         {
+            var parts = tag.Substring(TagFolderRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var folderRefId = Guid.Parse(parts[1]);
+
+            menu.Items.Add("Edit Description...", null, async (s, e) =>
+            {
+                var project = _projectManager.GetProject(projectId);
+                var fr = FindFolderRef(project, folderRefId);
+                if (fr != null)
+                {
+                    using var dlg = new InputDialog("Edit Folder Description", "Description:", fr.Description ?? "");
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        var description = dlg.InputText.Trim();
+                        await _projectManager.UpdateFolderReferenceAsync(
+                            projectId,
+                            folderRefId,
+                            newDescription: string.IsNullOrEmpty(description) ? null : description
+                        );
+                        InitializeTreeView();
+                    }
+                }
+            });
+            menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Remove from Project", null, async (s, e) =>
             {
-                var parts = tag.Substring(TagFolderRef.Length).Split(':');
-                var projectId = Guid.Parse(parts[0]);
-                var folderRefId = Guid.Parse(parts[1]);
                 var result = MessageBox.Show("Remove this folder reference from the project?",
                     "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (result == DialogResult.Yes)
@@ -759,14 +852,51 @@ public partial class MainForm : Form
             });
             menu.Items.Add("Open in Explorer", null, (s, e) =>
             {
-                var parts = tag.Substring(TagFolderRef.Length).Split(':');
-                var projectId = Guid.Parse(parts[0]);
-                var folderRefId = Guid.Parse(parts[1]);
                 var project = _projectManager.GetProject(projectId);
                 var fr = FindFolderRef(project, folderRefId);
                 if (fr != null && Directory.Exists(fr.RealPath))
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
+                }
+            });
+        }
+
+        if (tag.StartsWith(TagWebResource))
+        {
+            var parts = tag.Substring(TagWebResource.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var resourceId = Guid.Parse(parts[1]);
+
+            menu.Items.Add("Edit...", null, async (s, e) =>
+            {
+                var project = _projectManager.GetProject(projectId);
+                var wr = FindWebResource(project, resourceId);
+                if (wr != null)
+                {
+                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        await _projectManager.UpdateWebResourceAsync(
+                            projectId,
+                            resourceId,
+                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                            dlg.ResourceUrl.Trim(),
+                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
+                        );
+                        InitializeTreeView();
+                    }
+                }
+            });
+            menu.Items.Add("Launch", null, (s, e) => LaunchWebResource(tag));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Remove from Project", null, async (s, e) =>
+            {
+                var result = MessageBox.Show("Remove this web resource from the project?",
+                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+                    InitializeTreeView();
                 }
             });
         }
@@ -778,6 +908,51 @@ public partial class MainForm : Form
     }
 
     // ── Helpers ──
+
+    private void LaunchWebResource(string tag)
+    {
+        var parts = tag.Substring(TagWebResource.Length).Split(':');
+        if (parts.Length < 2) return;
+
+        var projectId = Guid.Parse(parts[0]);
+        var resourceId = Guid.Parse(parts[1]);
+
+        var project = _projectManager.GetProject(projectId);
+        var webResource = FindWebResource(project, resourceId);
+
+        if (webResource != null && !string.IsNullOrWhiteSpace(webResource.Url))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(webResource.Url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to launch URL: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private WebResource? FindWebResource(Project? project, Guid resourceId)
+    {
+        if (project == null) return null;
+        return FindWebResourceIn(project.Children, resourceId);
+    }
+
+    private static WebResource? FindWebResourceIn(List<ProjectChild> children, Guid id)
+    {
+        foreach (var child in children)
+        {
+            if (child is WebResource wr && wr.Id == id)
+                return wr;
+            if (child is Collection coll)
+            {
+                var found = FindWebResourceIn(coll.Children, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
 
     private FolderReference? FindFolderRef(Project? project, Guid folderRefId)
     {
