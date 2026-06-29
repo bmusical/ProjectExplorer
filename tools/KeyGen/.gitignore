@@ -1,0 +1,6 @@
+# Never commit private keys
+private_key.pem
+
+# Generated output
+bin/
+obj/

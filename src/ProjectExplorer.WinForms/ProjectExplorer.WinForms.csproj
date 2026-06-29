@@ -7,11 +7,22 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>ProjectNest</AssemblyName>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Company>HxM Blazor Software LLC</Company>
+    <Product>Project Nest</Product>
+    <Copyright>Copyright © 2025 HxM Blazor Software LLC</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProjectExplorer.Core\ProjectExplorer.Core.csproj" />
     <ProjectReference Include="..\ProjectExplorer.Shell\ProjectExplorer.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoUpdater.NET" Version="1.9.2" />
   </ItemGroup>
 
 </Project>

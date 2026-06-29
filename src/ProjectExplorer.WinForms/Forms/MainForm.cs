@@ -4,6 +4,7 @@ using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
 using ProjectExplorer.WinForms.Helpers;
+using LicenseState = ProjectExplorer.Core.Models.LicenseState;
 
 namespace ProjectExplorer.WinForms;
 
@@ -11,6 +12,8 @@ public partial class MainForm : Form
 {
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
+    private readonly LicenseManager _licenseManager;
+    private LicenseInfo _license;
 
     // Navigation history
     private readonly Stack<string> _backStack = new();
@@ -51,10 +54,13 @@ public partial class MainForm : Form
     private const string TagWebResource = "WebResource:";
     private const string TagRealFolder = "RealFolder:";
 
-    public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider)
+    public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
+                    LicenseManager licenseManager, LicenseInfo license)
     {
-        _projectManager = projectManager;
+        _projectManager    = projectManager;
         _shellIconProvider = shellIconProvider;
+        _licenseManager    = licenseManager;
+        _license           = license;
 
         InitializeComponent();
 
@@ -77,12 +83,75 @@ public partial class MainForm : Form
     {
         base.OnLoad(e);
 
-        // Configure SplitContainer constraints here - the form is now laid out
-        // and splitMain has its actual width, so validation won't fail.
-        // Order matters: set SplitterDistance to a safe value FIRST, then min sizes.
         splitMain.SplitterDistance = Math.Max(300, splitMain.Width / 4);
         splitMain.Panel1MinSize = 150;
         splitMain.Panel2MinSize = 150;
+
+        UpdateLicenseUi();
+    }
+
+    private void RefreshLicense() =>
+        _license = _licenseManager.GetCurrentLicense(_projectManager.Projects);
+
+    private void UpdateLicenseUi()
+    {
+        switch (_license.State)
+        {
+            case LicenseState.Free:
+                lblStatus.Text = $"Free — {_license.ProjectCount}/{_license.ProjectLimit} projects, " +
+                                 $"{_license.LeafNodeCount}/{_license.LeafNodeLimit} references  |  Help > Register";
+                break;
+            case LicenseState.LimitReached:
+                lblStatus.Text = $"Free limit reached ({_license.LeafNodeCount} references, {_license.ProjectCount} projects)  |  Help > Register to unlock";
+                break;
+            case LicenseState.Licensed:
+                lblStatus.Text = $"Licensed to {_license.Email}";
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the action can proceed. If the free limit would be
+    /// breached, shows a prompt and returns false.
+    /// </summary>
+    private bool CheckLeafLimit(string actionDescription)
+    {
+        if (_license.State == LicenseState.Licensed) return true;
+        RefreshLicense();
+        if (_license.LeafNodeCount < _license.LeafNodeLimit) return true;
+
+        var result = MessageBox.Show(
+            $"You've reached the free limit of {_license.LeafNodeLimit} folder/web references.\n\n" +
+            $"Register Project Nest to add unlimited references.",
+            $"Free Limit Reached — {actionDescription}",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+
+        if (result == DialogResult.OK) OpenRegistrationDialog();
+        return false;
+    }
+
+    private bool CheckProjectLimit()
+    {
+        if (_license.State == LicenseState.Licensed) return true;
+        RefreshLicense();
+        if (_license.ProjectCount < _license.ProjectLimit) return true;
+
+        var result = MessageBox.Show(
+            $"You've reached the free limit of {_license.ProjectLimit} projects.\n\n" +
+            $"Register Project Nest to create unlimited projects.",
+            "Free Limit Reached — New Project",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+
+        if (result == DialogResult.OK) OpenRegistrationDialog();
+        return false;
+    }
+
+    private void OpenRegistrationDialog()
+    {
+        using var dlg = new RegistrationDialog(_licenseManager, _license);
+        dlg.ShowDialog(this);
+        _license = dlg.ResultLicense;
+        UpdateLicenseUi();
     }
 
     protected override void OnShown(EventArgs e)
@@ -769,6 +838,8 @@ public partial class MainForm : Form
 
     private async void MenuFileNewProject_Click(object? sender, EventArgs e)
     {
+        if (!CheckProjectLimit()) return;
+
         using var dialog = new InputDialog("Create New Project", "Project name:", "New Project");
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
@@ -776,6 +847,8 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(name))
             {
                 await _projectManager.CreateProjectAsync(name);
+                RefreshLicense();
+                UpdateLicenseUi();
                 RefreshTreeView();
             }
         }
@@ -809,6 +882,8 @@ public partial class MainForm : Form
             return;
         }
 
+        if (!CheckLeafLimit("Add Folder")) return;
+
         using var dialog = new FolderBrowserDialog
         {
             Description = "Select a folder to add to the project",
@@ -818,12 +893,16 @@ public partial class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             await _projectManager.AddFolderReferenceAsync(_currentProject.Id, dialog.SelectedPath);
+            RefreshLicense();
+            UpdateLicenseUi();
             RefreshTreeView();
         }
     }
 
     private async Task ShowAddWebResourceDialog(Guid projectId, Guid? parentCollectionId)
     {
+        if (!CheckLeafLimit("Add Web Resource")) return;
+
         using var dialog = new WebResourceDialog();
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
@@ -834,6 +913,8 @@ public partial class MainForm : Form
             if (!string.IsNullOrEmpty(url))
             {
                 await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId);
+                RefreshLicense();
+                UpdateLicenseUi();
                 RefreshTreeView();
             }
         }
@@ -900,10 +981,13 @@ public partial class MainForm : Form
             });
             menu.Items.Add("Add Folder...", null, async (s, e) =>
             {
+                if (!CheckLeafLimit("Add Folder")) return;
                 using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, collectionId);
+                    RefreshLicense();
+                    UpdateLicenseUi();
                     RefreshTreeView();
                 }
             });

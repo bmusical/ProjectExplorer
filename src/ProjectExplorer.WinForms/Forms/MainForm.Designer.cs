@@ -43,6 +43,9 @@ partial class MainForm
     private ToolStripMenuItem menuProject;
     private ToolStripMenuItem menuProjectNewCollection;
     private ToolStripMenuItem menuProjectAddFolder;
+    private ToolStripMenuItem menuHelp;
+    private ToolStripMenuItem menuHelpRegister;
+    private ToolStripMenuItem menuHelpAbout;
 
     protected override void Dispose(bool disposing)
     {
@@ -118,9 +121,17 @@ partial class MainForm
             menuProjectNewCollection, menuProjectAddFolder
         });
 
+        this.menuHelpRegister = new ToolStripMenuItem { Text = "&Register / License..." };
+        this.menuHelpAbout    = new ToolStripMenuItem { Text = "&About Project Nest..." };
+        this.menuHelp = new ToolStripMenuItem { Text = "&Help" };
+        this.menuHelp.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            menuHelpRegister, new ToolStripSeparator(), menuHelpAbout
+        });
+
         this.menuStrip = new MenuStrip
         {
-            Items = { this.menuFile, this.menuView, this.menuProject },
+            Items = { this.menuFile, this.menuView, this.menuProject, this.menuHelp },
             Dock = DockStyle.Top
         };
 
@@ -128,6 +139,8 @@ partial class MainForm
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;
+        this.menuHelpRegister.Click += (s, e) => OpenRegistrationDialog();
+        this.menuHelpAbout.Click    += (s, e) => new AboutForm().ShowDialog(this);
         this.menuViewDetails.Click += (s, e) => SetViewMode(AppView.Details);
         this.menuViewLargeIcons.Click += (s, e) => SetViewMode(AppView.LargeIcon);
         this.menuViewSmallIcons.Click += (s, e) => SetViewMode(AppView.SmallIcon);
@@ -204,7 +217,7 @@ partial class MainForm
         });
         this.MainMenuStrip = this.menuStrip;
 
-        this.Text = "Project Explorer";
+        this.Text = "Project Nest";
         this.Size = new Size(1200, 750);
         this.MinimumSize = new Size(800, 500);
         this.StartPosition = FormStartPosition.CenterScreen;
