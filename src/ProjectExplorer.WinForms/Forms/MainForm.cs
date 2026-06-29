@@ -443,9 +443,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagCollection + $"{_currentProject.Id}:{coll.Id}"
                 };
-                item.SubItems.Add(coll.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is FolderReference fr)
@@ -454,9 +455,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagFolderRef + $"{_currentProject.Id}:{fr.Id}"
                 };
-                item.SubItems.Add(fr.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is WebResource wr)
@@ -465,9 +467,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
                 };
-                item.SubItems.Add(wr.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
+                item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
             }
         }
@@ -487,9 +490,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagCollection + $"{_currentProject.Id}:{coll.Id}"
                 };
-                item.SubItems.Add(coll.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Collection");
                 item.SubItems.Add("");
+                item.SubItems.Add(coll.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is FolderReference fr)
@@ -498,9 +502,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagFolderRef + $"{_currentProject.Id}:{fr.Id}"
                 };
-                item.SubItems.Add(fr.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Folder Reference");
                 item.SubItems.Add("");
+                item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
             }
             else if (child is WebResource wr)
@@ -509,9 +514,10 @@ public partial class MainForm : Form
                 {
                     Tag = TagWebResource + $"{_currentProject.Id}:{wr.Id}"
                 };
-                item.SubItems.Add(wr.Description ?? "");
+                item.SubItems.Add("");
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
+                item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
             }
         }
