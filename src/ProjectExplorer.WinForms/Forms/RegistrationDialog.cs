@@ -27,7 +27,7 @@ public class RegistrationDialog : Form
 
     private void InitializeComponent()
     {
-        this.Text = "Project Nest Explorer — Registration";
+        this.Text = "Project Nest — Registration";
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
@@ -43,7 +43,7 @@ public class RegistrationDialog : Form
         };
         var lblTitle = new Label
         {
-            Text = "Project Nest Explorer",
+            Text = "Project Nest",
             Font = new Font("Segoe UI", 16f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -144,7 +144,7 @@ public class RegistrationDialog : Form
         {
             txtKey.Text = "";
             MessageBox.Show(
-                $"Thank you! Project Nest Explorer is now activated for:\n{result.Email}",
+                $"Thank you! Project Nest is now activated for:\n{result.Email}",
                 "Activated", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         else

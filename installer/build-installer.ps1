@@ -15,7 +15,7 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 
 # ── 1. Publish ────────────────────────────────────────────────────────────────
 
-Write-Host "==> Publishing Project Nest Explorer $Version (win-x64, self-contained)..." -ForegroundColor Cyan
+Write-Host "==> Publishing Project Nest $Version (win-x64, self-contained)..." -ForegroundColor Cyan
 
 dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj" `
     -c Release `
