@@ -361,3 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# ── Project Nest — secrets & build artifacts (do not commit) ──
+# License signing keys — NEVER commit the private key.
+*.pem
+private_key.pem
+public_key.pem
+# Installer output (published to GitHub Releases instead)
+installer-output/

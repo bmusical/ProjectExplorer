@@ -32,14 +32,38 @@ public class RegistrationDialog : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 320);
+        this.Size = new Size(480, 336);
 
         // ── Banner ──
         var banner = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 64,
+            Height = 80,
             BackColor = Color.FromArgb(30, 80, 160)
+        };
+        var logo = new PictureBox
+        {
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(48, 48),
+            Location = new Point(16, 16)
+        };
+        try
+        {
+            using var logoStream = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.logo.png");
+            if (logoStream != null)
+                logo.Image = Image.FromStream(logoStream);
+        }
+        catch { /* logo is decorative — ignore load failures */ }
+
+        var lblProduct = new Label
+        {
+            Text = "PROJECT NEST",
+            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(150, 185, 240),
+            AutoSize = true,
+            Location = new Point(78, 12)
         };
         var lblTitle = new Label
         {
@@ -47,7 +71,7 @@ public class RegistrationDialog : Form
             Font = new Font("Segoe UI", 16f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
-            Location = new Point(14, 8)
+            Location = new Point(76, 28)
         };
         var lblSub = new Label
         {
@@ -55,15 +79,15 @@ public class RegistrationDialog : Form
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Color.FromArgb(200, 220, 255),
             AutoSize = true,
-            Location = new Point(16, 38)
+            Location = new Point(78, 58)
         };
-        banner.Controls.AddRange(new Control[] { lblTitle, lblSub });
+        banner.Controls.AddRange(new Control[] { logo, lblProduct, lblTitle, lblSub });
 
         // ── Body ──
         lblStatus = new Label
         {
             Font = new Font("Segoe UI", 9f),
-            Location = new Point(18, 80),
+            Location = new Point(18, 96),
             Size = new Size(430, 48),
             AutoSize = false
         };
@@ -71,7 +95,7 @@ public class RegistrationDialog : Form
         var sep = new Label
         {
             BorderStyle = BorderStyle.Fixed3D,
-            Location = new Point(18, 134),
+            Location = new Point(18, 150),
             Size = new Size(430, 2)
         };
 
@@ -80,13 +104,13 @@ public class RegistrationDialog : Form
             Text = "Enter license key:",
             Font = new Font("Segoe UI", 9f),
             AutoSize = true,
-            Location = new Point(18, 146)
+            Location = new Point(18, 162)
         };
 
         txtKey = new TextBox
         {
             Font = new Font("Consolas", 9f),
-            Location = new Point(18, 168),
+            Location = new Point(18, 184),
             Size = new Size(430, 24),
             PlaceholderText = "Paste your license key here"
         };
@@ -95,7 +119,7 @@ public class RegistrationDialog : Form
         {
             Text = "Activate",
             Size = new Size(96, 30),
-            Location = new Point(18, 204)
+            Location = new Point(18, 220)
         };
         btnActivate.Click += BtnActivate_Click;
 
@@ -104,7 +128,7 @@ public class RegistrationDialog : Form
             Text = "Purchase a license →",
             Font = new Font("Segoe UI", 9f),
             AutoSize = true,
-            Location = new Point(130, 210)
+            Location = new Point(130, 226)
         };
         lnkBuy.LinkClicked += (s, e) =>
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -118,7 +142,7 @@ public class RegistrationDialog : Form
             Text = "Close",
             DialogResult = DialogResult.OK,
             Size = new Size(88, 30),
-            Location = new Point(360, 246)
+            Location = new Point(360, 262)
         };
 
         this.Controls.AddRange(new Control[]

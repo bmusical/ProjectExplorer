@@ -1,11 +1,11 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <item>
   <!-- Bump Version and URL for every release -->
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <!-- Direct download link to the installer on GitHub Releases -->
-  <url>https://github.com/bmusical/ProjectExplorer/releases/download/v1.0.0/ProjectNest-1.0.0-Setup.exe</url>
+  <url>https://github.com/bmusical/ProjectExplorer/releases/download/v1.0.1/ProjectNest-1.0.1-Setup.exe</url>
   <!-- Release notes shown in the update dialog — supports basic HTML -->
-  <changelog>https://github.com/bmusical/ProjectExplorer/releases/tag/v1.0.0</changelog>
+  <changelog>https://github.com/bmusical/ProjectExplorer/releases/tag/v1.0.1</changelog>
   <!-- Mandatory=true forces the update with no Skip/Remind Later option -->
   <mandatory>false</mandatory>
 </item>
