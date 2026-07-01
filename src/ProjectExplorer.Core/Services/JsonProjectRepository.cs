@@ -114,6 +114,8 @@ public class JsonProjectRepository : IProjectRepository
                 arr.Add(SerializeFolderReference(fr));
             else if (child is WebResource wr)
                 arr.Add(SerializeWebResource(wr));
+            else if (child is FileReference fileRef)
+                arr.Add(SerializeFileReference(fileRef));
         }
         return arr;
     }
@@ -192,6 +194,30 @@ public class JsonProjectRepository : IProjectRepository
         return obj;
     }
 
+    private static JsonObject SerializeFileReference(FileReference fileRef)
+    {
+        var obj = new JsonObject
+        {
+            ["childType"] = "fileReference",
+            ["id"] = fileRef.Id.ToString(),
+            ["parentId"] = fileRef.ParentId.ToString(),
+            ["sortOrder"] = fileRef.SortOrder,
+            ["filePath"] = fileRef.FilePath,
+            ["displayName"] = fileRef.DisplayName,
+            ["description"] = fileRef.Description
+        };
+
+        if (fileRef.Metadata.Count > 0)
+        {
+            var meta = new JsonObject();
+            foreach (var kvp in fileRef.Metadata)
+                meta[kvp.Key] = kvp.Value;
+            obj["metadata"] = meta;
+        }
+
+        return obj;
+    }
+
     // ── Manual Deserialization ──
 
     private static Project? ParseProject(JsonNode? node)
@@ -233,6 +259,7 @@ public class JsonProjectRepository : IProjectRepository
             "collection" => ParseCollection(node),
             "folderReference" => ParseFolderReference(node),
             "webResource" => ParseWebResource(node),
+            "fileReference" => ParseFileReference(node),
             _ => null
         };
     }
@@ -313,5 +340,27 @@ public class JsonProjectRepository : IProjectRepository
         }
 
         return wr;
+    }
+
+    private static FileReference ParseFileReference(JsonNode node)
+    {
+        var fileRef = new FileReference
+        {
+            Id = Guid.TryParse(node["id"]?.GetValue<string>(), out var id) ? id : Guid.NewGuid(),
+            ParentId = Guid.TryParse(node["parentId"]?.GetValue<string>(), out var pid) ? pid : Guid.Empty,
+            SortOrder = node["sortOrder"]?.GetValue<int>() ?? 0,
+            FilePath = node["filePath"]?.GetValue<string>() ?? "",
+            DisplayName = node["displayName"]?.GetValue<string>(),
+            Description = node["description"]?.GetValue<string>()
+        };
+
+        var metaObj = node["metadata"]?.AsObject();
+        if (metaObj != null)
+        {
+            foreach (var kvp in metaObj)
+                fileRef.Metadata[kvp.Key] = kvp.Value?.GetValue<string>() ?? "";
+        }
+
+        return fileRef;
     }
 }

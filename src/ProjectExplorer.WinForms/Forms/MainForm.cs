@@ -53,6 +53,7 @@ public partial class MainForm : Form
     private const string TagCollection = "Collection:";
     private const string TagFolderRef = "FolderRef:";
     private const string TagWebResource = "WebResource:";
+    private const string TagFileRef = "FileRef:";
     private const string TagRealFolder = "RealFolder:";
 
     public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
@@ -192,41 +193,68 @@ public partial class MainForm : Form
 
     private void LoadDefaultIcons()
     {
+        // Real folder icons come from the shell; the conceptual node types
+        // (Project / Collection / WebResource / FileReference) get distinct,
+        // meaningful glyph icons drawn from the Segoe MDL2 Assets font so each
+        // type reads instantly in the tree and list.
         try
         {
-            // Project icon (use folder icon as placeholder)
             var folderIcon = _shellIconProvider.GetFolderIcon(IconSize.Small);
             imageListSmall.Images.Add("Folder", folderIcon);
             imageListSmall.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Small, open: true));
-
-            // Large icons
             imageListLarge.Images.Add("Folder", _shellIconProvider.GetFolderIcon(IconSize.Large));
             imageListLarge.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Large, open: true));
-
-            // Project and Collection placeholders (use different system icons)
-            imageListSmall.Images.Add("Project", SystemIcons.Application.ToBitmap());
-            imageListSmall.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
-            imageListLarge.Images.Add("Project", SystemIcons.Application.ToBitmap());
-            imageListLarge.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
-
-            // WebResource icon (use globe/network icon)
-            imageListSmall.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
-            imageListLarge.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
         }
         catch
         {
-            // If shell icon loading fails (e.g., on non-Windows), use system icons as fallback
-            imageListSmall.Images.Add("Folder", SystemIcons.Information.ToBitmap());
-            imageListSmall.Images.Add("FolderOpen", SystemIcons.Information.ToBitmap());
-            imageListSmall.Images.Add("Project", SystemIcons.Application.ToBitmap());
-            imageListSmall.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
-            imageListSmall.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
-            imageListLarge.Images.Add("Folder", SystemIcons.Information.ToBitmap());
-            imageListLarge.Images.Add("FolderOpen", SystemIcons.Information.ToBitmap());
-            imageListLarge.Images.Add("Project", SystemIcons.Application.ToBitmap());
-            imageListLarge.Images.Add("Collection", SystemIcons.WinLogo.ToBitmap());
-            imageListLarge.Images.Add("WebResource", SystemIcons.Shield.ToBitmap());
+            imageListSmall.Images.Add("Folder", GlyphBitmap("\uE8B7", 16, Color.FromArgb(222, 175, 60)));
+            imageListSmall.Images.Add("FolderOpen", GlyphBitmap("\uE838", 16, Color.FromArgb(222, 175, 60)));
+            imageListLarge.Images.Add("Folder", GlyphBitmap("\uE8B7", 48, Color.FromArgb(222, 175, 60)));
+            imageListLarge.Images.Add("FolderOpen", GlyphBitmap("\uE838", 48, Color.FromArgb(222, 175, 60)));
         }
+
+        // Project  = nest/home accent blue   (\uE80F = Home)
+        imageListSmall.Images.Add("Project", GlyphBitmap("\uE80F", 16, Color.FromArgb(30, 80, 160)));
+        imageListLarge.Images.Add("Project", GlyphBitmap("\uE80F", 48, Color.FromArgb(30, 80, 160)));
+
+        // Collection = library/stack         (\uE8F1 = Library)
+        imageListSmall.Images.Add("Collection", GlyphBitmap("\uE8F1", 16, Color.FromArgb(120, 90, 170)));
+        imageListLarge.Images.Add("Collection", GlyphBitmap("\uE8F1", 48, Color.FromArgb(120, 90, 170)));
+
+        // WebResource = globe (was a confusing security shield) (\uE774 = Globe)
+        imageListSmall.Images.Add("WebResource", GlyphBitmap("\uE774", 16, Color.FromArgb(40, 130, 120)));
+        imageListLarge.Images.Add("WebResource", GlyphBitmap("\uE774", 48, Color.FromArgb(40, 130, 120)));
+
+        // FileReference = page/document       (\uE8A5 = Document)
+        imageListSmall.Images.Add("FileReference", GlyphBitmap("\uE8A5", 16, Color.FromArgb(90, 100, 110)));
+        imageListLarge.Images.Add("FileReference", GlyphBitmap("\uE8A5", 48, Color.FromArgb(90, 100, 110)));
+    }
+
+    /// <summary>
+    /// Renders a single Segoe MDL2 Assets glyph to a transparent bitmap of the
+    /// given size and colour, for use as a node/list icon.
+    /// </summary>
+    private static Bitmap GlyphBitmap(string glyph, int size, Color color)
+    {
+        var bmp = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        g.Clear(Color.Transparent);
+        try
+        {
+            using var font = new Font("Segoe MDL2 Assets", size * 0.72f, GraphicsUnit.Pixel);
+            using var brush = new SolidBrush(color);
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString(glyph, font, brush, new RectangleF(0, 0, size, size), sf);
+        }
+        catch
+        {
+            // Font unavailable (non-Windows) — draw a simple coloured square as a fallback.
+            using var brush = new SolidBrush(color);
+            g.FillRectangle(brush, 2, 2, size - 4, size - 4);
+        }
+        return bmp;
     }
 
     // ── Tree View Initialization ──
@@ -330,6 +358,42 @@ public partial class MainForm : Form
             };
             parent.Nodes.Add(webNode);
         }
+        else if (child is FileReference fileRef)
+        {
+            var fileNode = new TreeNode(fileRef.EffectiveName)
+            {
+                Tag = TagFileRef + $"{project.Id}:{fileRef.Id}",
+                ToolTipText = fileRef.Description ?? fileRef.FilePath,
+                ImageIndex = GetFileRefImageIndex(fileRef),
+                SelectedImageIndex = GetFileRefImageIndex(fileRef)
+            };
+            parent.Nodes.Add(fileNode);
+        }
+    }
+
+    /// <summary>
+    /// Returns an image index for a FileReference, preferring the real shell icon
+    /// for the file's extension and falling back to the generic FileReference glyph.
+    /// </summary>
+    private int GetFileRefImageIndex(FileReference fileRef)
+    {
+        var ext = fileRef.Extension;
+        if (!string.IsNullOrEmpty(ext))
+        {
+            var iconKey = $"ext_{ext}";
+            if (!imageListSmall.Images.ContainsKey(iconKey))
+            {
+                try
+                {
+                    imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
+                    imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                }
+                catch { /* fall through to generic glyph */ }
+            }
+            if (imageListSmall.Images.ContainsKey(iconKey))
+                return imageListSmall.Images.IndexOfKey(iconKey);
+        }
+        return GetImageIndex("FileReference");
     }
 
     private int GetImageIndex(string key)
@@ -376,6 +440,23 @@ public partial class MainForm : Form
             {
                 _currentPath = folderRef.RealPath;
                 PopulateFileList(folderRef.RealPath);
+            }
+        }
+        else if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            _currentProject = _projectManager.GetProject(projectId);
+            var fileRefId = Guid.Parse(parts[1]);
+            var fileRef = FindFileRef(_currentProject, fileRefId);
+            if (fileRef != null)
+            {
+                var dir = Path.GetDirectoryName(fileRef.FilePath);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    _currentPath = dir;
+                    PopulateFileList(dir);
+                }
             }
         }
         else if (tag.StartsWith(TagRealFolder))
@@ -562,6 +643,18 @@ public partial class MainForm : Form
                 item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
             }
+            else if (child is FileReference fileRef)
+            {
+                var item = new ListViewItem(fileRef.EffectiveName, GetFileRefListImageKey(fileRef))
+                {
+                    Tag = TagFileRef + $"{_currentProject.Id}:{fileRef.Id}"
+                };
+                item.SubItems.Add("");
+                item.SubItems.Add("File");
+                item.SubItems.Add(fileRef.FilePath);
+                item.SubItems.Add(fileRef.Description ?? "");
+                listView.Items.Add(item);
+            }
         }
     }
 
@@ -608,6 +701,18 @@ public partial class MainForm : Form
                 item.SubItems.Add("Web Resource");
                 item.SubItems.Add(wr.Url);
                 item.SubItems.Add(wr.Description ?? "");
+                listView.Items.Add(item);
+            }
+            else if (child is FileReference fileRef)
+            {
+                var item = new ListViewItem(fileRef.EffectiveName, GetFileRefListImageKey(fileRef))
+                {
+                    Tag = TagFileRef + $"{_currentProject.Id}:{fileRef.Id}"
+                };
+                item.SubItems.Add("");
+                item.SubItems.Add("File");
+                item.SubItems.Add(fileRef.FilePath);
+                item.SubItems.Add(fileRef.Description ?? "");
                 listView.Items.Add(item);
             }
         }
@@ -786,6 +891,17 @@ public partial class MainForm : Form
             // Launch web resource in default browser
             LaunchWebResource(tag);
         }
+        else if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            if (parts.Length >= 2)
+            {
+                var projectId = Guid.Parse(parts[0]);
+                var fileRefId = Guid.Parse(parts[1]);
+                var fileRef = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fileRef != null) OpenFileReference(fileRef);
+            }
+        }
         else if (tag.StartsWith(TagRealFolder))
         {
             var path = tag.Substring(TagRealFolder.Length);
@@ -822,10 +938,211 @@ public partial class MainForm : Form
 
     private void ListView_MouseClick(object? sender, MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Right)
+        if (e.Button != MouseButtons.Right) return;
+
+        var hit = listView.HitTest(e.Location);
+        if (hit.Item != null && !hit.Item.Selected)
         {
-            // Future: show shell context menu for real files
+            listView.SelectedItems.Clear();
+            hit.Item.Selected = true;
         }
+
+        ShowListViewContextMenu(hit.Item, e.Location);
+    }
+
+    private void ShowListViewContextMenu(ListViewItem? item, Point location)
+    {
+        var menu = new ContextMenuStrip();
+        var tag = item?.Tag?.ToString() ?? "";
+
+        if (item == null)
+        {
+            // Empty-area click: offer view options / new-item shortcuts if a project is open.
+            if (_currentProject != null)
+            {
+                menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
+                menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
+                menu.Items.Add("Add Web Resource...", null, async (s, e) => await ShowAddWebResourceDialog(_currentProject.Id, null));
+                menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(_currentProject.Id, null));
+                menu.Items.Add(new ToolStripSeparator());
+            }
+            AddViewSubmenu(menu);
+        }
+        else if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection) || tag.StartsWith(TagFolderRef))
+        {
+            menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
+
+            if (tag.StartsWith(TagFolderRef))
+            {
+                var parts = tag.Substring(TagFolderRef.Length).Split(':');
+                var projectId = Guid.Parse(parts[0]);
+                var folderRefId = Guid.Parse(parts[1]);
+                menu.Items.Add("Open in Explorer", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null && Directory.Exists(fr.RealPath))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
+                });
+                menu.Items.Add("Copy Path", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null && !string.IsNullOrEmpty(fr.RealPath)) Clipboard.SetText(fr.RealPath);
+                });
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add("Remove from Project", null, async (s, e) =>
+                {
+                    if (MessageBox.Show("Remove this folder reference from the project?", "Confirm Remove",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
+                        RefreshTreeView();
+                    }
+                });
+            }
+        }
+        else if (tag.StartsWith(TagWebResource))
+        {
+            var parts = tag.Substring(TagWebResource.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var resourceId = Guid.Parse(parts[1]);
+
+            menu.Items.Add("Open (Launch)", null, (s, e) => LaunchWebResource(tag));
+            menu.Items.Add("Copy URL", null, (s, e) =>
+            {
+                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+                if (wr != null && !string.IsNullOrEmpty(wr.Url)) Clipboard.SetText(wr.Url);
+            });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Edit...", null, async (s, e) =>
+            {
+                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+                if (wr != null)
+                {
+                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        await _projectManager.UpdateWebResourceAsync(projectId, resourceId,
+                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                            dlg.ResourceUrl.Trim(),
+                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                        RefreshTreeView();
+                    }
+                }
+            });
+            menu.Items.Add("Remove from Project", null, async (s, e) =>
+            {
+                if (MessageBox.Show("Remove this web resource from the project?", "Confirm Remove",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+                    RefreshTreeView();
+                }
+            });
+        }
+        else if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var fileRefId = Guid.Parse(parts[1]);
+
+            menu.Items.Add("Open", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null) OpenFileReference(fr);
+            });
+            menu.Items.Add("Open Containing Folder", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null && File.Exists(fr.FilePath))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
+            });
+            menu.Items.Add("Copy Path", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
+            });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Edit...", null, async (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null)
+                {
+                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        await _projectManager.UpdateFileReferenceAsync(projectId, fileRefId,
+                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                            newPath: dlg.ResourceFilePath.Trim(),
+                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                        RefreshTreeView();
+                    }
+                }
+            });
+            menu.Items.Add("Remove from Project", null, async (s, e) =>
+            {
+                if (MessageBox.Show("Remove this file reference from the project?", "Confirm Remove",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
+                    RefreshTreeView();
+                }
+            });
+        }
+        else if (tag.StartsWith(TagRealFolder))
+        {
+            var path = tag.Substring(TagRealFolder.Length);
+            menu.Items.Add("Open", null, (s, e) =>
+            {
+                _backStack.Push(_currentPath);
+                _forwardStack.Clear();
+                NavigateToPath(path);
+            });
+            menu.Items.Add("Open in Explorer", null, (s, e) =>
+            {
+                if (Directory.Exists(path))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+            });
+            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+        }
+        else if (tag.StartsWith("File:"))
+        {
+            var filePath = tag.Substring("File:".Length);
+            menu.Items.Add("Open", null, (s, e) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(filePath) { UseShellExecute = true }); }
+                catch (Exception ex) { MessageBox.Show($"Failed to open file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            });
+            menu.Items.Add("Open Containing Folder", null, (s, e) =>
+            {
+                if (File.Exists(filePath))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = true });
+            });
+            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(filePath));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Add as File Resource...", null, async (s, e) =>
+            {
+                if (_currentProject == null) return;
+                if (!CheckLeafLimit("Add File")) return;
+                await _projectManager.AddFileReferenceAsync(_currentProject.Id, filePath);
+                RefreshLicense();
+                UpdateLicenseUi();
+                RefreshTreeView();
+            });
+        }
+
+        if (menu.Items.Count > 0)
+            menu.Show(listView, location);
+    }
+
+    private void AddViewSubmenu(ContextMenuStrip menu)
+    {
+        var viewMenu = new ToolStripMenuItem("View");
+        viewMenu.DropDownItems.Add("Details", null, (s, e) => SetViewMode(AppView.Details));
+        viewMenu.DropDownItems.Add("Large Icons", null, (s, e) => SetViewMode(AppView.LargeIcon));
+        viewMenu.DropDownItems.Add("Small Icons", null, (s, e) => SetViewMode(AppView.SmallIcon));
+        viewMenu.DropDownItems.Add("List", null, (s, e) => SetViewMode(AppView.List));
+        viewMenu.DropDownItems.Add("Tile", null, (s, e) => SetViewMode(AppView.Tile));
+        menu.Items.Add(viewMenu);
     }
 
     // ── View Modes ──
@@ -938,6 +1255,27 @@ public partial class MainForm : Form
         }
     }
 
+    private async Task ShowAddFileResourceDialog(Guid projectId, Guid? parentCollectionId)
+    {
+        if (!CheckLeafLimit("Add File")) return;
+
+        using var dialog = new FileResourceDialog();
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            var path = dialog.ResourceFilePath.Trim();
+            var name = string.IsNullOrWhiteSpace(dialog.ResourceName) ? null : dialog.ResourceName.Trim();
+            var description = string.IsNullOrWhiteSpace(dialog.ResourceDescription) ? null : dialog.ResourceDescription.Trim();
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                await _projectManager.AddFileReferenceAsync(projectId, path, name, description, parentCollectionId);
+                RefreshLicense();
+                UpdateLicenseUi();
+                RefreshTreeView();
+            }
+        }
+    }
+
     // ── Context Menu ──
 
     private void ShowTreeViewContextMenu(TreeNode node, Point location)
@@ -958,6 +1296,11 @@ public partial class MainForm : Form
             {
                 var projectId = Guid.Parse(tag.Substring(TagProject.Length));
                 await ShowAddWebResourceDialog(projectId, null);
+            });
+            menu.Items.Add("Add File...", null, async (s, e) =>
+            {
+                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+                await ShowAddFileResourceDialog(projectId, null);
             });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
@@ -1012,6 +1355,10 @@ public partial class MainForm : Form
             menu.Items.Add("Add Web Resource...", null, async (s, e) =>
             {
                 await ShowAddWebResourceDialog(projectId, collectionId);
+            });
+            menu.Items.Add("Add File...", null, async (s, e) =>
+            {
+                await ShowAddFileResourceDialog(projectId, collectionId);
             });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
@@ -1110,6 +1457,61 @@ public partial class MainForm : Form
                 if (result == DialogResult.Yes)
                 {
                     await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+                    RefreshTreeView();
+                }
+            });
+        }
+
+        if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var fileRefId = Guid.Parse(parts[1]);
+
+            menu.Items.Add("Open", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null) OpenFileReference(fr);
+            });
+            menu.Items.Add("Open Containing Folder", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null && File.Exists(fr.FilePath))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
+            });
+            menu.Items.Add("Copy Path", null, (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
+            });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Edit...", null, async (s, e) =>
+            {
+                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+                if (fr != null)
+                {
+                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        await _projectManager.UpdateFileReferenceAsync(
+                            projectId,
+                            fileRefId,
+                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                            newPath: dlg.ResourceFilePath.Trim(),
+                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
+                        );
+                        RefreshTreeView();
+                    }
+                }
+            });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Remove from Project", null, async (s, e) =>
+            {
+                var result = MessageBox.Show("Remove this file reference from the project?",
+                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
                     RefreshTreeView();
                 }
             });
@@ -1391,6 +1793,75 @@ public partial class MainForm : Form
             if (child is Collection coll)
             {
                 var found = FindWebResourceIn(coll.Children, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the ImageList key to use for a FileReference in the ListView,
+    /// registering the extension's shell icon on demand.
+    /// </summary>
+    private string GetFileRefListImageKey(FileReference fileRef)
+    {
+        var ext = fileRef.Extension;
+        if (!string.IsNullOrEmpty(ext))
+        {
+            var iconKey = $"ext_{ext}";
+            if (!imageListSmall.Images.ContainsKey(iconKey))
+            {
+                try
+                {
+                    imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
+                    imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                }
+                catch { /* fall through to generic glyph */ }
+            }
+            if (imageListSmall.Images.ContainsKey(iconKey))
+                return iconKey;
+        }
+        return "FileReference";
+    }
+
+    private void OpenFileReference(FileReference fileRef)
+    {
+        if (string.IsNullOrWhiteSpace(fileRef.FilePath)) return;
+
+        if (!File.Exists(fileRef.FilePath))
+        {
+            MessageBox.Show(
+                $"The file could not be found:\n{fileRef.FilePath}\n\nIt may have been moved, renamed, or deleted.",
+                "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            // UseShellExecute opens the file with its associated application (by file-type).
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fileRef.FilePath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to open file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private FileReference? FindFileRef(Project? project, Guid fileRefId)
+    {
+        if (project == null) return null;
+        return FindFileRefIn(project.Children, fileRefId);
+    }
+
+    private static FileReference? FindFileRefIn(List<ProjectChild> children, Guid id)
+    {
+        foreach (var child in children)
+        {
+            if (child is FileReference fr && fr.Id == id)
+                return fr;
+            if (child is Collection coll)
+            {
+                var found = FindFileRefIn(coll.Children, id);
                 if (found != null) return found;
             }
         }
