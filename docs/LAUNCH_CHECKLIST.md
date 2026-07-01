@@ -25,7 +25,7 @@
   accepts ANY correctly-formatted string as a valid license** (dev mode). If you ship like this,
   every "key" works and nobody needs to pay. See **Section 2**.
 - [ ] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
-  updater fetches `https://raw.githubusercontent.com/bmusical/ProjectExplorer/main/updates/updates.xml`.
+  updater fetches `https://raw.githubusercontent.com/bmusical/ProjectExplorer/master/updates/updates.xml`.
   If the repo is private, that URL 404s and auto-update silently fails. See **Section 5**.
 
 ---
@@ -36,16 +36,16 @@
   - **Product / brand:** *Project Nest*
   - **Program / application:** *Project Nest Explorer*
   - **Company:** *HxM Blazor Software LLC*
-- [ ] ⛔ **Fix the placeholder URLs and support email — they are currently inconsistent:**
-  | File | Current value | Should be |
-  |------|---------------|-----------|
-  | `RegistrationDialog.cs` → `lnkBuy` | `https://hxm.com/projectnest` | your real Gumroad product URL |
-  | `RegistrationDialog.cs` → invalid-key message | `support@hxm.com` | your real support email |
-  | `installer/ProjectExplorer.iss` → `AppPublisherURL` | `https://blaznaccess.com/landing/project-nest` | confirm this is the real landing page |
-  | `installer/ProjectExplorer.iss` → `AppSupportURL` | `mailto:support@blaznaccess.com` | confirm this is the real support address |
+- [x] ✅ **URLs & support email are now consistent on `blaznaccess.com`:**
+  | File | Value |
+  |------|-------|
+  | `RegistrationDialog.cs` → `lnkBuy` | `https://blaznaccess.com/landing/project-nest` *(swap for the direct Gumroad product URL once live)* |
+  | `RegistrationDialog.cs` → invalid-key message | `support@blaznaccess.com` |
+  | `installer/ProjectExplorer.iss` → `AppPublisherURL` | `https://blaznaccess.com/landing/project-nest` |
+  | `installer/ProjectExplorer.iss` → `AppSupportURL` | `mailto:support@blaznaccess.com` |
 
-  > Pick **one** support email and **one** purchase URL and use them consistently. Right now the
-  > code says `hxm.com` and the installer says `blaznaccess.com` — decide which is canonical.
+  > Canonical support address is **support@blaznaccess.com**. The only remaining TODO here is to
+  > repoint `lnkBuy` at the *direct Gumroad checkout URL* when the product page is published.
 - [ ] 🔧 Register / confirm ownership of the domain used in those URLs.
 - [ ] 🔧 Set up the support inbox (e.g. `support@yourdomain.com`) and make sure you actually receive mail there.
 - [ ] 💡 Write a one-line tagline (already in-app: *"All your projects, one place."*) and keep it consistent across Gumroad, the landing page, and the About box.
@@ -190,7 +190,7 @@ Everything is scripted in `installer/build-installer.ps1`.
 
 ## 5. GitHub Releases & auto-update (🔧 one-time + 🔁 every release)
 
-The in-app updater (AutoUpdater.NET) reads `updates/updates.xml` from the repo's **`main`** branch and
+The in-app updater (AutoUpdater.NET) reads `updates/updates.xml` from the repo's **`master`** branch and
 compares `<version>` to the running assembly version. If newer, it prompts the user and downloads the
 `<url>` installer.
 
@@ -200,11 +200,8 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
   - Go to repo **Settings → General → Danger Zone → Change visibility → Public**.
   - Alternatively, keep the repo private and host `updates.xml` on your public website, then update
     the `UpdateCheckUrl` constant in `MainForm.cs` to that URL. (Public repo is simpler.)
-- [ ] ⚠️ **Branch name mismatch to verify:** the updater URL points at **`/main/`** but this repo's
-  default branch is **`master`**. Either:
-  - rename the default branch to `main`, **or**
-  - change the URL in `MainForm.cs` from `.../ProjectExplorer/main/updates/updates.xml` to `.../master/...`.
-  Pick one and make them match, or updates will never be found. (Tracked in Section 7.)
+- [x] ✅ **Branch name mismatch fixed:** the updater URL in `MainForm.cs` now points at **`/master/`**,
+  matching this repo's default branch. (There is no `main` branch — that was resolved.)
 
 ### 5.2 Cut a release (🔁 every release)
 
@@ -258,8 +255,8 @@ These are tracked here so nothing slips. (The trivial-and-safe ones are handled 
 the judgment calls are left for you.)
 
 - [ ] ⛔ Replace `PublicKeyPem` placeholder (Section 2.2).
-- [ ] ⛔ Reconcile the `main` vs `master` branch in the updater URL (Section 5.1).
-- [ ] ⛔ Reconcile support email + purchase URL between `RegistrationDialog.cs` and the installer (Section 1).
+- [x] ✅ Updater URL now uses `/master/` (repo's real default branch; no `main` exists). *(handled in companion PR)*
+- [x] ✅ Support email + landing URL reconciled to `blaznaccess.com` across `RegistrationDialog.cs` and the installer. *(handled in companion PR)*
 - [x] 🔧 Fixed the stray "Inno Setup 7" comments in `build-installer.ps1` **and** `ProjectExplorer.iss` — all now correctly say **Inno Setup 6**. *(handled in companion PR)*
 - [ ] 🔧 Ensure `*.pem`, `publish/`, and `installer-output/` are git-ignored. *(handled in companion PR)*
 - [ ] 💡 Keep `updates/updates.xml` `<mandatory>` = `false` unless you ship a critical fix.

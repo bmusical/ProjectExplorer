@@ -148,7 +148,7 @@ public partial class MainForm : Form
     }
 
     private const string UpdateCheckUrl =
-        "https://raw.githubusercontent.com/bmusical/ProjectExplorer/main/updates/updates.xml";
+        "https://raw.githubusercontent.com/bmusical/ProjectExplorer/master/updates/updates.xml";
 
     /// <param name="silent">
     /// true = only show dialog when an update is available (startup background check).

@@ -133,7 +133,7 @@ public class RegistrationDialog : Form
         lnkBuy.LinkClicked += (s, e) =>
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "https://hxm.com/projectnest",   // update with real URL
+                FileName = "https://blaznaccess.com/landing/project-nest",   // TODO: swap for direct Gumroad product URL when live
                 UseShellExecute = true
             });
 
@@ -175,7 +175,7 @@ public class RegistrationDialog : Form
         {
             MessageBox.Show(
                 "That key doesn't appear to be valid. Please check it and try again.\n" +
-                "If you need help, contact support@hxm.com.",
+                "If you need help, contact support@blaznaccess.com.",
                 "Invalid Key", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
