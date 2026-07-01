@@ -4,6 +4,12 @@ partial class MainForm
 {
     private System.ComponentModel.IContainer components = null;
 
+    // Branded header band
+    private Panel headerPanel;
+    private PictureBox headerLogo;
+    private Label headerTitle;
+    private Label headerTagline;
+
     // Top navigation
     private ToolStrip toolStripNav;
     private ToolStripButton btnBack;
@@ -75,23 +81,59 @@ partial class MainForm
         };
 
         // ── Navigation ToolStrip ──
-        this.btnBack = new ToolStripButton { Text = "←", ToolTipText = "Back", Enabled = false };
-        this.btnForward = new ToolStripButton { Text = "→", ToolTipText = "Forward", Enabled = false };
-        this.btnUp = new ToolStripButton { Text = "↑", ToolTipText = "Up" };
-        this.btnOpenExplorer = new ToolStripButton { Text = "📁", ToolTipText = "Open in Explorer", Enabled = false };
+        // Larger, clearer buttons. Glyphs are drawn from the "Segoe MDL2 Assets"
+        // system font (present on Windows 10/11) so no external icon assets are needed.
+        var navGlyphFont = new Font("Segoe MDL2 Assets", 12f);
+
+        this.btnBack = new ToolStripButton
+        {
+            Text = "\uE72B", // ChevronLeft / Back
+            Font = navGlyphFont,
+            ToolTipText = "Back",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnForward = new ToolStripButton
+        {
+            Text = "\uE72A", // ChevronRight / Forward
+            Font = navGlyphFont,
+            ToolTipText = "Forward",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnUp = new ToolStripButton
+        {
+            Text = "\uE74A", // Up
+            Font = navGlyphFont,
+            ToolTipText = "Up",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnOpenExplorer = new ToolStripButton
+        {
+            Text = "\uE838", // FolderOpen
+            Font = navGlyphFont,
+            ToolTipText = "Open in Explorer",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
         this.txtAddress = new ToolStripTextBox
         {
             Name = "txtAddress",
-            Size = new Size(400, 25),
-            BorderStyle = BorderStyle.FixedSingle
+            Size = new Size(500, 28),
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Segoe UI", 9.5f)
         };
 
         this.toolStripNav = new ToolStrip
         {
-            Items = { this.btnBack, this.btnForward, this.btnUp, this.btnOpenExplorer, this.txtAddress },
+            Items = { this.btnBack, this.btnForward, this.btnUp, new ToolStripSeparator(), this.btnOpenExplorer, this.txtAddress },
             Dock = DockStyle.Top,
             GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(4, 2, 4, 2)
+            ImageScalingSize = new Size(24, 24),
+            AutoSize = false,
+            Height = 40,
+            Padding = new Padding(6, 4, 6, 4),
+            RenderMode = ToolStripRenderMode.System
         };
 
         this.btnBack.Click += BtnBack_Click;
@@ -151,6 +193,57 @@ partial class MainForm
         this.menuViewSmallIcons.Click += (s, e) => SetViewMode(AppView.SmallIcon);
         this.menuViewList.Click += (s, e) => SetViewMode(AppView.List);
         this.menuViewTile.Click += (s, e) => SetViewMode(AppView.Tile);
+
+        // ── Branded Header Band ──
+        // Reuses the same accent blue as the About and Registration dialogs so the
+        // main window shares the product's visual identity.
+        var accentBlue = Color.FromArgb(30, 80, 160);
+
+        this.headerPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 56,
+            BackColor = accentBlue
+        };
+
+        this.headerLogo = new PictureBox
+        {
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(40, 40),
+            Location = new Point(12, 8),
+            BackColor = Color.Transparent
+        };
+        try
+        {
+            using var logoStream = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.logo.png");
+            if (logoStream != null)
+                this.headerLogo.Image = Image.FromStream(logoStream);
+        }
+        catch { /* logo is decorative — ignore load failures */ }
+
+        this.headerTitle = new Label
+        {
+            Text = "Project Nest Explorer",
+            Font = new Font("Segoe UI", 15f, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Location = new Point(60, 7)
+        };
+
+        this.headerTagline = new Label
+        {
+            Text = "All your projects, one place.",
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Italic),
+            ForeColor = Color.FromArgb(200, 220, 255),
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Location = new Point(62, 33)
+        };
+
+        this.headerPanel.Controls.AddRange(new Control[] { this.headerLogo, this.headerTitle, this.headerTagline });
 
         // ── Tree View ──
         this.treeView = new TreeView
@@ -214,22 +307,43 @@ partial class MainForm
         this.statusStrip = new StatusStrip { Items = { lblStatus } };
 
         // ── Form ──
+        // Docked controls are added in reverse visual order (last added docks first / topmost).
         this.Controls.AddRange(new Control[] {
             this.statusStrip,
             this.splitMain,
             this.toolStripNav,
+            this.headerPanel,
             this.menuStrip
         });
         this.MainMenuStrip = this.menuStrip;
 
         this.Text = "Project Nest Explorer";
+        this.Font = new Font("Segoe UI", 9f);
         this.Size = new Size(1200, 750);
         this.MinimumSize = new Size(800, 500);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.KeyPreview = true;
-        this.Icon = SystemIcons.Application;
+        this.Icon = LoadAppIcon();
 
         this.ResumeLayout(false);
         this.PerformLayout();
+    }
+
+    /// <summary>
+    /// Loads the embedded application icon, falling back to the system application
+    /// icon if the resource cannot be found (e.g. during design-time).
+    /// </summary>
+    private static Icon LoadAppIcon()
+    {
+        try
+        {
+            using var stream = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.app.ico");
+            if (stream != null)
+                return new Icon(stream);
+        }
+        catch { /* fall through to system icon */ }
+        return SystemIcons.Application;
     }
 }

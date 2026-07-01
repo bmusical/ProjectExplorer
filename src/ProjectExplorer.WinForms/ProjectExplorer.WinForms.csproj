@@ -14,7 +14,13 @@
     <Company>HxM Blazor Software LLC</Company>
     <Product>Project Nest Explorer</Product>
     <Copyright>Copyright © 2025 HxM Blazor Software LLC</Copyright>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\app.ico" LogicalName="ProjectExplorer.WinForms.Assets.app.ico" />
+    <EmbeddedResource Include="Assets\logo.png" LogicalName="ProjectExplorer.WinForms.Assets.logo.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProjectExplorer.Core\ProjectExplorer.Core.csproj" />
