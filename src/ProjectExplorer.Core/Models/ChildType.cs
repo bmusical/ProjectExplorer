@@ -7,5 +7,6 @@ public enum ChildType
 {
     Collection,
     FolderReference,
-    WebResource
+    WebResource,
+    FileReference
 }

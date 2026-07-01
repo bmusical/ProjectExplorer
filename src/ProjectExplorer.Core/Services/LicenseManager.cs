@@ -114,7 +114,7 @@ public sealed class LicenseManager
             if (child is Collection c)
                 count += CountLeavesIn(c.Children);
             else
-                count++; // FolderReference or WebResource
+                count++; // FolderReference, WebResource, or FileReference
         }
         return count;
     }

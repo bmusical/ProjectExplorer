@@ -227,4 +227,112 @@ public class ProjectManagerTests
             try { Directory.Delete(dir, true); } catch { }
         }
     }
+
+    // ── FileReference tests ──
+
+    [Fact]
+    public async Task AddFileReference_AddsToProjectRoot()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+
+        var fr = await mgr.AddFileReferenceAsync(project.Id, @"C:\Docs\spec.pdf", displayName: "Spec", description: "The brief");
+
+        Assert.NotEqual(Guid.Empty, fr.Id);
+        Assert.Equal(@"C:\Docs\spec.pdf", fr.FilePath);
+        Assert.Equal("Spec", fr.DisplayName);
+        Assert.Equal("The brief", fr.Description);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        var loaded = reloaded.FirstOrDefault(p => p.Id == project.Id);
+        Assert.NotNull(loaded);
+        Assert.Single(loaded!.Children);
+        var loadedFr = Assert.IsType<FileReference>(loaded.Children[0]);
+        Assert.Equal("Spec", loadedFr.EffectiveName);
+        Assert.Equal(@"C:\Docs\spec.pdf", loadedFr.FilePath);
+    }
+
+    [Fact]
+    public async Task AddFileReference_IntoCollection()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Docs");
+
+        var fr = await mgr.AddFileReferenceAsync(project.Id, @"D:\report.docx", parentCollectionId: coll.Id);
+
+        Assert.Equal(coll.Id, fr.ParentId);
+        var loadedColl = mgr.GetProject(project.Id)!.FindCollection(coll.Id);
+        Assert.NotNull(loadedColl);
+        Assert.Single(loadedColl!.Children);
+        Assert.IsType<FileReference>(loadedColl.Children[0]);
+    }
+
+    [Fact]
+    public async Task FileReference_EffectiveName_FallsBackToFileName()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+
+        var fr = await mgr.AddFileReferenceAsync(project.Id, @"C:\Dev\notes.txt");
+
+        Assert.Equal("notes.txt", fr.EffectiveName);
+        Assert.Equal(".txt", fr.Extension);
+    }
+
+    [Fact]
+    public async Task FileReference_Extension_HandlesPosixAndNoExtension()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+
+        var withExt = await mgr.AddFileReferenceAsync(project.Id, "/home/dev/image.PNG");
+        Assert.Equal(".png", withExt.Extension);
+        Assert.Equal("image.PNG", withExt.EffectiveName);
+
+        var noExt = await mgr.AddFileReferenceAsync(project.Id, "/home/dev/Makefile");
+        Assert.Equal(string.Empty, noExt.Extension);
+        Assert.Equal("Makefile", noExt.EffectiveName);
+    }
+
+    [Fact]
+    public async Task UpdateFileReference_ChangesFields()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var fr = await mgr.AddFileReferenceAsync(project.Id, @"C:\old.txt");
+
+        await mgr.UpdateFileReferenceAsync(project.Id, fr.Id,
+            newDisplayName: "Renamed", newPath: @"C:\new.md", newDescription: "updated");
+
+        var loaded = mgr.GetProject(project.Id)!.Children.OfType<FileReference>().Single();
+        Assert.Equal("Renamed", loaded.DisplayName);
+        Assert.Equal(@"C:\new.md", loaded.FilePath);
+        Assert.Equal("updated", loaded.Description);
+    }
+
+    [Fact]
+    public async Task RemoveFileReference_RemovesFromProject()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var fr = await mgr.AddFileReferenceAsync(project.Id, @"C:\gone.txt");
+
+        await mgr.RemoveFileReferenceAsync(project.Id, fr.Id);
+
+        var loaded = (await new JsonProjectRepository(_tempDir).LoadAllAsync())
+            .First(p => p.Id == project.Id);
+        Assert.Empty(loaded.Children);
+    }
+
+    [Fact]
+    public async Task FileReference_CountsAsLeafNode()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        await mgr.AddFileReferenceAsync(project.Id, @"C:\a.txt");
+        await mgr.AddFileReferenceAsync(project.Id, @"C:\b.txt");
+
+        Assert.Equal(2, LicenseManager.CountLeafNodes(mgr.Projects));
+    }
 }

@@ -208,6 +208,57 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    // ── FileReference CRUD ──
+
+    public async Task<FileReference> AddFileReferenceAsync(Guid projectId, string filePath, string? displayName = null, string? description = null, Guid? parentCollectionId = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+
+        var fileRef = new FileReference
+        {
+            FilePath = filePath,
+            DisplayName = displayName,
+            Description = description,
+            ParentId = parentCollectionId ?? project.Id,
+            SortOrder = GetNextSortOrder(project, parentCollectionId)
+        };
+
+        var parentList = parentCollectionId.HasValue
+            ? project.FindCollection(parentCollectionId.Value)?.Children
+            : project.Children;
+
+        if (parentList == null)
+            throw new InvalidOperationException($"Parent collection {parentCollectionId} not found.");
+
+        parentList.Add(fileRef);
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+        return fileRef;
+    }
+
+    public async Task RemoveFileReferenceAsync(Guid projectId, Guid fileRefId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var parentList = project.FindParentList(fileRefId) ?? throw new InvalidOperationException($"Cannot find parent list for file reference {fileRefId}.");
+        parentList.RemoveAll(c => c.Id == fileRefId);
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
+    public async Task UpdateFileReferenceAsync(Guid projectId, Guid fileRefId, string? newDisplayName = null, string? newPath = null, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var parentList = project.FindParentList(fileRefId) ?? throw new InvalidOperationException($"Cannot find parent list for file reference {fileRefId}.");
+        var fileRef = parentList.FirstOrDefault(c => c.Id == fileRefId) as FileReference
+            ?? throw new InvalidOperationException($"File reference {fileRefId} not found.");
+
+        if (newDisplayName != null) fileRef.DisplayName = newDisplayName;
+        if (newPath != null) fileRef.FilePath = newPath;
+        if (newDescription != null) fileRef.Description = newDescription;
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     // ── Reordering ──
 
     public async Task ReorderChildrenAsync(Guid projectId, Guid? parentCollectionId, List<Guid> orderedChildIds)
