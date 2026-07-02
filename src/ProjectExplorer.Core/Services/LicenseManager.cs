@@ -23,7 +23,12 @@ public sealed class LicenseManager
     // ── Key verification ──────────────────────────────────────────────────────
     // Replace with your real ECDSA P-256 public key (PEM) after generating your keypair.
     // In dev mode (placeholder present) keys are accepted as plain "email|FULL|date" strings.
-    private const string PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER";
+    private const string PublicKeyPem = """
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEB+9A3XrPjAvAEsos8xJCA1OoJKCJ
+iVHCFrT7kOopxLYLRL+MU7EDW5nlRPDHEbDi1er7sJIFuyKGTCc9i+mNqA==
+-----END PUBLIC KEY-----
+""";
 
     // ── Storage ───────────────────────────────────────────────────────────────
     private readonly string _storageDir;
