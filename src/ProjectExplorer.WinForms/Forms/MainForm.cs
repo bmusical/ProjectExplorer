@@ -14,6 +14,15 @@ public partial class MainForm : Form
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
     private readonly IShellThumbnailProvider _shellThumbnailProvider;
+
+    // Tracks, per image ListViewItem, the icon key (shown in Small/Details/List
+    // views) and the thumbnail key (shown in Large/Extra Large views), so we can
+    // emulate Windows Explorer: icons in compact views, thumbnails in big views.
+    private readonly Dictionary<ListViewItem, (string IconKey, string ThumbKey)> _imageItemKeys = new();
+
+    // The current view mode, so async thumbnail loads know whether to apply
+    // the thumbnail immediately (large views) or leave the icon in place.
+    private AppView _currentView = AppView.Details;
     private readonly LicenseManager _licenseManager;
     private LicenseInfo _license;
 
@@ -784,10 +793,11 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileInfo.LastWriteTime.ToString("g"));
                 listView.Items.Add(item);
 
-                // For image files, request a real thumbnail in the background and
-                // swap it into the Large Icons image list once ready.
+                // For image files, request a real thumbnail in the background.
+                // The item keeps its file-type icon for compact views; the
+                // thumbnail is used only in Large/Extra Large views (Option B).
                 if (ImageFileHelper.IsImageExtension(ext))
-                    QueueThumbnail(item, file);
+                    QueueThumbnail(item, file, iconKey);
             }
         }
         catch (UnauthorizedAccessException)
@@ -801,13 +811,15 @@ public partial class MainForm : Form
     /// assigns it to the given ListView item's Large Icon. Falls back silently
     /// to the existing extension icon when no thumbnail can be produced.
     /// </summary>
-    private void QueueThumbnail(ListViewItem item, string filePath)
+    private void QueueThumbnail(ListViewItem item, string filePath, string iconKey)
     {
-        // Request the thumbnail at the largest size we display (extra-large),
-        // then downscale for the other image lists. A ListView item shares one
-        // ImageKey across all its image lists, so the key MUST exist in every
-        // list (small, large, extra-large) or the icon vanishes when the view
-        // switches. That is exactly the bug this guards against.
+        // Option B (Windows Explorer behaviour): image files keep their
+        // file-type ICON in compact views (Small Icons / List / Details) and
+        // show the picture THUMBNAIL only in Large / Extra Large views.
+        //
+        // We therefore add the thumbnail only to the large image lists, record
+        // both keys for the item, and switch the item's ImageKey between them
+        // in SetViewMode. The item starts on its icon key (set at creation).
         var requestSize = imageListExtraLarge.ImageSize;
         var thumbKey = "thumb:" + filePath;
 
@@ -832,15 +844,17 @@ public partial class MainForm : Form
                             return;
                         }
 
-                        // Add a correctly-sized copy of the thumbnail to every
-                        // image list under the same key so the item shows a
-                        // thumbnail in every view mode (Small/Details/List/
-                        // Large/Extra Large).
-                        AddThumbToList(imageListSmall, thumbKey, bmp);
+                        // Thumbnails live only in the large image lists.
                         AddThumbToList(imageListLarge, thumbKey, bmp);
                         AddThumbToList(imageListExtraLarge, thumbKey, bmp);
 
-                        item.ImageKey = thumbKey;
+                        // Remember both keys so view switches can toggle them.
+                        _imageItemKeys[item] = (iconKey, thumbKey);
+
+                        // If we're currently in a large view, show the thumbnail
+                        // now; otherwise leave the icon in place.
+                        if (IsLargeView(_currentView))
+                            item.ImageKey = thumbKey;
 
                         bmp.Dispose();
                     }
@@ -849,6 +863,44 @@ public partial class MainForm : Form
             }
             catch { bmp.Dispose(); }
         });
+    }
+
+    /// <summary>True for the icon views that should display picture thumbnails.</summary>
+    private static bool IsLargeView(AppView view) =>
+        view == AppView.LargeIcon || view == AppView.ExtraLargeIcon;
+
+    /// <summary>
+    /// Opens a terminal (Command Prompt or PowerShell) with its working
+    /// directory set to <paramref name="folderPath"/>. Prefers PowerShell 7
+    /// (pwsh.exe) when requested and available, falling back to Windows
+    /// PowerShell. Shows a friendly message if the folder no longer exists.
+    /// </summary>
+    private void LaunchTerminal(string folderPath, bool usePowerShell)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            MessageBox.Show(
+                $"The folder could not be found:\n{folderPath}\n\nIt may have been moved, renamed, or deleted.",
+                "Folder Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var fileName = usePowerShell ? "powershell.exe" : "cmd.exe";
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = folderPath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not open {(usePowerShell ? "PowerShell" : "Command Prompt")}:\n{ex.Message}",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     /// <summary>
@@ -943,6 +995,7 @@ public partial class MainForm : Form
         _currentPath = path;
         listView.BeginUpdate();
         listView.Items.Clear();
+        _imageItemKeys.Clear();
         PopulateFileList(path);
         listView.EndUpdate();
         UpdateAddressBar();
@@ -1126,6 +1179,16 @@ public partial class MainForm : Form
                     if (fr != null && Directory.Exists(fr.RealPath))
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
                 });
+                menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+                });
+                menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
+                });
                 menu.Items.Add("Copy Path", null, (s, e) =>
                 {
                     var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
@@ -1245,6 +1308,8 @@ public partial class MainForm : Form
                 if (Directory.Exists(path))
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             });
+            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
+            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
             menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
         }
         else if (tag.StartsWith("File:"))
@@ -1295,10 +1360,26 @@ public partial class MainForm : Form
 
     private void SetViewMode(AppView mode)
     {
+        _currentView = mode;
+
         // "Extra Large Icons" is not a distinct WinForms View value; Windows
         // achieves it by using the LargeIcon view with a bigger LargeImageList.
         // Swap the large image list accordingly, then set the underlying View.
         listView.LargeImageList = mode == AppView.ExtraLargeIcon ? imageListExtraLarge : imageListLarge;
+
+        // Option B: image files show their picture thumbnail in large views and
+        // their file-type icon in compact views. Toggle each tracked image item.
+        var showThumbs = IsLargeView(mode);
+        if (_imageItemKeys.Count > 0)
+        {
+            listView.BeginUpdate();
+            foreach (var (item, keys) in _imageItemKeys)
+            {
+                if (item.ListView == null) continue;
+                item.ImageKey = showThumbs ? keys.ThumbKey : keys.IconKey;
+            }
+            listView.EndUpdate();
+        }
 
         listView.View = mode switch
         {
@@ -1570,6 +1651,16 @@ public partial class MainForm : Form
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
                 }
+            });
+            menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+            {
+                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+            });
+            menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+            {
+                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
             });
         }
 
