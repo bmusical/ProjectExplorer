@@ -14,6 +14,15 @@ public partial class MainForm : Form
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
     private readonly IShellThumbnailProvider _shellThumbnailProvider;
+
+    // Tracks, per image ListViewItem, the icon key (shown in Small/Details/List
+    // views) and the thumbnail key (shown in Large/Extra Large views), so we can
+    // emulate Windows Explorer: icons in compact views, thumbnails in big views.
+    private readonly Dictionary<ListViewItem, (string IconKey, string ThumbKey)> _imageItemKeys = new();
+
+    // The current view mode, so async thumbnail loads know whether to apply
+    // the thumbnail immediately (large views) or leave the icon in place.
+    private AppView _currentView = AppView.Details;
     private readonly LicenseManager _licenseManager;
     private LicenseInfo _license;
 
@@ -207,6 +216,8 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Small, open: true));
             imageListLarge.Images.Add("Folder", _shellIconProvider.GetFolderIcon(IconSize.Large));
             imageListLarge.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Large, open: true));
+            imageListExtraLarge.Images.Add("Folder", _shellIconProvider.GetFolderIcon(IconSize.Large));
+            imageListExtraLarge.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Large, open: true));
         }
         catch
         {
@@ -214,23 +225,29 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("FolderOpen", GlyphBitmap("\uE838", 16, Color.FromArgb(222, 175, 60)));
             imageListLarge.Images.Add("Folder", GlyphBitmap("\uE8B7", 48, Color.FromArgb(222, 175, 60)));
             imageListLarge.Images.Add("FolderOpen", GlyphBitmap("\uE838", 48, Color.FromArgb(222, 175, 60)));
+            imageListExtraLarge.Images.Add("Folder", GlyphBitmap("\uE8B7", 96, Color.FromArgb(222, 175, 60)));
+            imageListExtraLarge.Images.Add("FolderOpen", GlyphBitmap("\uE838", 96, Color.FromArgb(222, 175, 60)));
         }
 
         // Project  = nest/home accent blue   (\uE80F = Home)
         imageListSmall.Images.Add("Project", GlyphBitmap("\uE80F", 16, Color.FromArgb(30, 80, 160)));
         imageListLarge.Images.Add("Project", GlyphBitmap("\uE80F", 48, Color.FromArgb(30, 80, 160)));
+        imageListExtraLarge.Images.Add("Project", GlyphBitmap("\uE80F", 96, Color.FromArgb(30, 80, 160)));
 
         // Collection = library/stack         (\uE8F1 = Library)
         imageListSmall.Images.Add("Collection", GlyphBitmap("\uE8F1", 16, Color.FromArgb(120, 90, 170)));
         imageListLarge.Images.Add("Collection", GlyphBitmap("\uE8F1", 48, Color.FromArgb(120, 90, 170)));
+        imageListExtraLarge.Images.Add("Collection", GlyphBitmap("\uE8F1", 96, Color.FromArgb(120, 90, 170)));
 
         // WebResource = globe (was a confusing security shield) (\uE774 = Globe)
         imageListSmall.Images.Add("WebResource", GlyphBitmap("\uE774", 16, Color.FromArgb(40, 130, 120)));
         imageListLarge.Images.Add("WebResource", GlyphBitmap("\uE774", 48, Color.FromArgb(40, 130, 120)));
+        imageListExtraLarge.Images.Add("WebResource", GlyphBitmap("\uE774", 96, Color.FromArgb(40, 130, 120)));
 
         // FileReference = page/document       (\uE8A5 = Document)
         imageListSmall.Images.Add("FileReference", GlyphBitmap("\uE8A5", 16, Color.FromArgb(90, 100, 110)));
         imageListLarge.Images.Add("FileReference", GlyphBitmap("\uE8A5", 48, Color.FromArgb(90, 100, 110)));
+        imageListExtraLarge.Images.Add("FileReference", GlyphBitmap("\uE8A5", 96, Color.FromArgb(90, 100, 110)));
     }
 
     /// <summary>
@@ -390,6 +407,7 @@ public partial class MainForm : Form
                 {
                     imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
                     imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                    imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                 }
                 catch { /* fall through to generic glyph */ }
             }
@@ -758,6 +776,7 @@ public partial class MainForm : Form
                         imageListSmall.Images.Add(iconKey, icon);
                         var largeIcon = _shellIconProvider.GetIconByExtension(ext, IconSize.Large);
                         imageListLarge.Images.Add(iconKey, largeIcon);
+                        imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                     }
                     catch
                     {
@@ -774,10 +793,11 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileInfo.LastWriteTime.ToString("g"));
                 listView.Items.Add(item);
 
-                // For image files, request a real thumbnail in the background and
-                // swap it into the Large Icons image list once ready.
+                // For image files, request a real thumbnail in the background.
+                // The item keeps its file-type icon for compact views; the
+                // thumbnail is used only in Large/Extra Large views (Option B).
                 if (ImageFileHelper.IsImageExtension(ext))
-                    QueueThumbnail(item, file);
+                    QueueThumbnail(item, file, iconKey);
             }
         }
         catch (UnauthorizedAccessException)
@@ -791,15 +811,22 @@ public partial class MainForm : Form
     /// assigns it to the given ListView item's Large Icon. Falls back silently
     /// to the existing extension icon when no thumbnail can be produced.
     /// </summary>
-    private void QueueThumbnail(ListViewItem item, string filePath)
+    private void QueueThumbnail(ListViewItem item, string filePath, string iconKey)
     {
-        var size = imageListLarge.ImageSize;
+        // Option B (Windows Explorer behaviour): image files keep their
+        // file-type ICON in compact views (Small Icons / List / Details) and
+        // show the picture THUMBNAIL only in Large / Extra Large views.
+        //
+        // We therefore add the thumbnail only to the large image lists, record
+        // both keys for the item, and switch the item's ImageKey between them
+        // in SetViewMode. The item starts on its icon key (set at creation).
+        var requestSize = imageListExtraLarge.ImageSize;
         var thumbKey = "thumb:" + filePath;
 
         System.Threading.Tasks.Task.Run(() =>
         {
             System.Drawing.Bitmap? bmp = null;
-            try { bmp = _shellThumbnailProvider.GetThumbnail(filePath, size); }
+            try { bmp = _shellThumbnailProvider.GetThumbnail(filePath, requestSize); }
             catch { bmp = null; }
             if (bmp == null) return;
 
@@ -817,18 +844,91 @@ public partial class MainForm : Form
                             return;
                         }
 
-                        if (!imageListLarge.Images.ContainsKey(thumbKey))
-                            imageListLarge.Images.Add(thumbKey, bmp);
-                        else
-                            bmp.Dispose();
+                        // Thumbnails live only in the large image lists.
+                        AddThumbToList(imageListLarge, thumbKey, bmp);
+                        AddThumbToList(imageListExtraLarge, thumbKey, bmp);
 
-                        item.ImageKey = thumbKey;
+                        // Remember both keys so view switches can toggle them.
+                        _imageItemKeys[item] = (iconKey, thumbKey);
+
+                        // If we're currently in a large view, show the thumbnail
+                        // now; otherwise leave the icon in place.
+                        if (IsLargeView(_currentView))
+                            item.ImageKey = thumbKey;
+
+                        bmp.Dispose();
                     }
                     catch { bmp.Dispose(); }
                 });
             }
             catch { bmp.Dispose(); }
         });
+    }
+
+    /// <summary>True for the icon views that should display picture thumbnails.</summary>
+    private static bool IsLargeView(AppView view) =>
+        view == AppView.LargeIcon || view == AppView.ExtraLargeIcon;
+
+    /// <summary>
+    /// Opens a terminal (Command Prompt or PowerShell) with its working
+    /// directory set to <paramref name="folderPath"/>. Prefers PowerShell 7
+    /// (pwsh.exe) when requested and available, falling back to Windows
+    /// PowerShell. Shows a friendly message if the folder no longer exists.
+    /// </summary>
+    private void LaunchTerminal(string folderPath, bool usePowerShell)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            MessageBox.Show(
+                $"The folder could not be found:\n{folderPath}\n\nIt may have been moved, renamed, or deleted.",
+                "Folder Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var fileName = usePowerShell ? "powershell.exe" : "cmd.exe";
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = folderPath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not open {(usePowerShell ? "PowerShell" : "Command Prompt")}:\n{ex.Message}",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    /// <summary>
+    /// Adds <paramref name="source"/> to <paramref name="list"/> under
+    /// <paramref name="key"/>, scaled to the list's image size. No-op if the
+    /// key already exists.
+    /// </summary>
+    private static void AddThumbToList(ImageList list, string key, System.Drawing.Bitmap source)
+    {
+        if (list.Images.ContainsKey(key)) return;
+
+        var target = list.ImageSize;
+        var scaled = new System.Drawing.Bitmap(target.Width, target.Height,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = System.Drawing.Graphics.FromImage(scaled))
+        {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.Clear(System.Drawing.Color.Transparent);
+
+            // Preserve aspect ratio, centered ("fit").
+            var ratio = Math.Min((float)target.Width / source.Width, (float)target.Height / source.Height);
+            var w = Math.Max(1, (int)(source.Width * ratio));
+            var h = Math.Max(1, (int)(source.Height * ratio));
+            var x = (target.Width - w) / 2;
+            var y = (target.Height - h) / 2;
+            g.DrawImage(source, x, y, w, h);
+        }
+        list.Images.Add(key, scaled);
     }
 
     // ── Navigation ──
@@ -895,6 +995,7 @@ public partial class MainForm : Form
         _currentPath = path;
         listView.BeginUpdate();
         listView.Items.Clear();
+        _imageItemKeys.Clear();
         PopulateFileList(path);
         listView.EndUpdate();
         UpdateAddressBar();
@@ -1078,6 +1179,16 @@ public partial class MainForm : Form
                     if (fr != null && Directory.Exists(fr.RealPath))
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
                 });
+                menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+                });
+                menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+                {
+                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
+                });
                 menu.Items.Add("Copy Path", null, (s, e) =>
                 {
                     var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
@@ -1197,6 +1308,8 @@ public partial class MainForm : Form
                 if (Directory.Exists(path))
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             });
+            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
+            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
             menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
         }
         else if (tag.StartsWith("File:"))
@@ -1233,6 +1346,7 @@ public partial class MainForm : Form
     {
         var viewMenu = new ToolStripMenuItem("View");
         viewMenu.DropDownItems.Add("Details", null, (s, e) => SetViewMode(AppView.Details));
+        viewMenu.DropDownItems.Add("Extra Large Icons", null, (s, e) => SetViewMode(AppView.ExtraLargeIcon));
         viewMenu.DropDownItems.Add("Large Icons", null, (s, e) => SetViewMode(AppView.LargeIcon));
         viewMenu.DropDownItems.Add("Small Icons", null, (s, e) => SetViewMode(AppView.SmallIcon));
         viewMenu.DropDownItems.Add("List", null, (s, e) => SetViewMode(AppView.List));
@@ -1242,13 +1356,35 @@ public partial class MainForm : Form
 
     // ── View Modes ──
 
-    private enum AppView { Details, LargeIcon, SmallIcon, List, Tile }
+    private enum AppView { Details, ExtraLargeIcon, LargeIcon, SmallIcon, List, Tile }
 
     private void SetViewMode(AppView mode)
     {
+        _currentView = mode;
+
+        // "Extra Large Icons" is not a distinct WinForms View value; Windows
+        // achieves it by using the LargeIcon view with a bigger LargeImageList.
+        // Swap the large image list accordingly, then set the underlying View.
+        listView.LargeImageList = mode == AppView.ExtraLargeIcon ? imageListExtraLarge : imageListLarge;
+
+        // Option B: image files show their picture thumbnail in large views and
+        // their file-type icon in compact views. Toggle each tracked image item.
+        var showThumbs = IsLargeView(mode);
+        if (_imageItemKeys.Count > 0)
+        {
+            listView.BeginUpdate();
+            foreach (var (item, keys) in _imageItemKeys)
+            {
+                if (item.ListView == null) continue;
+                item.ImageKey = showThumbs ? keys.ThumbKey : keys.IconKey;
+            }
+            listView.EndUpdate();
+        }
+
         listView.View = mode switch
         {
             AppView.Details => System.Windows.Forms.View.Details,
+            AppView.ExtraLargeIcon => System.Windows.Forms.View.LargeIcon,
             AppView.LargeIcon => System.Windows.Forms.View.LargeIcon,
             AppView.SmallIcon => System.Windows.Forms.View.SmallIcon,
             AppView.List => System.Windows.Forms.View.List,
@@ -1258,6 +1394,7 @@ public partial class MainForm : Form
 
         // Update menu checkmarks
         menuViewDetails.Checked = mode == AppView.Details;
+        menuViewExtraLargeIcons.Checked = mode == AppView.ExtraLargeIcon;
         menuViewLargeIcons.Checked = mode == AppView.LargeIcon;
         menuViewSmallIcons.Checked = mode == AppView.SmallIcon;
         menuViewList.Checked = mode == AppView.List;
@@ -1514,6 +1651,16 @@ public partial class MainForm : Form
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
                 }
+            });
+            menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+            {
+                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+            });
+            menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+            {
+                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
             });
         }
 
@@ -1910,6 +2057,7 @@ public partial class MainForm : Form
                 {
                     imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
                     imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                    imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                 }
                 catch { /* fall through to generic glyph */ }
             }
