@@ -65,6 +65,8 @@ public partial class MainForm : Form
 
         InitializeComponent();
 
+        SetWindowTitle();
+
         // Attach event handler for address bar - must be done after InitializeComponent
         if (txtAddress.TextBox != null)
         {
@@ -78,6 +80,17 @@ public partial class MainForm : Form
         RestoreTreeState(treeView.Nodes, new HashSet<string>(persistedState.ExpandedTags), persistedState.SelectedTag);
         treeView.EndUpdate();
         treeView.SelectedNode?.EnsureVisible();
+    }
+
+    /// <summary>
+    /// Sets the window title to "Project Nest Explorer {major.minor.build}", reading the
+    /// version from the assembly so it always matches the csproj &lt;Version&gt; with no hardcoding.
+    /// </summary>
+    private void SetWindowTitle()
+    {
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+                ?? new Version(1, 0, 0);
+        this.Text = $"Project Nest Explorer {v.Major}.{v.Minor}.{v.Build}";
     }
 
     protected override void OnLoad(EventArgs e)
