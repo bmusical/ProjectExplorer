@@ -13,6 +13,7 @@ public partial class MainForm : Form
 {
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
+    private readonly IShellThumbnailProvider _shellThumbnailProvider;
     private readonly LicenseManager _licenseManager;
     private LicenseInfo _license;
 
@@ -57,12 +58,14 @@ public partial class MainForm : Form
     private const string TagRealFolder = "RealFolder:";
 
     public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
+                    IShellThumbnailProvider shellThumbnailProvider,
                     LicenseManager licenseManager, LicenseInfo license)
     {
-        _projectManager    = projectManager;
-        _shellIconProvider = shellIconProvider;
-        _licenseManager    = licenseManager;
-        _license           = license;
+        _projectManager         = projectManager;
+        _shellIconProvider      = shellIconProvider;
+        _shellThumbnailProvider = shellThumbnailProvider;
+        _licenseManager         = licenseManager;
+        _license                = license;
 
         InitializeComponent();
 
@@ -770,12 +773,62 @@ public partial class MainForm : Form
                 item.SubItems.Add(GetFileTypeDescription(ext));
                 item.SubItems.Add(fileInfo.LastWriteTime.ToString("g"));
                 listView.Items.Add(item);
+
+                // For image files, request a real thumbnail in the background and
+                // swap it into the Large Icons image list once ready.
+                if (ImageFileHelper.IsImageExtension(ext))
+                    QueueThumbnail(item, file);
             }
         }
         catch (UnauthorizedAccessException)
         {
             listView.Items.Add(new ListViewItem("(Access denied)") { ForeColor = Color.Gray });
         }
+    }
+
+    /// <summary>
+    /// Loads a real image thumbnail off the UI thread and, once available,
+    /// assigns it to the given ListView item's Large Icon. Falls back silently
+    /// to the existing extension icon when no thumbnail can be produced.
+    /// </summary>
+    private void QueueThumbnail(ListViewItem item, string filePath)
+    {
+        var size = imageListLarge.ImageSize;
+        var thumbKey = "thumb:" + filePath;
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            System.Drawing.Bitmap? bmp = null;
+            try { bmp = _shellThumbnailProvider.GetThumbnail(filePath, size); }
+            catch { bmp = null; }
+            if (bmp == null) return;
+
+            if (IsDisposed || listView.IsDisposed) { bmp.Dispose(); return; }
+
+            try
+            {
+                BeginInvoke(() =>
+                {
+                    try
+                    {
+                        if (IsDisposed || listView.IsDisposed || item.ListView == null)
+                        {
+                            bmp.Dispose();
+                            return;
+                        }
+
+                        if (!imageListLarge.Images.ContainsKey(thumbKey))
+                            imageListLarge.Images.Add(thumbKey, bmp);
+                        else
+                            bmp.Dispose();
+
+                        item.ImageKey = thumbKey;
+                    }
+                    catch { bmp.Dispose(); }
+                });
+            }
+            catch { bmp.Dispose(); }
+        });
     }
 
     // ── Navigation ──
@@ -912,10 +965,52 @@ public partial class MainForm : Form
         else if (tag.StartsWith("File:"))
         {
             var filePath = tag.Substring("File:".Length);
+
+            // Image files open in the built-in viewer; everything else opens
+            // with its associated application via the shell.
+            if (ImageFileHelper.IsImageFile(filePath))
+            {
+                OpenImageViewer(filePath);
+                return;
+            }
+
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(filePath) { UseShellExecute = true });
             }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// Opens the in-app image viewer for the given image, seeded with all
+    /// image files in the same folder so Next/Previous work.
+    /// </summary>
+    private void OpenImageViewer(string imagePath)
+    {
+        try
+        {
+            var folder = Path.GetDirectoryName(imagePath);
+            IEnumerable<string> images;
+            if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+            {
+                images = Directory.EnumerateFiles(folder)
+                                  .Where(ImageFileHelper.IsImageFile)
+                                  .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                                  .ToList();
+            }
+            else
+            {
+                images = new[] { imagePath };
+            }
+
+            using var viewer = new ImageViewerForm(images, imagePath);
+            viewer.ShowDialog(this);
+        }
+        catch
+        {
+            // Fall back to the OS default app if the viewer cannot open.
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(imagePath) { UseShellExecute = true }); }
             catch { }
         }
     }
@@ -1833,6 +1928,13 @@ public partial class MainForm : Form
             MessageBox.Show(
                 $"The file could not be found:\n{fileRef.FilePath}\n\nIt may have been moved, renamed, or deleted.",
                 "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // Image file references open in the built-in viewer.
+        if (ImageFileHelper.IsImageFile(fileRef.FilePath))
+        {
+            OpenImageViewer(fileRef.FilePath);
             return;
         }
 
