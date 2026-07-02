@@ -34,6 +34,7 @@ partial class MainForm
     // Image lists
     private ImageList imageListSmall;
     private ImageList imageListLarge;
+    private ImageList imageListExtraLarge;
 
     // Menu strip
     private MenuStrip menuStrip;
@@ -42,6 +43,7 @@ partial class MainForm
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
+    private ToolStripMenuItem menuViewExtraLargeIcons;
     private ToolStripMenuItem menuViewLargeIcons;
     private ToolStripMenuItem menuViewSmallIcons;
     private ToolStripMenuItem menuViewList;
@@ -77,6 +79,11 @@ partial class MainForm
         this.imageListLarge = new ImageList(this.components)
         {
             ImageSize = new Size(48, 48),
+            ColorDepth = ColorDepth.Depth32Bit
+        };
+        this.imageListExtraLarge = new ImageList(this.components)
+        {
+            ImageSize = new Size(96, 96),
             ColorDepth = ColorDepth.Depth32Bit
         };
 
@@ -149,12 +156,13 @@ partial class MainForm
 
         this.menuView = new ToolStripMenuItem { Text = "&View" };
         this.menuViewDetails = new ToolStripMenuItem { Text = "&Details", Checked = true };
+        this.menuViewExtraLargeIcons = new ToolStripMenuItem { Text = "&Extra Large Icons" };
         this.menuViewLargeIcons = new ToolStripMenuItem { Text = "Large &Icons" };
         this.menuViewSmallIcons = new ToolStripMenuItem { Text = "&Small Icons" };
         this.menuViewList = new ToolStripMenuItem { Text = "&List" };
         this.menuViewTile = new ToolStripMenuItem { Text = "&Tile" };
         this.menuView.DropDownItems.AddRange(new ToolStripItem[] {
-            menuViewDetails, menuViewLargeIcons, menuViewSmallIcons, menuViewList, menuViewTile
+            menuViewDetails, menuViewExtraLargeIcons, menuViewLargeIcons, menuViewSmallIcons, menuViewList, menuViewTile
         });
 
         this.menuProject = new ToolStripMenuItem { Text = "&Project" };
@@ -189,6 +197,7 @@ partial class MainForm
         this.menuHelpCheckForUpdates.Click += (s, e) => CheckForUpdates(silent: false);
         this.menuHelpAbout.Click           += (s, e) => new AboutForm().ShowDialog(this);
         this.menuViewDetails.Click += (s, e) => SetViewMode(AppView.Details);
+        this.menuViewExtraLargeIcons.Click += (s, e) => SetViewMode(AppView.ExtraLargeIcon);
         this.menuViewLargeIcons.Click += (s, e) => SetViewMode(AppView.LargeIcon);
         this.menuViewSmallIcons.Click += (s, e) => SetViewMode(AppView.SmallIcon);
         this.menuViewList.Click += (s, e) => SetViewMode(AppView.List);
