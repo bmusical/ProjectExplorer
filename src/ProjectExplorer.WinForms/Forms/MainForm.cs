@@ -207,6 +207,8 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Small, open: true));
             imageListLarge.Images.Add("Folder", _shellIconProvider.GetFolderIcon(IconSize.Large));
             imageListLarge.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Large, open: true));
+            imageListExtraLarge.Images.Add("Folder", _shellIconProvider.GetFolderIcon(IconSize.Large));
+            imageListExtraLarge.Images.Add("FolderOpen", _shellIconProvider.GetFolderIcon(IconSize.Large, open: true));
         }
         catch
         {
@@ -214,23 +216,29 @@ public partial class MainForm : Form
             imageListSmall.Images.Add("FolderOpen", GlyphBitmap("\uE838", 16, Color.FromArgb(222, 175, 60)));
             imageListLarge.Images.Add("Folder", GlyphBitmap("\uE8B7", 48, Color.FromArgb(222, 175, 60)));
             imageListLarge.Images.Add("FolderOpen", GlyphBitmap("\uE838", 48, Color.FromArgb(222, 175, 60)));
+            imageListExtraLarge.Images.Add("Folder", GlyphBitmap("\uE8B7", 96, Color.FromArgb(222, 175, 60)));
+            imageListExtraLarge.Images.Add("FolderOpen", GlyphBitmap("\uE838", 96, Color.FromArgb(222, 175, 60)));
         }
 
         // Project  = nest/home accent blue   (\uE80F = Home)
         imageListSmall.Images.Add("Project", GlyphBitmap("\uE80F", 16, Color.FromArgb(30, 80, 160)));
         imageListLarge.Images.Add("Project", GlyphBitmap("\uE80F", 48, Color.FromArgb(30, 80, 160)));
+        imageListExtraLarge.Images.Add("Project", GlyphBitmap("\uE80F", 96, Color.FromArgb(30, 80, 160)));
 
         // Collection = library/stack         (\uE8F1 = Library)
         imageListSmall.Images.Add("Collection", GlyphBitmap("\uE8F1", 16, Color.FromArgb(120, 90, 170)));
         imageListLarge.Images.Add("Collection", GlyphBitmap("\uE8F1", 48, Color.FromArgb(120, 90, 170)));
+        imageListExtraLarge.Images.Add("Collection", GlyphBitmap("\uE8F1", 96, Color.FromArgb(120, 90, 170)));
 
         // WebResource = globe (was a confusing security shield) (\uE774 = Globe)
         imageListSmall.Images.Add("WebResource", GlyphBitmap("\uE774", 16, Color.FromArgb(40, 130, 120)));
         imageListLarge.Images.Add("WebResource", GlyphBitmap("\uE774", 48, Color.FromArgb(40, 130, 120)));
+        imageListExtraLarge.Images.Add("WebResource", GlyphBitmap("\uE774", 96, Color.FromArgb(40, 130, 120)));
 
         // FileReference = page/document       (\uE8A5 = Document)
         imageListSmall.Images.Add("FileReference", GlyphBitmap("\uE8A5", 16, Color.FromArgb(90, 100, 110)));
         imageListLarge.Images.Add("FileReference", GlyphBitmap("\uE8A5", 48, Color.FromArgb(90, 100, 110)));
+        imageListExtraLarge.Images.Add("FileReference", GlyphBitmap("\uE8A5", 96, Color.FromArgb(90, 100, 110)));
     }
 
     /// <summary>
@@ -390,6 +398,7 @@ public partial class MainForm : Form
                 {
                     imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
                     imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                    imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                 }
                 catch { /* fall through to generic glyph */ }
             }
@@ -758,6 +767,7 @@ public partial class MainForm : Form
                         imageListSmall.Images.Add(iconKey, icon);
                         var largeIcon = _shellIconProvider.GetIconByExtension(ext, IconSize.Large);
                         imageListLarge.Images.Add(iconKey, largeIcon);
+                        imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                     }
                     catch
                     {
@@ -793,13 +803,18 @@ public partial class MainForm : Form
     /// </summary>
     private void QueueThumbnail(ListViewItem item, string filePath)
     {
-        var size = imageListLarge.ImageSize;
+        // Request the thumbnail at the largest size we display (extra-large),
+        // then downscale for the other image lists. A ListView item shares one
+        // ImageKey across all its image lists, so the key MUST exist in every
+        // list (small, large, extra-large) or the icon vanishes when the view
+        // switches. That is exactly the bug this guards against.
+        var requestSize = imageListExtraLarge.ImageSize;
         var thumbKey = "thumb:" + filePath;
 
         System.Threading.Tasks.Task.Run(() =>
         {
             System.Drawing.Bitmap? bmp = null;
-            try { bmp = _shellThumbnailProvider.GetThumbnail(filePath, size); }
+            try { bmp = _shellThumbnailProvider.GetThumbnail(filePath, requestSize); }
             catch { bmp = null; }
             if (bmp == null) return;
 
@@ -817,18 +832,51 @@ public partial class MainForm : Form
                             return;
                         }
 
-                        if (!imageListLarge.Images.ContainsKey(thumbKey))
-                            imageListLarge.Images.Add(thumbKey, bmp);
-                        else
-                            bmp.Dispose();
+                        // Add a correctly-sized copy of the thumbnail to every
+                        // image list under the same key so the item shows a
+                        // thumbnail in every view mode (Small/Details/List/
+                        // Large/Extra Large).
+                        AddThumbToList(imageListSmall, thumbKey, bmp);
+                        AddThumbToList(imageListLarge, thumbKey, bmp);
+                        AddThumbToList(imageListExtraLarge, thumbKey, bmp);
 
                         item.ImageKey = thumbKey;
+
+                        bmp.Dispose();
                     }
                     catch { bmp.Dispose(); }
                 });
             }
             catch { bmp.Dispose(); }
         });
+    }
+
+    /// <summary>
+    /// Adds <paramref name="source"/> to <paramref name="list"/> under
+    /// <paramref name="key"/>, scaled to the list's image size. No-op if the
+    /// key already exists.
+    /// </summary>
+    private static void AddThumbToList(ImageList list, string key, System.Drawing.Bitmap source)
+    {
+        if (list.Images.ContainsKey(key)) return;
+
+        var target = list.ImageSize;
+        var scaled = new System.Drawing.Bitmap(target.Width, target.Height,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = System.Drawing.Graphics.FromImage(scaled))
+        {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.Clear(System.Drawing.Color.Transparent);
+
+            // Preserve aspect ratio, centered ("fit").
+            var ratio = Math.Min((float)target.Width / source.Width, (float)target.Height / source.Height);
+            var w = Math.Max(1, (int)(source.Width * ratio));
+            var h = Math.Max(1, (int)(source.Height * ratio));
+            var x = (target.Width - w) / 2;
+            var y = (target.Height - h) / 2;
+            g.DrawImage(source, x, y, w, h);
+        }
+        list.Images.Add(key, scaled);
     }
 
     // ── Navigation ──
@@ -1233,6 +1281,7 @@ public partial class MainForm : Form
     {
         var viewMenu = new ToolStripMenuItem("View");
         viewMenu.DropDownItems.Add("Details", null, (s, e) => SetViewMode(AppView.Details));
+        viewMenu.DropDownItems.Add("Extra Large Icons", null, (s, e) => SetViewMode(AppView.ExtraLargeIcon));
         viewMenu.DropDownItems.Add("Large Icons", null, (s, e) => SetViewMode(AppView.LargeIcon));
         viewMenu.DropDownItems.Add("Small Icons", null, (s, e) => SetViewMode(AppView.SmallIcon));
         viewMenu.DropDownItems.Add("List", null, (s, e) => SetViewMode(AppView.List));
@@ -1242,13 +1291,19 @@ public partial class MainForm : Form
 
     // ── View Modes ──
 
-    private enum AppView { Details, LargeIcon, SmallIcon, List, Tile }
+    private enum AppView { Details, ExtraLargeIcon, LargeIcon, SmallIcon, List, Tile }
 
     private void SetViewMode(AppView mode)
     {
+        // "Extra Large Icons" is not a distinct WinForms View value; Windows
+        // achieves it by using the LargeIcon view with a bigger LargeImageList.
+        // Swap the large image list accordingly, then set the underlying View.
+        listView.LargeImageList = mode == AppView.ExtraLargeIcon ? imageListExtraLarge : imageListLarge;
+
         listView.View = mode switch
         {
             AppView.Details => System.Windows.Forms.View.Details,
+            AppView.ExtraLargeIcon => System.Windows.Forms.View.LargeIcon,
             AppView.LargeIcon => System.Windows.Forms.View.LargeIcon,
             AppView.SmallIcon => System.Windows.Forms.View.SmallIcon,
             AppView.List => System.Windows.Forms.View.List,
@@ -1258,6 +1313,7 @@ public partial class MainForm : Form
 
         // Update menu checkmarks
         menuViewDetails.Checked = mode == AppView.Details;
+        menuViewExtraLargeIcons.Checked = mode == AppView.ExtraLargeIcon;
         menuViewLargeIcons.Checked = mode == AppView.LargeIcon;
         menuViewSmallIcons.Checked = mode == AppView.SmallIcon;
         menuViewList.Checked = mode == AppView.List;
@@ -1910,6 +1966,7 @@ public partial class MainForm : Form
                 {
                     imageListSmall.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Small));
                     imageListLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
+                    imageListExtraLarge.Images.Add(iconKey, _shellIconProvider.GetIconByExtension(ext, IconSize.Large));
                 }
                 catch { /* fall through to generic glyph */ }
             }
