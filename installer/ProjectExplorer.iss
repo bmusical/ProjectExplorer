@@ -5,7 +5,7 @@
 ; Output lands in publish\ at the repo root, then run this script.
 
 #define AppName      "Project Nest Explorer"
-#define AppVersion   "1.0.0"
+#define AppVersion   "1.0.1"
 #define AppPublisher "HxM Blazor Software LLC"
 #define AppExeName   "ProjectNest.exe"
 #define AppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
@@ -26,13 +26,13 @@ SetupIconFile=..\src\ProjectExplorer.WinForms\Assets\app.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-; Inno Setup 7: unified privilege model
+; Inno Setup 6: unified privilege model
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0.17763
 ; Windows 10 1809+ required (needed for .NET 10 self-contained)
 
-; Inno Setup 7: show changelog/notes page in wizard (optional — leave blank to skip)
+; Inno Setup 6: show changelog/notes page in wizard (optional — leave blank to skip)
 ; InfoAfterFile=..\CHANGELOG.txt
 
 VersionInfoVersion={#AppVersion}

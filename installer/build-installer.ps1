@@ -1,5 +1,5 @@
 # build-installer.ps1 — run from the repo root or the installer\ folder
-# Requires: .NET 10 SDK, Inno Setup 7 (iscc.exe on PATH or at default install path)
+# Requires: .NET 10 SDK, Inno Setup 6 (iscc.exe on PATH or at default install path)
 #
 # Usage:
 #   .\build-installer.ps1 -Version 1.2.0

@@ -21,17 +21,46 @@ public class AboutForm : Form
         var banner = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 80,
+            Height = 88,
             BackColor = Color.FromArgb(30, 80, 160)
+        };
+
+        var logo = new PictureBox
+        {
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(56, 56),
+            Location = new Point(16, 16),
+            BackColor = Color.Transparent
+        };
+        try
+        {
+            using var logoStream = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.logo.png");
+            if (logoStream != null)
+                logo.Image = Image.FromStream(logoStream);
+        }
+        catch { /* logo is decorative — ignore load failures */ }
+
+        // Product line (eyebrow) — "Project Nest" is the product; the app below is the program.
+        var lblProduct = new Label
+        {
+            Text = "PROJECT NEST",
+            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(150, 185, 240),
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Location = new Point(86, 14)
         };
 
         var lblAppName = new Label
         {
             Text = "Project Nest Explorer",
-            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 17f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
-            Location = new Point(16, 12)
+            BackColor = Color.Transparent,
+            Location = new Point(84, 30)
         };
 
         var lblTagline = new Label
@@ -40,10 +69,11 @@ public class AboutForm : Form
             Font = new Font("Segoe UI", 9f, FontStyle.Italic),
             ForeColor = Color.FromArgb(200, 220, 255),
             AutoSize = true,
-            Location = new Point(18, 50)
+            BackColor = Color.Transparent,
+            Location = new Point(86, 62)
         };
 
-        banner.Controls.AddRange(new Control[] { lblAppName, lblTagline });
+        banner.Controls.AddRange(new Control[] { logo, lblProduct, lblAppName, lblTagline });
 
         // ── Body ──
         var body = new Panel
