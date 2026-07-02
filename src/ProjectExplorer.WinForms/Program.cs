@@ -28,6 +28,7 @@ internal static class Program
         var license = licenseManager.GetCurrentLicense(projectManager.Projects);
 
         IShellIconProvider shellIconProvider = new ShellIconProvider();
+        IShellThumbnailProvider shellThumbnailProvider = new ShellThumbnailProvider();
 
         if (projectManager.Projects.Count == 0)
         {
@@ -36,7 +37,7 @@ internal static class Program
             projectManager.CreateCollectionAsync(sample.Id, "Documentation").GetAwaiter().GetResult();
         }
 
-        var mainForm = new MainForm(projectManager, shellIconProvider, licenseManager, license);
+        var mainForm = new MainForm(projectManager, shellIconProvider, shellThumbnailProvider, licenseManager, license);
         mainForm.ListViewItemSorter = new ListViewColumnSorter();
 
         // Check for updates ~5 seconds after startup so the main window is visible first
