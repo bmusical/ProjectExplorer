@@ -16,6 +16,9 @@ partial class MainForm
     private ToolStripButton btnForward;
     private ToolStripButton btnUp;
     private ToolStripButton btnOpenExplorer;
+    private ToolStripButton btnOpenCmd;
+    private ToolStripButton btnOpenPowerShell;
+    private ToolStripButton btnCopyPath;
     private ToolStripTextBox txtAddress;
 
     // Main splitter
@@ -115,13 +118,35 @@ partial class MainForm
             ToolTipText = "Up",
             DisplayStyle = ToolStripItemDisplayStyle.Text
         };
+        // Action buttons get colour-coded "chip" icons (instead of plain glyph
+        // text) so each one visually echoes the context-menu command it runs.
         this.btnOpenExplorer = new ToolStripButton
         {
-            Text = "\uE838", // FolderOpen
-            Font = navGlyphFont,
+            Image = ChipBitmap("\uE838", "Segoe MDL2 Assets", 24, Color.FromArgb(255, 236, 196), Color.FromArgb(180, 120, 20)),
             ToolTipText = "Open in Explorer",
             Enabled = false,
-            DisplayStyle = ToolStripItemDisplayStyle.Text
+            DisplayStyle = ToolStripItemDisplayStyle.Image
+        };
+        this.btnOpenCmd = new ToolStripButton
+        {
+            Image = ChipBitmap(">_", "Consolas", 24, Color.FromArgb(32, 32, 32), Color.FromArgb(90, 230, 120)),
+            ToolTipText = "Open Command Prompt Here",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Image
+        };
+        this.btnOpenPowerShell = new ToolStripButton
+        {
+            Image = ChipBitmap("PS", "Consolas", 24, Color.FromArgb(1, 36, 86), Color.White),
+            ToolTipText = "Open PowerShell Here",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Image
+        };
+        this.btnCopyPath = new ToolStripButton
+        {
+            Image = ChipBitmap("\uE8C8", "Segoe MDL2 Assets", 24, Color.FromArgb(230, 230, 230), Color.FromArgb(70, 70, 70)),
+            ToolTipText = "Copy Path",
+            Enabled = false,
+            DisplayStyle = ToolStripItemDisplayStyle.Image
         };
         this.txtAddress = new ToolStripTextBox
         {
@@ -133,20 +158,30 @@ partial class MainForm
 
         this.toolStripNav = new ToolStrip
         {
-            Items = { this.btnBack, this.btnForward, this.btnUp, new ToolStripSeparator(), this.btnOpenExplorer, this.txtAddress },
+            Items = {
+                this.btnBack, this.btnForward, this.btnUp, new ToolStripSeparator(),
+                this.btnOpenExplorer, this.btnOpenCmd, this.btnOpenPowerShell, this.btnCopyPath,
+                new ToolStripSeparator(), this.txtAddress
+            },
             Dock = DockStyle.Top,
             GripStyle = ToolStripGripStyle.Hidden,
             ImageScalingSize = new Size(24, 24),
             AutoSize = false,
             Height = 40,
             Padding = new Padding(6, 4, 6, 4),
-            RenderMode = ToolStripRenderMode.System
+            RenderMode = ToolStripRenderMode.System,
+            // A little extra 3D: buttons stay flat at rest and pop into a
+            // raised/sunken bevel on hover/press instead of the flat system look.
+            Renderer = new Toolbar3DRenderer()
         };
 
         this.btnBack.Click += BtnBack_Click;
         this.btnForward.Click += BtnForward_Click;
         this.btnUp.Click += BtnUp_Click;
         this.btnOpenExplorer.Click += BtnOpenExplorer_Click;
+        this.btnOpenCmd.Click += BtnOpenCmd_Click;
+        this.btnOpenPowerShell.Click += BtnOpenPowerShell_Click;
+        this.btnCopyPath.Click += BtnCopyPath_Click;
 
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
@@ -213,6 +248,18 @@ partial class MainForm
             Dock = DockStyle.Top,
             Height = 56,
             BackColor = accentBlue
+        };
+        // Subtle vertical gradient + bottom shadow line so the header reads as a
+        // raised band sitting above the rest of the window instead of a flat fill.
+        this.headerPanel.Paint += (s, e) =>
+        {
+            var rect = this.headerPanel.ClientRectangle;
+            using var gradient = new System.Drawing.Drawing2D.LinearGradientBrush(
+                rect, ControlPaint.Light(accentBlue, 0.2f), ControlPaint.Dark(accentBlue, 0.1f),
+                System.Drawing.Drawing2D.LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(gradient, rect);
+            using var shadowPen = new Pen(Color.FromArgb(70, Color.Black));
+            e.Graphics.DrawLine(shadowPen, 0, rect.Bottom - 1, rect.Width, rect.Bottom - 1);
         };
 
         this.headerLogo = new PictureBox
