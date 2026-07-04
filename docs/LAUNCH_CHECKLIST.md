@@ -206,9 +206,9 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 ### 5.2 Cut a release (🔁 every release)
 
 - [ ] 🔁 Commit & push the updated `updates/updates.xml`.
-- [ ] 🔁 Create a git tag and GitHub Release named **`v<version>`** (e.g. `v1.0.1`):
+- [ ] 🔁 Create a git tag and GitHub Release named **`<version>`** (no `v` prefix, e.g. `1.0.1`):
   ```bash
-  gh release create v1.0.1 \
+  gh release create 1.0.1 \
     "installer-output/ProjectNest-1.0.1-Setup.exe" \
     --title "Project Nest Explorer 1.0.1" \
     --notes-file docs/release-notes/1.0.1.md
