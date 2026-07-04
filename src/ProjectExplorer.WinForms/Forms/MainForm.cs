@@ -290,6 +290,88 @@ public partial class MainForm : Form
         return bmp;
     }
 
+    /// <summary>
+    /// Draws a small, softly beveled "chip" icon — a rounded swatch in
+    /// <paramref name="backColor"/> with a centered glyph/text — used for the
+    /// toolbar's action buttons so each one visually echoes the context-menu
+    /// command it triggers (Explorer / CMD / PowerShell / Copy Path).
+    /// </summary>
+    private static Bitmap ChipBitmap(string glyph, string fontFamily, int size, Color backColor, Color foreColor)
+    {
+        var bmp = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+
+        var rect = new Rectangle(1, 1, size - 3, size - 3);
+        int radius = Math.Max(3, size / 5);
+        using (var path = RoundedRectPath(rect, radius))
+        {
+            using (var backBrush = new SolidBrush(backColor))
+                g.FillPath(backBrush, path);
+
+            // Raised bevel: a light highlight along the top/left edge and a
+            // shadow along the bottom/right, so the chip reads as a small 3D
+            // button rather than a flat swatch.
+            using var lightPen = new Pen(Color.FromArgb(100, Color.White), 1.25f);
+            using var darkPen = new Pen(Color.FromArgb(80, Color.Black), 1.25f);
+            g.DrawArc(lightPen, rect.X, rect.Y, radius * 2, radius * 2, 180, 90);
+            g.DrawLine(lightPen, rect.X + radius, rect.Y, rect.Right - radius, rect.Y);
+            g.DrawArc(darkPen, rect.Right - radius * 2, rect.Bottom - radius * 2, radius * 2, radius * 2, 0, 90);
+            g.DrawLine(darkPen, rect.X + radius, rect.Bottom, rect.Right - radius, rect.Bottom);
+        }
+
+        try
+        {
+            using var font = new Font(fontFamily, size * 0.46f, FontStyle.Bold, GraphicsUnit.Pixel);
+            using var textBrush = new SolidBrush(foreColor);
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString(glyph, font, textBrush, new RectangleF(0, 0, size, size), sf);
+        }
+        catch
+        {
+            // Requested font unavailable (e.g. non-Windows) — draw a plain dot so the
+            // button still has a legible focal point instead of an empty chip.
+            using var textBrush = new SolidBrush(foreColor);
+            g.FillEllipse(textBrush, size * 0.35f, size * 0.35f, size * 0.3f, size * 0.3f);
+        }
+
+        return bmp;
+    }
+
+    private static System.Drawing.Drawing2D.GraphicsPath RoundedRectPath(Rectangle rect, int radius)
+    {
+        var path = new System.Drawing.Drawing2D.GraphicsPath();
+        int d = radius * 2;
+        path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+        path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+        path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+        path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+
+    /// <summary>
+    /// Renders toolbar buttons with a classic raised/sunken 3D bevel on hover
+    /// and press, instead of the flat, borderless look of the default system
+    /// renderer — buttons stay flat at rest so the toolbar isn't busy.
+    /// </summary>
+    private sealed class Toolbar3DRenderer : ToolStripSystemRenderer
+    {
+        protected override void OnRenderButtonBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (e.Item is not ToolStripButton button || !button.Enabled || (!button.Selected && !button.Pressed && !button.Checked))
+            {
+                base.OnRenderButtonBackground(e);
+                return;
+            }
+
+            var bounds = new Rectangle(Point.Empty, button.Size);
+            var style = button.Pressed || button.Checked ? Border3DStyle.Sunken : Border3DStyle.Raised;
+            ControlPaint.DrawBorder3D(e.Graphics, bounds, style);
+        }
+    }
+
     // ── Tree View Initialization ──
 
     private void InitializeTreeView()
@@ -988,6 +1070,18 @@ public partial class MainForm : Form
         }
     }
 
+    private void BtnOpenCmd_Click(object? sender, EventArgs e) => LaunchTerminal(_currentPath, usePowerShell: false);
+
+    private void BtnOpenPowerShell_Click(object? sender, EventArgs e) => LaunchTerminal(_currentPath, usePowerShell: true);
+
+    private void BtnCopyPath_Click(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_currentPath) && Directory.Exists(_currentPath))
+        {
+            Clipboard.SetText(_currentPath);
+        }
+    }
+
     private void AddressBar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
@@ -1031,8 +1125,12 @@ public partial class MainForm : Form
 
     private void UpdateToolbarButtons()
     {
-        // Enable Explorer button when viewing a real folder path
-        btnOpenExplorer.Enabled = !string.IsNullOrEmpty(_currentPath) && Directory.Exists(_currentPath);
+        // Enable Explorer/CMD/PowerShell/Copy Path buttons when viewing a real folder path
+        var onRealFolder = !string.IsNullOrEmpty(_currentPath) && Directory.Exists(_currentPath);
+        btnOpenExplorer.Enabled = onRealFolder;
+        btnOpenCmd.Enabled = onRealFolder;
+        btnOpenPowerShell.Enabled = onRealFolder;
+        btnCopyPath.Enabled = onRealFolder;
 
         // Update navigation buttons
         btnBack.Enabled = _backStack.Count > 0;
