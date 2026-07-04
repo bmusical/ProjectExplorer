@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Date | Branch | Findings |
 |------|--------|----------|
 | 2026-06-29 | `claude/claude-md-charges-review-1a2ser` | No issues detected — diff was empty (no committed or uncommitted changes relative to upstream). |
+| 2026-07-04 | `claude/projectexplorer-keygen-review-g7gles` | Reviewed `tools/KeyGen` + `LicenseManager`. Private key was never committed (only the public key, correctly). Real ECDSA keypair is live and matches the key embedded in `LicenseManager.cs`. Risk found: `KeyGen setup` overwrites `public_key.pem`/`private_key.pem` unconditionally with no existing-file check — re-running it post-launch would silently mint a new keypair and invalidate every sold license. Added `tools/KeyGen/README.md` documenting safe usage (setup/generate/verify) and this caveat. No code changes made to the tool itself. |
 
 ## What This Project Is
 
