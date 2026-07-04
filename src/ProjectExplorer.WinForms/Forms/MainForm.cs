@@ -1782,6 +1782,9 @@ public partial class MainForm : Form
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
                 }
             });
+            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
+            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
+            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
         }
 
         if (menu.Items.Count > 0)
