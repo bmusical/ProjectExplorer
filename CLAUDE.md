@@ -15,6 +15,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 It ships as a commercial product: a free tier (3 projects / 25 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
 
+### Naming: Product vs. Program
+
+**"Project Nest"** is the product/brand — deliberately one notch broader than this app, leaving room to add other tools under the same brand later. **"Project Nest Explorer"** is the name of *this* program specifically. Don't collapse the two:
+
+- **Product** (`Project Nest`) shows up as: the `<Product>` MSBuild property in `ProjectExplorer.WinForms.csproj` (the exe's Win32 "Product name" metadata), and the small bold "PROJECT NEST" eyebrow label shown above the program name in `AboutForm.cs`, `RegistrationDialog.cs`, and `MainForm.Designer.cs`'s header band.
+- **Program** (`Project Nest Explorer`) is everything else: the main window title bar (`MainForm.SetWindowTitle`), dialog titles, the bigger title label under each "PROJECT NEST" eyebrow, `AssemblyName`/`AppExeName` derivatives (`ProjectNest.exe`), README/CHANGELOG/installer copy, etc.
+- The name also doubles as a bit of wordplay: read with the emphasis on "Project" (as in *a project*, i.e. a noun describing the nest) it's a workspace; read with the emphasis on "Nest" it reads as a project's name; some pronounce "Project" like *projector* either way.
+
+`docs/LAUNCH_CHECKLIST.md` §1 tracks this same Product/Program split as a one-time naming-consistency checkbox.
+
 ## Commands
 
 ```bash
@@ -45,7 +55,7 @@ Three app layers plus an internal key-generation console tool:
 |---|---|
 | `ProjectExplorer.Core` | Models, `ProjectManager` service, `IProjectRepository` interface, JSON persistence, `LicenseManager` |
 | `ProjectExplorer.Shell` | Windows Shell P/Invoke wrappers (icons via `SHGetFileInfo`; Fluent/Mica window styling via DWM/UxTheme) |
-| `ProjectExplorer.WinForms` | TreeView + ListView UI, dialogs, entry point. Assembly name `ProjectNest`, product name `Project Nest Explorer` |
+| `ProjectExplorer.WinForms` | TreeView + ListView UI, dialogs, entry point. Assembly name `ProjectNest`, product `Project Nest`, program `Project Nest Explorer` (see **Naming** above) |
 | `tools/KeyGen` | Standalone console app — generates the ECDSA keypair and signs customer license keys. Internal use only, never shipped to customers |
 
 ### Data Model
