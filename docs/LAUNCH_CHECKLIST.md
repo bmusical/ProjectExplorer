@@ -23,9 +23,10 @@
 - [x] ⛔ **Replace the license public key.** *(Done — commit `5a95f73` embedded the real ECDSA
   public key in `LicenseManager.cs`. Dev mode, where the app would accept ANY correctly-formatted
   string as a valid license, is no longer active.)* See **Section 2**.
-- [ ] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
+- [x] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
   updater fetches `https://raw.githubusercontent.com/bmusical/ProjectExplorer/master/updates/updates.xml`.
-  If the repo is private, that URL 404s and auto-update silently fails. See **Section 5**.
+  If the repo is private, that URL 404s and auto-update silently fails. *(Done — repo flipped to
+  public on 2026-07-08; verified the raw URL now returns 200.)* See **Section 5**.
 
 ---
 
@@ -197,8 +198,10 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 
 ### 5.1 Make the update feed reachable (⛔ one-time)
 
-- [ ] ⛔ **The repository must be PUBLIC** for `raw.githubusercontent.com/.../updates.xml` to load.
-  - Go to repo **Settings → General → Danger Zone → Change visibility → Public**.
+- [x] ⛔ **The repository must be PUBLIC** for `raw.githubusercontent.com/.../updates.xml` to load.
+  *(Done — repo visibility changed to Public on 2026-07-08 via Settings → General → Danger Zone.
+  The repo name stays `ProjectExplorer` — see CLAUDE.md's Naming section for why that's
+  intentionally distinct from the "Project Nest" / "Project Nest Explorer" branding.)*
   - Alternatively, keep the repo private and host `updates.xml` on your public website, then update
     the `UpdateCheckUrl` constant in `MainForm.cs` to that URL. (Public repo is simpler.)
 - [x] ✅ **Branch name mismatch fixed:** the updater URL in `MainForm.cs` now points at **`/master/`**,
