@@ -57,8 +57,8 @@ if ($UpdateXml)
     $xmlPath = "$repoRoot\updates\updates.xml"
     Write-Host "==> Updating $xmlPath ..." -ForegroundColor Cyan
 
-    $downloadUrl  = "https://github.com/bmusical/ProjectExplorer/releases/download/v$Version/ProjectNest-$Version-Setup.exe"
-    $changelogUrl = "https://github.com/bmusical/ProjectExplorer/releases/tag/v$Version"
+    $downloadUrl  = "https://github.com/bmusical/ProjectExplorer/releases/download/$Version/ProjectNest-$Version-Setup.exe"
+    $changelogUrl = "https://github.com/bmusical/ProjectExplorer/releases/tag/$Version"
 
     $xml = [xml](Get-Content $xmlPath -Encoding UTF8)
     $xml.item.version   = $Version
@@ -78,6 +78,6 @@ Write-Host "==> Build complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps for a release:"
 Write-Host "  1. Commit and push updates\updates.xml"
-Write-Host "  2. Create GitHub Release: v$Version"
+Write-Host "  2. Create GitHub Release: $Version"
 Write-Host "  3. Upload $setupExe as the release asset"
 Write-Host "  4. Existing users will be prompted to update on next launch"
