@@ -33,6 +33,9 @@ partial class MainForm
     // File preview panel (right panel, shown instead of listView for a selected FileReference)
     private FilePreviewPanel filePreviewPanel;
 
+    // Web resource preview panel (right panel, shown instead of listView for a selected WebResource)
+    private WebResourcePreviewPanel webResourcePreviewPanel;
+
     // Status bar
     private StatusStrip statusStrip;
     private ToolStripStatusLabel lblStatus;
@@ -357,6 +360,10 @@ partial class MainForm
         this.filePreviewPanel.OpenRequested += FilePreviewPanel_OpenRequested;
         this.filePreviewPanel.PropertiesRequested += FilePreviewPanel_PropertiesRequested;
 
+        // ── Web Resource Preview Panel (shown instead of listView for a selected WebResource) ──
+        this.webResourcePreviewPanel = new WebResourcePreviewPanel { Visible = false };
+        this.webResourcePreviewPanel.OpenExternalRequested += WebResourcePreviewPanel_OpenExternalRequested;
+
         // ── Split Container ──
         this.splitMain = new SplitContainer
         {
@@ -366,6 +373,7 @@ partial class MainForm
         };
         this.splitMain.Panel1.Controls.Add(this.treeView);
         this.splitMain.Panel2.Controls.Add(this.filePreviewPanel);
+        this.splitMain.Panel2.Controls.Add(this.webResourcePreviewPanel);
         this.splitMain.Panel2.Controls.Add(this.listView);
 
         // ── Status Strip ──

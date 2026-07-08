@@ -76,6 +76,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.WinForms/Forms/ImageViewerForm.cs` — in-app image viewer for image FileReferences/folder contents
 - `src/ProjectExplorer.WinForms/Forms/FilePreviewPanel.cs` — inline preview panel shown in place of the ListView when a FileReference tree node is selected; renders image/text content when supported, always offers Open/Properties otherwise
 - `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
+- `src/ProjectExplorer.WinForms/Forms/WebResourcePreviewPanel.cs` — inline preview panel shown in place of the ListView when a WebResource tree node is selected (a ListView row for one routes here too, via `SelectTreeNodeByTag`); renders the URL with WebView2 (`Microsoft.Web.WebView2` package — requires the WebView2 Runtime, falls back to a message + "Open in External Browser" if it's missing), always offers "Open in External Browser"
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
 - `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
 - `tools/KeyGen/Program.cs` — `setup` / `generate` / `verify` commands for the license key system
@@ -132,6 +133,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **Windows 11 Fluent styling** — `ModernWindowStyler` applies DWM/UxTheme attributes (rounded corners, Mica/dark titlebar) at startup.
 - **F2 rename** — `MainForm.TreeView_KeyDown` handles `Keys.F2` on the selected TreeView node. (Del-to-delete and Enter-to-open in the TreeView are **not** wired up yet — only the address bar handles Enter today; still open items, see Roadmap.)
 - **FileReference inline preview** — selecting a FileReference tree node now shows `FilePreviewPanel` in place of the ListView instead of leaving the previously-viewed folder listing on screen. Renders images and common text formats inline (`FilePreviewHelper.GetPreviewKind`); always offers Open/Properties buttons regardless of whether the format is previewable.
+- **WebResource inline preview** — selecting a WebResource tree node shows `WebResourcePreviewPanel` in place of the ListView, rendering the URL inline via WebView2; double-clicking a WebResource row in the ListView now selects the corresponding tree node (same as Project/Collection/FolderRef) so it shows in the same preview instead of launching the external browser directly. Both the TreeView/ListView context menus and the preview panel itself offer an explicit "Open in External Browser" action.
 
 ## Roadmap
 
