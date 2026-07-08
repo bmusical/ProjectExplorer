@@ -727,6 +727,7 @@ public partial class MainForm : Form
             item.SubItems.Add("");
             item.SubItems.Add("Project");
             item.SubItems.Add(project.Modified.ToString("g"));
+            item.SubItems.Add(project.Description ?? "");
             listView.Items.Add(item);
         }
     }
@@ -1621,6 +1622,21 @@ public partial class MainForm : Form
         AddNewChildMenuItems(menu, projectId, null);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            if (project != null)
+            {
+                using var dlg = new InputDialog("Edit Project Description", "Description:", project.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateProjectAsync(
+                        projectId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Delete Project", null, async (s, e) =>
         {

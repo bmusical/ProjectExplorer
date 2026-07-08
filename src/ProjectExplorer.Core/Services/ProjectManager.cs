@@ -52,6 +52,14 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    public async Task UpdateProjectAsync(Guid projectId, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        if (newDescription != null) project.Description = newDescription;
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     public async Task DeleteProjectAsync(Guid projectId)
     {
         _projects.RemoveAll(p => p.Id == projectId);

@@ -35,6 +35,23 @@ public class ProjectManagerTests
     }
 
     [Fact]
+    public async Task UpdateProject_ChangesDescription()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        Assert.Null(project.Description);
+
+        await mgr.UpdateProjectAsync(project.Id, newDescription: "Client website redesign");
+
+        var loaded = mgr.GetProject(project.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("Client website redesign", loaded!.Description);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        Assert.Equal("Client website redesign", reloaded.First(p => p.Id == project.Id).Description);
+    }
+
+    [Fact]
     public async Task CreateCollection_AddsToProject()
     {
         var mgr = await CreateManagerAsync();
