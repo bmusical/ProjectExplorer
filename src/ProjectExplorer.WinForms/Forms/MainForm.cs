@@ -4,6 +4,7 @@ using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
+using ProjectExplorer.Shell.Services;
 using ProjectExplorer.WinForms.Helpers;
 using LicenseState = ProjectExplorer.Core.Models.LicenseState;
 
@@ -78,6 +79,11 @@ public partial class MainForm : Form
 
         InitializeComponent();
 
+        // Adopt Windows 11 Explorer's visual style for the tree/list controls
+        // (alternating hover/selection colors, no dotted focus rectangle).
+        ModernWindowStyler.ApplyExplorerListStyle(treeView.Handle);
+        ModernWindowStyler.ApplyExplorerListStyle(listView.Handle);
+
         SetWindowTitle();
 
         // Attach event handler for address bar - must be done after InitializeComponent
@@ -104,6 +110,12 @@ public partial class MainForm : Form
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
                 ?? new Version(1, 0, 0);
         this.Text = $"Project Nest Explorer {v.Major}.{v.Minor}.{v.Build}";
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ModernWindowStyler.ApplyRoundedCorners(this.Handle);
     }
 
     protected override void OnLoad(EventArgs e)
