@@ -107,6 +107,16 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    public async Task UpdateCollectionAsync(Guid projectId, Guid collectionId, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var collection = project.FindCollection(collectionId) ?? throw new InvalidOperationException($"Collection {collectionId} not found.");
+
+        if (newDescription != null) collection.Description = newDescription;
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     // ── FolderReference CRUD ──
 
     public async Task<FolderReference> AddFolderReferenceAsync(Guid projectId, string realPath, Guid? parentCollectionId = null, string? displayName = null)

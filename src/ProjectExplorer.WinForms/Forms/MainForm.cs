@@ -1642,6 +1642,21 @@ public partial class MainForm : Form
         AddNewChildMenuItems(menu, projectId, collectionId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var collection = _projectManager.GetProject(projectId)?.FindCollection(collectionId);
+            if (collection != null)
+            {
+                using var dlg = new InputDialog("Edit Collection Description", "Description:", collection.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateCollectionAsync(
+                        projectId, collectionId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Delete Collection", null, async (s, e) =>
         {

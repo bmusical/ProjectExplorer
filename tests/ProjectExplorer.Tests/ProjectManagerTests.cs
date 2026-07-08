@@ -67,6 +67,25 @@ public class ProjectManagerTests
     }
 
     [Fact]
+    public async Task UpdateCollection_ChangesDescription()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Assets");
+        Assert.Null(coll.Description);
+
+        await mgr.UpdateCollectionAsync(project.Id, coll.Id, newDescription: "Texture and audio assets");
+
+        var loaded = mgr.GetProject(project.Id)!.FindCollection(coll.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("Texture and audio assets", loaded!.Description);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        var reloadedColl = reloaded.First(p => p.Id == project.Id).FindCollection(coll.Id);
+        Assert.Equal("Texture and audio assets", reloadedColl!.Description);
+    }
+
+    [Fact]
     public async Task AddFolderReference_ToProject()
     {
         var mgr = await CreateManagerAsync();
