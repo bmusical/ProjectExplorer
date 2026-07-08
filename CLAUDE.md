@@ -74,11 +74,14 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.WinForms/Forms/MainForm.cs` — 2300+ line main window; TreeView (left) drives ListView (right) with navigation history stacks, drag-and-drop reparenting, and unified context menus
 - `src/ProjectExplorer.WinForms/Forms/RegistrationDialog.cs` — license key activation UI (Help ▸ Register / License…)
 - `src/ProjectExplorer.WinForms/Forms/ImageViewerForm.cs` — in-app image viewer for image FileReferences/folder contents
+- `src/ProjectExplorer.WinForms/Forms/FilePreviewPanel.cs` — inline preview panel shown in place of the ListView when a FileReference tree node is selected; renders image/text content when supported, always offers Open/Properties otherwise
+- `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
 - `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
 - `tools/KeyGen/Program.cs` — `setup` / `generate` / `verify` commands for the license key system
 - `tests/ProjectExplorer.Tests/ProjectManagerTests.cs` — xUnit tests for CRUD operations and tree traversal
 - `tests/ProjectExplorer.Tests/ImageViewingTests.cs` — xUnit tests for image detection/viewing behavior
+- `tests/ProjectExplorer.Tests/FilePreviewHelperTests.cs` — xUnit tests for `FilePreviewHelper`'s Image/Text/None classification
 - `docs/LAUNCH_CHECKLIST.md` — the authoritative, start-to-finish runbook for licensing, packaging, Gumroad, and releases; consult it before touching anything in the Licensing or Distribution sections below
 - `docs/RELEASE.md` — condensed "cut a new release" steps, extracted from the checklist above
 - `tools/KeyGen/README.md` — how to generate the ECDSA keypair and mint/verify customer license keys
@@ -128,6 +131,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **Unified context menus + Properties verb** — TreeView and ListView right-click menus were consolidated; a Properties dialog was added for inspecting/editing node metadata.
 - **Windows 11 Fluent styling** — `ModernWindowStyler` applies DWM/UxTheme attributes (rounded corners, Mica/dark titlebar) at startup.
 - **F2 rename** — `MainForm.TreeView_KeyDown` handles `Keys.F2` on the selected TreeView node. (Del-to-delete and Enter-to-open in the TreeView are **not** wired up yet — only the address bar handles Enter today; still open items, see Roadmap.)
+- **FileReference inline preview** — selecting a FileReference tree node now shows `FilePreviewPanel` in place of the ListView instead of leaving the previously-viewed folder listing on screen. Renders images and common text formats inline (`FilePreviewHelper.GetPreviewKind`); always offers Open/Properties buttons regardless of whether the format is previewable.
 
 ## Roadmap
 

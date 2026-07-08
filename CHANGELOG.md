@@ -6,6 +6,8 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Fix the ListView showing a stale folder listing when the TreeView selection moves to a
+  FileReference; add an inline preview panel (image/text formats) with Open/Properties buttons.
 - Allow Projects and Collections to have a description.
 - Unify TreeView/ListView context menus and add a Properties verb.
 - Windows 11 Fluent styling via DWM/UxTheme P/Invoke (rounded corners, Mica/dark titlebar).
