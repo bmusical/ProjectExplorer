@@ -368,3 +368,5 @@ private_key.pem
 public_key.pem
 # Installer output (published to GitHub Releases instead)
 installer-output/
+/docs/LAUNCH_CHECKLIST.html
+/CLAUDE.html
