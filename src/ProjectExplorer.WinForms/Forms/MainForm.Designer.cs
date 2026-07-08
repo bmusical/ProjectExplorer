@@ -30,6 +30,9 @@ partial class MainForm
     // List view (right panel)
     private ListView listView;
 
+    // File preview panel (right panel, shown instead of listView for a selected FileReference)
+    private FilePreviewPanel filePreviewPanel;
+
     // Status bar
     private StatusStrip statusStrip;
     private ToolStripStatusLabel lblStatus;
@@ -348,6 +351,12 @@ partial class MainForm
         this.listView.ColumnClick += ListView_ColumnClick;
         this.listView.MouseClick += ListView_MouseClick;
         this.Width = 1200;
+
+        // ── File Preview Panel (shown instead of listView for a selected FileReference) ──
+        this.filePreviewPanel = new FilePreviewPanel { Visible = false };
+        this.filePreviewPanel.OpenRequested += FilePreviewPanel_OpenRequested;
+        this.filePreviewPanel.PropertiesRequested += FilePreviewPanel_PropertiesRequested;
+
         // ── Split Container ──
         this.splitMain = new SplitContainer
         {
@@ -356,6 +365,7 @@ partial class MainForm
             BackColor = SystemColors.Control
         };
         this.splitMain.Panel1.Controls.Add(this.treeView);
+        this.splitMain.Panel2.Controls.Add(this.filePreviewPanel);
         this.splitMain.Panel2.Controls.Add(this.listView);
 
         // ── Status Strip ──

@@ -36,6 +36,9 @@ public partial class MainForm : Form
     private Project? _currentProject;
     private string _currentPath = string.Empty;
 
+    // The FileReference currently shown in filePreviewPanel, if any (null when listView is showing).
+    private FileReference? _currentPreviewFileRef;
+
     // Drag-drop state
     private TreeNode? _dragHighlightNode;
 
@@ -539,6 +542,32 @@ public partial class MainForm : Form
         if (e.Node == null) return;
 
         var tag = e.Node.Tag?.ToString() ?? "";
+
+        if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            _currentProject = _projectManager.GetProject(projectId);
+            var fileRefId = Guid.Parse(parts[1]);
+            var fileRef = FindFileRef(_currentProject, fileRefId);
+            if (fileRef != null)
+            {
+                var dir = Path.GetDirectoryName(fileRef.FilePath);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    _currentPath = dir;
+                else
+                    _currentPath = string.Empty;
+                ShowFileReferencePreview(fileRef);
+            }
+
+            UpdateAddressBar();
+            UpdateStatusBar();
+            UpdateToolbarButtons();
+            return;
+        }
+
+        HideFileReferencePreview();
+
         listView.BeginUpdate();
         listView.Items.Clear();
 
@@ -573,23 +602,6 @@ public partial class MainForm : Form
                 PopulateFileList(folderRef.RealPath);
             }
         }
-        else if (tag.StartsWith(TagFileRef))
-        {
-            var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            _currentProject = _projectManager.GetProject(projectId);
-            var fileRefId = Guid.Parse(parts[1]);
-            var fileRef = FindFileRef(_currentProject, fileRefId);
-            if (fileRef != null)
-            {
-                var dir = Path.GetDirectoryName(fileRef.FilePath);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                {
-                    _currentPath = dir;
-                    PopulateFileList(dir);
-                }
-            }
-        }
         else if (tag.StartsWith(TagRealFolder))
         {
             var path = tag.Substring(TagRealFolder.Length);
@@ -601,6 +613,42 @@ public partial class MainForm : Form
         UpdateAddressBar();
         UpdateStatusBar();
         UpdateToolbarButtons();
+    }
+
+    /// <summary>
+    /// Shows the given FileReference's inline preview in place of the ListView:
+    /// renders the file's content when we can (image/text), and always leaves
+    /// Open/Properties available regardless of whether the format is supported.
+    /// </summary>
+    private void ShowFileReferencePreview(FileReference fileRef)
+    {
+        _currentPreviewFileRef = fileRef;
+        listView.Visible = false;
+        filePreviewPanel.Visible = true;
+
+        var icon = string.IsNullOrEmpty(fileRef.Extension)
+            ? _shellIconProvider.GetFileIcon(fileRef.FilePath, IconSize.Jumbo)
+            : _shellIconProvider.GetIconByExtension(fileRef.Extension, IconSize.Jumbo);
+        filePreviewPanel.ShowFile(fileRef.FilePath, fileRef.Description, icon);
+    }
+
+    private void HideFileReferencePreview()
+    {
+        if (_currentPreviewFileRef == null) return;
+        _currentPreviewFileRef = null;
+        filePreviewPanel.Visible = false;
+        listView.Visible = true;
+    }
+
+    private void FilePreviewPanel_OpenRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewFileRef != null) OpenFileReference(_currentPreviewFileRef);
+    }
+
+    private void FilePreviewPanel_PropertiesRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewFileRef != null && File.Exists(_currentPreviewFileRef.FilePath))
+            _shellPropertiesProvider.ShowPropertiesDialog(_currentPreviewFileRef.FilePath, this.Handle);
     }
 
     private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
@@ -1115,6 +1163,7 @@ public partial class MainForm : Form
 
     private void NavigateToPath(string path)
     {
+        HideFileReferencePreview();
         _currentPath = path;
         listView.BeginUpdate();
         listView.Items.Clear();
@@ -1133,6 +1182,12 @@ public partial class MainForm : Form
 
     private void UpdateStatusBar()
     {
+        if (_currentPreviewFileRef != null)
+        {
+            lblStatus.Text = $"{_currentPreviewFileRef.EffectiveName}  |  {_currentPreviewFileRef.FilePath}";
+            return;
+        }
+
         var count = listView.Items.Count;
         lblStatus.Text = count == 1 ? "1 item" : $"{count} items";
         if (!string.IsNullOrEmpty(_currentPath))
