@@ -48,7 +48,7 @@
 - [ ] 🔧 Register / confirm ownership of the domain used in those URLs.
 - [ ] 🔧 Set up the support inbox (e.g. `support@yourdomain.com`) and make sure you actually receive mail there.
 - [ ] 💡 Write a one-line tagline (already in-app: *"All your projects, one place."*) and keep it consistent across Gumroad, the landing page, and the About box.
-- [ ] 💡 Decide on a EULA / license terms. A short plain-English "personal + commercial use, no redistribution of the key" is enough for v1. Add it as `LICENSE-EULA.txt` and reference it from the installer (`InfoBeforeFile`).
+- [x] 💡 Decide on a EULA / license terms. *(Done — `LICENSE-EULA.txt` at repo root covers personal + internal commercial use, no key redistribution, no reverse engineering/reselling/competing-product use, "as-is" warranty disclaimer. Wired into the installer via `LicenseFile=` in `installer/ProjectExplorer.iss`, so Setup shows an Accept/Decline page before install.)*
 
 ---
 
