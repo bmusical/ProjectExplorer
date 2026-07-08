@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Date | Branch | Findings |
 |------|--------|----------|
 | 2026-06-29 | `claude/claude-md-charges-review-1a2ser` | No issues detected — diff was empty (no committed or uncommitted changes relative to upstream). |
+| 2026-07-08 | `claude/claude-md-review-2r5x3l` | Two doc-drift issues fixed: (1) CLAUDE.md's Licensing section claimed `docs/LAUNCH_CHECKLIST.md`'s pre-flight checkbox for the public-key replacement was still stale, but the checklist already had it checked off — the stale claim was in CLAUDE.md itself, not the checklist. (2) `docs/LAUNCH_CHECKLIST.md`'s "Quick reference" section used a `vX.Y.Z` tag in its `gh release create` example, contradicting the no-`v`-prefix tag convention stated everywhere else (same doc §5.2, `docs/RELEASE.md`, `CHANGELOG.md`). Everything else checked (README, CHANGELOG, RELEASE.md, KeyGen README, LicenseManager.cs, MainForm.cs keyboard handling) matched the code. |
 
 ## What This Project Is
 
@@ -93,7 +94,7 @@ The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don'
 
 - **Key format**: ECDSA P-256 signed payloads of the form `email|FULL|yyyy-MM-dd`, encoded as `base64url(payload).base64url(signature)`. Verification is fully offline against an embedded public key — no license server.
 - **`tools/KeyGen`** is the key factory: `dotnet run -- setup` generates the keypair once (guard `private_key.pem` like cash, never commit it); `dotnet run -- generate --email <buyer>` mints a customer key per sale; `dotnet run -- verify --license <key>` sanity-checks one.
-- **Dev-mode placeholder — already replaced**: `LicenseManager.PublicKeyPem` used to ship as `"DEVELOPMENT_KEY_PLACEHOLDER"` (which makes the app accept *any* correctly-formatted string as a valid license), but the real ECDSA public key was embedded in commit `5a95f73` (2026-07-02). Verification is live, not dev mode. `docs/LAUNCH_CHECKLIST.md`'s pre-flight checkbox for this is stale and should be checked off.
+- **Dev-mode placeholder — already replaced**: `LicenseManager.PublicKeyPem` used to ship as `"DEVELOPMENT_KEY_PLACEHOLDER"` (which makes the app accept *any* correctly-formatted string as a valid license), but the real ECDSA public key was embedded in commit `5a95f73` (2026-07-02). Verification is live, not dev mode. `docs/LAUNCH_CHECKLIST.md`'s pre-flight checkbox for this is already checked off, in sync with the code.
 - **Packaging**: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true` → self-contained single-file `publish/ProjectNest.exe`.
 - **Installer**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) wraps the exe into `ProjectNest-<version>-Setup.exe`. Script at `installer/ProjectExplorer.iss`; fully scripted via `installer/build-installer.ps1`.
 - **Auto-update**: Wired up via `Autoupdater.NET.Official`, reading `updates/updates.xml` from the repo's `master` branch on GitHub (requires the repo to be public).

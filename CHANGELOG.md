@@ -9,6 +9,8 @@ Releases tagged `<version>` (no `v` prefix).
 - Allow Projects and Collections to have a description.
 - Unify TreeView/ListView context menus and add a Properties verb.
 - Windows 11 Fluent styling via DWM/UxTheme P/Invoke (rounded corners, Mica/dark titlebar).
+- Add `LICENSE-EULA.txt` and wire it into the installer as an Accept/Decline page (`LicenseFile`
+  in `installer/ProjectExplorer.iss`).
 
 ## [1.0.3] — 2026-07-08
 

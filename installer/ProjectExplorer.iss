@@ -23,6 +23,7 @@ DefaultGroupName={#AppName}
 OutputDir=..\installer-output
 OutputBaseFilename=ProjectNest-{#AppVersion}-Setup
 SetupIconFile=..\src\ProjectExplorer.WinForms\Assets\app.ico
+LicenseFile=..\LICENSE-EULA.txt
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

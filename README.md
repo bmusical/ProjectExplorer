@@ -75,4 +75,6 @@ Questions or bugs: [support@blaznaccess.com](mailto:support@blaznaccess.com), or
 
 ## License
 
-© 2025 HxM Blazor Software LLC. All rights reserved.
+© 2025 HxM Blazor Software LLC. All rights reserved. This repository is source-visible but not
+open source — no license is granted to copy, modify, or redistribute the code. End users of the
+app are bound by [`LICENSE-EULA.txt`](LICENSE-EULA.txt), shown during installation.
