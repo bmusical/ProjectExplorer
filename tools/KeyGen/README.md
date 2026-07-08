@@ -28,9 +28,11 @@ dotnet run -- setup
 Writes `public_key.pem` and `private_key.pem` to the current directory and prints the public key
 to the console.
 
-- Copy the printed public key into `LicenseManager.cs`, replacing the
-  `PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER"` line. **While that placeholder is present, the app
-  accepts any correctly-formatted string as a valid key — dev mode only, never ship it.**
+- Copy the printed public key into `LicenseManager.cs` as the `PublicKeyPem` constant. **If that
+  constant is ever set to the literal string `"DEVELOPMENT_KEY_PLACEHOLDER"`, the app accepts any
+  correctly-formatted string as a valid key — dev mode only, never ship it.** (For the current
+  build this has already been done: the real key was embedded in commit `5a95f73`.) If you ever
+  need to rotate keys — e.g. the private key is compromised — regenerate here and repeat this step.
 - `*.pem` is already git-ignored (see repo `.gitignore`). Never commit `private_key.pem`.
 - **Guard `private_key.pem` like cash.** Anyone who has it can mint free keys for your product.
   Store it offline (encrypted USB, password manager attachment, or a secrets vault) with at least

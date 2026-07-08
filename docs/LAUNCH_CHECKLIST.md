@@ -20,10 +20,9 @@
 
 ## 0. Pre-flight — the two things that will bite you
 
-- [ ] ⛔ **Replace the license public key.** Right now `LicenseManager.cs` has
-  `PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER"`. **While that placeholder is present, the app
-  accepts ANY correctly-formatted string as a valid license** (dev mode). If you ship like this,
-  every "key" works and nobody needs to pay. See **Section 2**.
+- [x] ⛔ **Replace the license public key.** *(Done — commit `5a95f73` embedded the real ECDSA
+  public key in `LicenseManager.cs`. Dev mode, where the app would accept ANY correctly-formatted
+  string as a valid license, is no longer active.)* See **Section 2**.
 - [ ] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
   updater fetches `https://raw.githubusercontent.com/bmusical/ProjectExplorer/master/updates/updates.xml`.
   If the repo is private, that URL 404s and auto-update silently fails. See **Section 5**.
@@ -75,8 +74,8 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
 
 ### 2.2 Embed the PUBLIC key into the app
 
-- [ ] ⛔ Open `src/ProjectExplorer.Core/Services/LicenseManager.cs`.
-- [ ] ⛔ Replace:
+- [x] ⛔ Open `src/ProjectExplorer.Core/Services/LicenseManager.cs`.
+- [x] ⛔ Replace:
   ```csharp
   private const string PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER";
   ```
@@ -88,8 +87,10 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
       "-----END PUBLIC KEY-----";
   ```
   (The public key is safe to embed and ship — it can only *verify*, not *sign*.)
+  *(Done in commit `5a95f73` — `LicenseManager.cs` now embeds a real PEM key, not the placeholder.)*
 - [ ] ⛔ Rebuild and confirm dev mode is OFF: a made-up string like `foo|FULL|2025-01-01` should now
   be **rejected** in the Registration dialog. Only keys signed by your private key should activate.
+  *(Code change is in place; still worth a manual rebuild-and-verify pass before shipping.)*
 
 ### 2.3 Mint a key for a customer (🔁 per sale)
 
@@ -254,7 +255,7 @@ conversion.
 These are tracked here so nothing slips. (The trivial-and-safe ones are handled in the companion PR;
 the judgment calls are left for you.)
 
-- [ ] ⛔ Replace `PublicKeyPem` placeholder (Section 2.2).
+- [x] ⛔ Replace `PublicKeyPem` placeholder (Section 2.2). *(Done — commit `5a95f73`.)*
 - [x] ✅ Updater URL now uses `/master/` (repo's real default branch; no `main` exists). *(handled in companion PR)*
 - [x] ✅ Support email + landing URL reconciled to `blaznaccess.com` across `RegistrationDialog.cs` and the installer. *(handled in companion PR)*
 - [x] 🔧 Fixed the stray "Inno Setup 7" comments in `build-installer.ps1` **and** `ProjectExplorer.iss` — all now correctly say **Inno Setup 6**. *(handled in companion PR)*
