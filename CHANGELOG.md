@@ -6,6 +6,11 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Add an inline WebResource preview: selecting a WebResource tree node renders its URL via
+  WebView2 in place of the ListView, and its ListView row now does the same on double-click
+  (instead of launching the external browser directly). Both the tree/list context menus and the
+  preview panel offer an explicit "Open in External Browser" action. Requires the WebView2
+  Runtime; falls back to a message + external-browser button when it's not installed.
 - Fix the ListView showing a stale folder listing when the TreeView selection moves to a
   FileReference; add an inline preview panel (image/text formats) with Open/Properties buttons.
 - Allow Projects and Collections to have a description.

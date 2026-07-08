@@ -39,6 +39,9 @@ public partial class MainForm : Form
     // The FileReference currently shown in filePreviewPanel, if any (null when listView is showing).
     private FileReference? _currentPreviewFileRef;
 
+    // The WebResource currently shown in webResourcePreviewPanel, if any (null when listView is showing).
+    private WebResource? _currentPreviewWebResource;
+
     // Drag-drop state
     private TreeNode? _dragHighlightNode;
 
@@ -557,6 +560,7 @@ public partial class MainForm : Form
                     _currentPath = dir;
                 else
                     _currentPath = string.Empty;
+                HideWebResourcePreview();
                 ShowFileReferencePreview(fileRef);
             }
 
@@ -566,7 +570,28 @@ public partial class MainForm : Form
             return;
         }
 
+        if (tag.StartsWith(TagWebResource))
+        {
+            var parts = tag.Substring(TagWebResource.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            _currentProject = _projectManager.GetProject(projectId);
+            var resourceId = Guid.Parse(parts[1]);
+            var webResource = FindWebResource(_currentProject, resourceId);
+            if (webResource != null)
+            {
+                _currentPath = string.Empty;
+                HideFileReferencePreview();
+                ShowWebResourcePreview(webResource);
+            }
+
+            UpdateAddressBar();
+            UpdateStatusBar();
+            UpdateToolbarButtons();
+            return;
+        }
+
         HideFileReferencePreview();
+        HideWebResourcePreview();
 
         listView.BeginUpdate();
         listView.Items.Clear();
@@ -649,6 +674,33 @@ public partial class MainForm : Form
     {
         if (_currentPreviewFileRef != null && File.Exists(_currentPreviewFileRef.FilePath))
             _shellPropertiesProvider.ShowPropertiesDialog(_currentPreviewFileRef.FilePath, this.Handle);
+    }
+
+    /// <summary>
+    /// Shows the given WebResource's inline preview in place of the ListView:
+    /// navigates the embedded browser (WebResourcePreviewPanel) to its URL.
+    /// "Open in External Browser" is always available via the event below.
+    /// </summary>
+    private void ShowWebResourcePreview(WebResource webResource)
+    {
+        _currentPreviewWebResource = webResource;
+        listView.Visible = false;
+        webResourcePreviewPanel.Visible = true;
+
+        webResourcePreviewPanel.ShowWebResource(webResource.Url, webResource.EffectiveName, imageListExtraLarge.Images["WebResource"]);
+    }
+
+    private void HideWebResourcePreview()
+    {
+        if (_currentPreviewWebResource == null) return;
+        _currentPreviewWebResource = null;
+        webResourcePreviewPanel.Visible = false;
+        listView.Visible = true;
+    }
+
+    private void WebResourcePreviewPanel_OpenExternalRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewWebResource != null) LaunchWebResource(_currentPreviewWebResource);
     }
 
     private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
@@ -1164,6 +1216,7 @@ public partial class MainForm : Form
     private void NavigateToPath(string path)
     {
         HideFileReferencePreview();
+        HideWebResourcePreview();
         _currentPath = path;
         listView.BeginUpdate();
         listView.Items.Clear();
@@ -1177,7 +1230,7 @@ public partial class MainForm : Form
 
     private void UpdateAddressBar()
     {
-        txtAddress.Text = _currentPath;
+        txtAddress.Text = _currentPreviewWebResource != null ? _currentPreviewWebResource.Url : _currentPath;
     }
 
     private void UpdateStatusBar()
@@ -1185,6 +1238,12 @@ public partial class MainForm : Form
         if (_currentPreviewFileRef != null)
         {
             lblStatus.Text = $"{_currentPreviewFileRef.EffectiveName}  |  {_currentPreviewFileRef.FilePath}";
+            return;
+        }
+
+        if (_currentPreviewWebResource != null)
+        {
+            lblStatus.Text = $"{_currentPreviewWebResource.EffectiveName}  |  {_currentPreviewWebResource.Url}";
             return;
         }
 
@@ -1224,8 +1283,10 @@ public partial class MainForm : Form
         }
         else if (tag.StartsWith(TagWebResource))
         {
-            // Launch web resource in default browser
-            LaunchWebResource(tag);
+            // Select the corresponding tree node so it shows in the browser preview,
+            // same as Project/Collection/FolderRef above; use the panel's
+            // "Open in External Browser" action to launch it in the default browser.
+            SelectTreeNodeByTag(tag);
         }
         else if (tag.StartsWith(TagFileRef))
         {
@@ -1801,7 +1862,7 @@ public partial class MainForm : Form
 
     private void AddWebResourceMenuItems(ContextMenuStrip menu, Guid projectId, Guid resourceId, string tag)
     {
-        menu.Items.Add("Launch", null, (s, e) => LaunchWebResource(tag));
+        menu.Items.Add("Open in External Browser", null, (s, e) => LaunchWebResource(tag));
         menu.Items.Add("Copy URL", null, (s, e) =>
         {
             var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
@@ -2190,17 +2251,20 @@ public partial class MainForm : Form
 
         var project = _projectManager.GetProject(projectId);
         var webResource = FindWebResource(project, resourceId);
+        if (webResource != null) LaunchWebResource(webResource);
+    }
 
-        if (webResource != null && !string.IsNullOrWhiteSpace(webResource.Url))
+    private void LaunchWebResource(WebResource webResource)
+    {
+        if (string.IsNullOrWhiteSpace(webResource.Url)) return;
+
+        try
         {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(webResource.Url) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to launch URL: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(webResource.Url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to launch URL: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
