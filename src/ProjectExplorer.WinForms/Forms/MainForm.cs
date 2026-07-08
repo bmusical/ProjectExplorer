@@ -15,6 +15,7 @@ public partial class MainForm : Form
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
     private readonly IShellThumbnailProvider _shellThumbnailProvider;
+    private readonly IShellPropertiesProvider _shellPropertiesProvider;
 
     // Tracks, per image ListViewItem, the icon key (shown in Small/Details/List
     // views) and the thumbnail key (shown in Large/Extra Large views), so we can
@@ -69,11 +70,13 @@ public partial class MainForm : Form
 
     public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
                     IShellThumbnailProvider shellThumbnailProvider,
+                    IShellPropertiesProvider shellPropertiesProvider,
                     LicenseManager licenseManager, LicenseInfo license)
     {
         _projectManager         = projectManager;
         _shellIconProvider      = shellIconProvider;
         _shellThumbnailProvider = shellThumbnailProvider;
+        _shellPropertiesProvider = shellPropertiesProvider;
         _licenseManager         = licenseManager;
         _license                = license;
 
@@ -1279,143 +1282,43 @@ public partial class MainForm : Form
             // Empty-area click: offer view options / new-item shortcuts if a project is open.
             if (_currentProject != null)
             {
-                menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
-                menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
-                menu.Items.Add("Add Web Resource...", null, async (s, e) => await ShowAddWebResourceDialog(_currentProject.Id, null));
-                menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(_currentProject.Id, null));
+                AddNewChildMenuItems(menu, _currentProject.Id, null);
                 menu.Items.Add(new ToolStripSeparator());
             }
             AddViewSubmenu(menu);
         }
-        else if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection) || tag.StartsWith(TagFolderRef))
+        else if (tag.StartsWith(TagProject))
         {
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
             menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
-
-            if (tag.StartsWith(TagFolderRef))
-            {
-                var parts = tag.Substring(TagFolderRef.Length).Split(':');
-                var projectId = Guid.Parse(parts[0]);
-                var folderRefId = Guid.Parse(parts[1]);
-                menu.Items.Add("Open in Explorer", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null && Directory.Exists(fr.RealPath))
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
-                });
-                menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
-                });
-                menu.Items.Add("Open PowerShell Here", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
-                });
-                menu.Items.Add("Copy Path", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null && !string.IsNullOrEmpty(fr.RealPath)) Clipboard.SetText(fr.RealPath);
-                });
-                menu.Items.Add(new ToolStripSeparator());
-                menu.Items.Add("Remove from Project", null, async (s, e) =>
-                {
-                    if (MessageBox.Show("Remove this folder reference from the project?", "Confirm Remove",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                    {
-                        await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                        RefreshTreeView();
-                    }
-                });
-            }
+            menu.Items.Add(new ToolStripSeparator());
+            AddProjectMenuItems(menu, projectId, () => RenameViaDialog(tag));
+        }
+        else if (tag.StartsWith(TagCollection))
+        {
+            var parts = tag.Substring(TagCollection.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var collectionId = Guid.Parse(parts[1]);
+            menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
+            menu.Items.Add(new ToolStripSeparator());
+            AddCollectionMenuItems(menu, projectId, collectionId, () => RenameViaDialog(tag));
+        }
+        else if (tag.StartsWith(TagFolderRef))
+        {
+            var parts = tag.Substring(TagFolderRef.Length).Split(':');
+            menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
+            menu.Items.Add(new ToolStripSeparator());
+            AddFolderReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
         else if (tag.StartsWith(TagWebResource))
         {
             var parts = tag.Substring(TagWebResource.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var resourceId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open (Launch)", null, (s, e) => LaunchWebResource(tag));
-            menu.Items.Add("Copy URL", null, (s, e) =>
-            {
-                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
-                if (wr != null && !string.IsNullOrEmpty(wr.Url)) Clipboard.SetText(wr.Url);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
-                if (wr != null)
-                {
-                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateWebResourceAsync(projectId, resourceId,
-                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            dlg.ResourceUrl.Trim(),
-                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                if (MessageBox.Show("Remove this web resource from the project?", "Confirm Remove",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                    RefreshTreeView();
-                }
-            });
+            AddWebResourceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]), tag);
         }
         else if (tag.StartsWith(TagFileRef))
         {
             var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var fileRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null) OpenFileReference(fr);
-            });
-            menu.Items.Add("Open Containing Folder", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && File.Exists(fr.FilePath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
-            });
-            menu.Items.Add("Copy Path", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null)
-                {
-                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateFileReferenceAsync(projectId, fileRefId,
-                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            newPath: dlg.ResourceFilePath.Trim(),
-                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                if (MessageBox.Show("Remove this file reference from the project?", "Confirm Remove",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
-                    RefreshTreeView();
-                }
-            });
+            AddFileReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
         else if (tag.StartsWith(TagRealFolder))
         {
@@ -1426,14 +1329,7 @@ public partial class MainForm : Form
                 _forwardStack.Clear();
                 NavigateToPath(path);
             });
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                if (Directory.Exists(path))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
-            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
-            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+            AddRealFolderMenuItems(menu, path);
         }
         else if (tag.StartsWith("File:"))
         {
@@ -1449,6 +1345,10 @@ public partial class MainForm : Form
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = true });
             });
             menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(filePath));
+            menu.Items.Add("Properties", null, (s, e) =>
+            {
+                if (File.Exists(filePath)) _shellPropertiesProvider.ShowPropertiesDialog(filePath, this.Handle);
+            });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Add as File Resource...", null, async (s, e) =>
             {
@@ -1463,6 +1363,51 @@ public partial class MainForm : Form
 
         if (menu.Items.Count > 0)
             menu.Show(listView, location);
+    }
+
+    /// <summary>
+    /// The ListView has no inline label editing (unlike the TreeView), so
+    /// Project/Collection renames triggered from a ListView context menu go
+    /// through this dialog instead of TreeNode.BeginEdit().
+    /// </summary>
+    private async void RenameViaDialog(string tag)
+    {
+        if (tag.StartsWith(TagProject))
+        {
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+            var project = _projectManager.GetProject(projectId);
+            if (project == null) return;
+
+            using var dlg = new InputDialog("Rename Project", "Project name:", project.Name);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.RenameProjectAsync(projectId, name);
+                    RefreshTreeView();
+                }
+            }
+        }
+        else if (tag.StartsWith(TagCollection))
+        {
+            var parts = tag.Substring(TagCollection.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var collectionId = Guid.Parse(parts[1]);
+            var collection = _projectManager.GetProject(projectId)?.FindCollection(collectionId);
+            if (collection == null) return;
+
+            using var dlg = new InputDialog("Rename Collection", "Collection name:", collection.Name);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.RenameCollectionAsync(projectId, collectionId, name);
+                    RefreshTreeView();
+                }
+            }
+        }
     }
 
     private void AddViewSubmenu(ContextMenuStrip menu)
@@ -1632,6 +1577,250 @@ public partial class MainForm : Form
     }
 
     // ── Context Menu ──
+    //
+    // Item-type menus are built by the shared Add*MenuItems helpers below so the
+    // TreeView and ListView context menus can never drift out of parity with
+    // each other — each helper is called from both ShowTreeViewContextMenu and
+    // ShowListViewContextMenu.
+
+    private void AddNewChildMenuItems(ContextMenuStrip menu, Guid projectId, Guid? parentCollectionId)
+    {
+        menu.Items.Add(parentCollectionId == null ? "New Collection..." : "New Sub-Collection...", null, async (s, e) =>
+        {
+            using var dlg = new InputDialog(
+                parentCollectionId == null ? "Create New Collection" : "Create Sub-Collection",
+                "Collection name:", "New Collection");
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.CreateCollectionAsync(projectId, name, parentCollectionId);
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add("Add Folder...", null, async (s, e) =>
+        {
+            if (!CheckLeafLimit("Add Folder")) return;
+            using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, parentCollectionId);
+                RefreshLicense();
+                UpdateLicenseUi();
+                RefreshTreeView();
+            }
+        });
+        menu.Items.Add("Add Web Resource...", null, async (s, e) => await ShowAddWebResourceDialog(projectId, parentCollectionId));
+        menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(projectId, parentCollectionId));
+    }
+
+    private void AddProjectMenuItems(ContextMenuStrip menu, Guid projectId, Action rename)
+    {
+        AddNewChildMenuItems(menu, projectId, null);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Delete Project", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            if (project == null) return;
+            var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.DeleteProjectAsync(projectId);
+                _currentProject = null;
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddCollectionMenuItems(ContextMenuStrip menu, Guid projectId, Guid collectionId, Action rename)
+    {
+        AddNewChildMenuItems(menu, projectId, collectionId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Delete Collection", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
+                "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.DeleteCollectionAsync(projectId, collectionId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddFolderReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid folderRefId)
+    {
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            var fr = FindFolderRef(project, folderRefId);
+            if (fr != null)
+            {
+                using var dlg = new InputDialog("Edit Folder Description", "Description:", fr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateFolderReferenceAsync(
+                        projectId, folderRefId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Open in Explorer", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && Directory.Exists(fr.RealPath))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
+        });
+        menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+        });
+        menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
+        });
+        menu.Items.Add("Copy Path", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && !string.IsNullOrEmpty(fr.RealPath)) Clipboard.SetText(fr.RealPath);
+        });
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && Directory.Exists(fr.RealPath)) _shellPropertiesProvider.ShowPropertiesDialog(fr.RealPath, this.Handle);
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this folder reference from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddWebResourceMenuItems(ContextMenuStrip menu, Guid projectId, Guid resourceId, string tag)
+    {
+        menu.Items.Add("Launch", null, (s, e) => LaunchWebResource(tag));
+        menu.Items.Add("Copy URL", null, (s, e) =>
+        {
+            var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+            if (wr != null && !string.IsNullOrEmpty(wr.Url)) Clipboard.SetText(wr.Url);
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Edit...", null, async (s, e) =>
+        {
+            var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+            if (wr != null)
+            {
+                using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    await _projectManager.UpdateWebResourceAsync(
+                        projectId, resourceId,
+                        string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                        dlg.ResourceUrl.Trim(),
+                        string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this web resource from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddFileReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid fileRefId)
+    {
+        menu.Items.Add("Open", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null) OpenFileReference(fr);
+        });
+        menu.Items.Add("Open Containing Folder", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && File.Exists(fr.FilePath))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
+        });
+        menu.Items.Add("Copy Path", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
+        });
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && File.Exists(fr.FilePath)) _shellPropertiesProvider.ShowPropertiesDialog(fr.FilePath, this.Handle);
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Edit...", null, async (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null)
+            {
+                using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    await _projectManager.UpdateFileReferenceAsync(
+                        projectId, fileRefId,
+                        newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                        newPath: dlg.ResourceFilePath.Trim(),
+                        newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this file reference from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddRealFolderMenuItems(ContextMenuStrip menu, string path)
+    {
+        menu.Items.Add("Open in Explorer", null, (s, e) =>
+        {
+            if (Directory.Exists(path))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        });
+        menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
+        menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
+        menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            if (Directory.Exists(path)) _shellPropertiesProvider.ShowPropertiesDialog(path, this.Handle);
+        });
+    }
 
     private void ShowTreeViewContextMenu(TreeNode node, Point location)
     {
@@ -1645,35 +1834,8 @@ public partial class MainForm : Form
 
         if (tag.StartsWith(TagProject))
         {
-            menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
-            menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
-            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                await ShowAddWebResourceDialog(projectId, null);
-            });
-            menu.Items.Add("Add File...", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                await ShowAddFileResourceDialog(projectId, null);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Delete Project", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                var project = _projectManager.GetProject(projectId);
-                if (project == null) return;
-                var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.DeleteProjectAsync(projectId);
-                    _currentProject = null;
-                    RefreshTreeView();
-                }
-            });
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+            AddProjectMenuItems(menu, projectId, () => node.BeginEdit());
         }
 
         if (tag.StartsWith(TagCollection))
@@ -1681,220 +1843,30 @@ public partial class MainForm : Form
             var parts = tag.Substring(TagCollection.Length).Split(':');
             var projectId = Guid.Parse(parts[0]);
             var collectionId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("New Sub-Collection...", null, async (s, e) =>
-            {
-                using var dlg = new InputDialog("Create Sub-Collection", "Name:", "New Collection");
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    var name = dlg.InputText.Trim();
-                    if (!string.IsNullOrEmpty(name))
-                    {
-                        await _projectManager.CreateCollectionAsync(projectId, name, collectionId);
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Add Folder...", null, async (s, e) =>
-            {
-                if (!CheckLeafLimit("Add Folder")) return;
-                using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, collectionId);
-                    RefreshLicense();
-                    UpdateLicenseUi();
-                    RefreshTreeView();
-                }
-            });
-            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
-            {
-                await ShowAddWebResourceDialog(projectId, collectionId);
-            });
-            menu.Items.Add("Add File...", null, async (s, e) =>
-            {
-                await ShowAddFileResourceDialog(projectId, collectionId);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Delete Collection", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
-                    "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.DeleteCollectionAsync(projectId, collectionId);
-                    RefreshTreeView();
-                }
-            });
+            AddCollectionMenuItems(menu, projectId, collectionId, () => node.BeginEdit());
         }
 
         if (tag.StartsWith(TagFolderRef))
         {
             var parts = tag.Substring(TagFolderRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var folderRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Edit Description...", null, async (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var fr = FindFolderRef(project, folderRefId);
-                if (fr != null)
-                {
-                    using var dlg = new InputDialog("Edit Folder Description", "Description:", fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        var description = dlg.InputText.Trim();
-                        await _projectManager.UpdateFolderReferenceAsync(
-                            projectId,
-                            folderRefId,
-                            newDescription: string.IsNullOrEmpty(description) ? null : description
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this folder reference from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                    RefreshTreeView();
-                }
-            });
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var fr = FindFolderRef(project, folderRefId);
-                if (fr != null && Directory.Exists(fr.RealPath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
-                }
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
-            {
-                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
-            });
-            menu.Items.Add("Open PowerShell Here", null, (s, e) =>
-            {
-                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
-            });
+            AddFolderReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
 
         if (tag.StartsWith(TagWebResource))
         {
             var parts = tag.Substring(TagWebResource.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var resourceId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var wr = FindWebResource(project, resourceId);
-                if (wr != null)
-                {
-                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateWebResourceAsync(
-                            projectId,
-                            resourceId,
-                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            dlg.ResourceUrl.Trim(),
-                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Launch", null, (s, e) => LaunchWebResource(tag));
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this web resource from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                    RefreshTreeView();
-                }
-            });
+            AddWebResourceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]), tag);
         }
 
         if (tag.StartsWith(TagFileRef))
         {
             var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var fileRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null) OpenFileReference(fr);
-            });
-            menu.Items.Add("Open Containing Folder", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && File.Exists(fr.FilePath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
-            });
-            menu.Items.Add("Copy Path", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null)
-                {
-                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateFileReferenceAsync(
-                            projectId,
-                            fileRefId,
-                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            newPath: dlg.ResourceFilePath.Trim(),
-                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this file reference from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
-                    RefreshTreeView();
-                }
-            });
+            AddFileReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
 
         if (tag.StartsWith(TagRealFolder))
         {
-            var path = tag.Substring(TagRealFolder.Length);
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                if (Directory.Exists(path))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-                }
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
-            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
-            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+            AddRealFolderMenuItems(menu, tag.Substring(TagRealFolder.Length));
         }
 
         if (menu.Items.Count > 0)

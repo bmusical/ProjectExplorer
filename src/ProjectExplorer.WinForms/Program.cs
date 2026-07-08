@@ -29,6 +29,7 @@ internal static class Program
 
         IShellIconProvider shellIconProvider = new ShellIconProvider();
         IShellThumbnailProvider shellThumbnailProvider = new ShellThumbnailProvider();
+        IShellPropertiesProvider shellPropertiesProvider = new ShellPropertiesProvider();
 
         if (projectManager.Projects.Count == 0)
         {
@@ -37,7 +38,7 @@ internal static class Program
             projectManager.CreateCollectionAsync(sample.Id, "Documentation").GetAwaiter().GetResult();
         }
 
-        var mainForm = new MainForm(projectManager, shellIconProvider, shellThumbnailProvider, licenseManager, license);
+        var mainForm = new MainForm(projectManager, shellIconProvider, shellThumbnailProvider, shellPropertiesProvider, licenseManager, license);
         mainForm.ListViewItemSorter = new ListViewColumnSorter();
 
         // Check for updates ~5 seconds after startup so the main window is visible first
