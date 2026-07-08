@@ -269,8 +269,9 @@ the judgment calls are left for you.)
   `bin/`, `obj/`. *(handled in companion PR)*
 - [ ] 🔧 Do **not** commit `private_key.pem`, `public_key.pem` is fine to keep locally but is embedded
   in code anyway.
-- [ ] 💡 Add a short top-level `README.md` for the public repo: what the product is, a screenshot, the
+- [x] 💡 Add a short top-level `README.md` for the public repo: what the product is, a screenshot, the
   Gumroad buy link, and a "Releases" pointer. (Buyers and the curious will land here once it's public.)
+  *(Added — swap in a real screenshot once the UI is final.)*
 - [ ] 💡 Add an `Issues` template so users can report bugs.
 
 ---
@@ -281,11 +282,15 @@ the judgment calls are left for you.)
 - [ ] 🔁 Track sales in Gumroad; reconcile against keys issued.
 - [ ] 💡 Collect feature requests against the roadmap already in `CLAUDE.md`
   (Open CMD here, drag-drop reparenting, Reveal in Explorer, search/filter, etc.).
-- [ ] 💡 Keep a `CHANGELOG.md` so release notes are quick to assemble each time.
+- [x] 💡 Keep a `CHANGELOG.md` so release notes are quick to assemble each time. Add a new
+  `[X.Y.Z]` section on every release (see `docs/RELEASE.md` step 2).
 
 ---
 
 ## Quick reference — "Release a new version" in 8 steps
+
+> Also written up standalone at [`docs/RELEASE.md`](RELEASE.md) for faster linking once you're
+> past first-launch setup.
 
 1. Bump version in `ProjectExplorer.WinForms.csproj`.
 2. Update `CHANGELOG.md` / write release notes.

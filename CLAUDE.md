@@ -10,7 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-ProjectExplorer is a Windows Forms desktop app (.NET 10) that solves a real problem: instead of opening 10–15 File Explorer windows every day to navigate a project's scattered folders and web resources, you open one tool. It organizes projects as a hierarchy of **Collections**, **FolderReferences** (real disk folders), and **WebResources** (URLs) — bringing local folders and project-related web resources together in one place.
+**Project Nest Explorer** (repo/codebase name: ProjectExplorer; publisher: HxM Blazor Software LLC) is a Windows Forms desktop app (.NET 10) that solves a real problem: instead of opening 10–15 File Explorer windows every day to navigate a project's scattered folders and web resources, you open one tool. It organizes projects as a hierarchy of **Collections**, **FolderReferences** (real disk folders), **FileReferences** (individual files), and **WebResources** (URLs) — bringing local folders, files, and project-related web resources together in one place.
+
+It ships as a commercial product: a free tier (3 projects / 25 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
 
 ## Commands
 
@@ -26,25 +28,33 @@ dotnet test
 
 # Run a single test by name
 dotnet test --filter "FullyQualifiedName~TestMethodName"
+
+# Publish a self-contained single-file exe (produces publish/ProjectNest.exe)
+dotnet publish src/ProjectExplorer.WinForms -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+# Build the Inno Setup installer end-to-end (Windows only, requires Inno Setup 6)
+./installer/build-installer.ps1 -Version X.Y.Z -UpdateXml
 ```
 
 ## Architecture
 
-Three-layer solution:
+Three app layers plus an internal key-generation console tool:
 
 | Project | Role |
 |---|---|
-| `ProjectExplorer.Core` | Models, ProjectManager service, IProjectRepository interface, JSON persistence |
-| `ProjectExplorer.Shell` | Windows Shell P/Invoke wrappers (icons via `SHGetFileInfo`) |
-| `ProjectExplorer.WinForms` | TreeView + ListView UI, dialogs, entry point |
+| `ProjectExplorer.Core` | Models, `ProjectManager` service, `IProjectRepository` interface, JSON persistence, `LicenseManager` |
+| `ProjectExplorer.Shell` | Windows Shell P/Invoke wrappers (icons via `SHGetFileInfo`; Fluent/Mica window styling via DWM/UxTheme) |
+| `ProjectExplorer.WinForms` | TreeView + ListView UI, dialogs, entry point. Assembly name `ProjectNest`, product name `Project Nest Explorer` |
+| `tools/KeyGen` | Standalone console app — generates the ECDSA keypair and signs customer license keys. Internal use only, never shipped to customers |
 
 ### Data Model
 
 ```
-Project
-  └─ Collection (nestable)
+Project (has optional Description)
+  └─ Collection (nestable, has optional Description)
        ├─ Collection
        ├─ FolderReference  (path to real folder on disk)
+       ├─ FileReference    (path to a single real file on disk; opened via its associated app)
        └─ WebResource      (URL)
 ```
 
@@ -52,29 +62,45 @@ All children inherit from `ProjectChild` (Id, ParentId, SortOrder, Metadata dict
 
 ### Data Flow
 
-User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepository.SaveAllAsync()` → `%APPDATA%\ProjectExplorer\projects.json` (with `.bak` backup on each save).
+User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepository.SaveAllAsync()` → `%APPDATA%\ProjectExplorer\projects.json` (with `.bak` backup on each save). License state is stored separately at `%APPDATA%\ProjectExplorer\license.json` via `LicenseManager`.
 
 ### Key Files
 
 - `src/ProjectExplorer.Core/Services/ProjectManager.cs` — all business logic; start here for any feature work
 - `src/ProjectExplorer.Core/Services/JsonProjectRepository.cs` — persistence; manual JSON node traversal for polymorphic deserialization
+- `src/ProjectExplorer.Core/Services/LicenseManager.cs` — free-tier limit checks + ECDSA license key verification; see Licensing section
 - `src/ProjectExplorer.Core/Models/Project.cs` — root model with tree helpers (`FindCollection`, `FindParentList`, circular reference detection)
-- `src/ProjectExplorer.WinForms/Forms/MainForm.cs` — 1000+ line main window; TreeView (left) drives ListView (right) with navigation history stacks
+- `src/ProjectExplorer.WinForms/Forms/MainForm.cs` — 2300+ line main window; TreeView (left) drives ListView (right) with navigation history stacks, drag-and-drop reparenting, and unified context menus
+- `src/ProjectExplorer.WinForms/Forms/RegistrationDialog.cs` — license key activation UI (Help ▸ Register / License…)
+- `src/ProjectExplorer.WinForms/Forms/ImageViewerForm.cs` — in-app image viewer for image FileReferences/folder contents
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
-- `tests/ProjectExplorer.Tests/ProjectManagerTests.cs` — 16 xUnit tests; good reference for expected behavior of CRUD operations and tree traversal
+- `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
+- `tools/KeyGen/Program.cs` — `setup` / `generate` / `verify` commands for the license key system
+- `tests/ProjectExplorer.Tests/ProjectManagerTests.cs` — xUnit tests for CRUD operations and tree traversal
+- `tests/ProjectExplorer.Tests/ImageViewingTests.cs` — xUnit tests for image detection/viewing behavior
+- `docs/LAUNCH_CHECKLIST.md` — the authoritative, start-to-finish runbook for licensing, packaging, Gumroad, and releases; consult it before touching anything in the Licensing or Distribution sections below
+- `docs/RELEASE.md` — condensed "cut a new release" steps, extracted from the checklist above
+- `tools/KeyGen/README.md` — how to generate the ECDSA keypair and mint/verify customer license keys
+- `README.md` — public-facing repo overview; `CHANGELOG.md` — version history
 
 ### Adding a New Child Type
 
-The pattern established by `WebResource` (commit `257e642`) is: add model → add `ChildType` enum value → handle in `JsonProjectRepository` deserialization switch → add `ProjectManager` CRUD methods → wire up context menu and dialog in `MainForm` → add tests.
+The pattern established by `WebResource` and `FileReference` is: add model → add `ChildType` enum value → handle in `JsonProjectRepository` deserialization switch → add `ProjectManager` CRUD methods → wire up context menu and dialog in `MainForm` → add tests.
 
-## Distribution / Installer
+## Licensing & Distribution
 
-The app targets Windows desktop users. Distribution plan:
+The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don't count); a license key unlocks unlimited use. Enforced by `LicenseManager` in `ProjectExplorer.Core`.
 
-- **Packaging**: Publish as a self-contained single-file executable via `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`. Output goes to `publish/`.
-- **Installer**: Use [Inno Setup](https://jrsoftware.org/isinfo.php) (free, well-established) to wrap the published exe into a standard Windows installer (`ProjectExplorerSetup.exe`). The Inno Setup script lives at `installer/ProjectExplorer.iss`.
-- **No store dependency**: Ship as a direct download — no Microsoft Store submission required for initial release.
-- **Auto-update**: Not planned for v1; revisit after initial user feedback.
+- **Key format**: ECDSA P-256 signed payloads of the form `email|FULL|yyyy-MM-dd`, encoded as `base64url(payload).base64url(signature)`. Verification is fully offline against an embedded public key — no license server.
+- **`tools/KeyGen`** is the key factory: `dotnet run -- setup` generates the keypair once (guard `private_key.pem` like cash, never commit it); `dotnet run -- generate --email <buyer>` mints a customer key per sale; `dotnet run -- verify --license <key>` sanity-checks one.
+- **⚠️ Dev-mode trap**: `LicenseManager.PublicKeyPem` currently ships as `"DEVELOPMENT_KEY_PLACEHOLDER"`, which makes the app accept *any* correctly-formatted string as a valid license. This **must** be replaced with the real generated public key before any public release — see `docs/LAUNCH_CHECKLIST.md` Section 2.
+- **Packaging**: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true` → self-contained single-file `publish/ProjectNest.exe`.
+- **Installer**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) wraps the exe into `ProjectNest-<version>-Setup.exe`. Script at `installer/ProjectExplorer.iss`; fully scripted via `installer/build-installer.ps1`.
+- **Auto-update**: Wired up via `Autoupdater.NET.Official`, reading `updates/updates.xml` from the repo's `master` branch on GitHub (requires the repo to be public).
+- **Sales channel**: Gumroad (handles checkout/tax); recommended model is signed keys generated per-sale via `tools/KeyGen`, not Gumroad's own random license keys (incompatible with the ECDSA verifier).
+- **No store dependency**: direct download, no Microsoft Store submission.
+
+`docs/LAUNCH_CHECKLIST.md` is the full runbook (brand/legal, keypair generation, Gumroad setup, release steps, code signing) — treat it as the source of truth and keep it in sync with any change to licensing or the release process.
 
 ## Target Users
 
@@ -90,53 +116,17 @@ Understanding who uses this shapes which features matter most:
 
 Common thread: **people who context-switch between multiple projects** and hate re-navigating the same folder trees every session.
 
-## Planned Feature: Open Command Prompt Here
+## Recently Shipped
 
-Right-click on any **FolderReference** (or a Collection that contains folder references) and choose **"Open CMD here"** / **"Open PowerShell here"** to launch a terminal pre-`cd`'d to that folder.
+These were tracked as "Planned Feature" sections in earlier versions of this file — both are now fully implemented, so treat the code as the source of truth rather than the notes below:
 
-### Implementation notes
-
-- Context menu item added in `MainForm.cs` for `FolderReference` nodes (both TreeView right-click and ListView right-click).
-- Launch via `Process.Start(new ProcessStartInfo { FileName = "cmd.exe", WorkingDirectory = folderRef.Path, UseShellExecute = true })`.
-- For PowerShell: swap `FileName` for `"powershell.exe"` (or `"pwsh.exe"` if installed).
-- Guard with `Directory.Exists(folderRef.Path)` before launching; show a friendly error if the path no longer exists.
-- Consider a settings option for preferred shell (CMD vs PowerShell) — store in `%APPDATA%\ProjectExplorer\settings.json`.
-- No new model changes needed; purely a UI/shell layer addition.
-
-### Tests to add
-
-- Unit test that `ProjectManager` is not involved (shell launch is fire-and-forget in the UI layer — no service test needed).
-- Manual test: verify working directory is correct, verify graceful error when path is missing.
-
-## Planned Feature: Drag-and-Drop Node Moving
-
-The TreeView needs to support dragging any node (Collection, FolderReference, WebResource) and dropping it onto a different parent Collection or a Project root to reparent it.
-
-### Core service method needed
-
-`ProjectManager` needs a `MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId)` method:
-
-1. Locate the child via `project.FindParentList(childId)` — remove it from the source list.
-2. Resolve the destination list: `project.FindCollection(newParentCollectionId)?.Children` or `project.Children` for project root.
-3. Guard against circular references when moving a Collection into one of its own descendants — use `project.HasCircularReferences()` after tentatively inserting, then roll back if true.
-4. Set `child.ParentId = newParentCollectionId ?? project.Id` and append to destination list.
-5. Save via `_repository.SaveProjectAsync(project)`.
-
-### WinForms wiring (MainForm.cs)
-
-- Set `treeView.AllowDrop = true`.
-- Handle `ItemDrag` → call `treeView.DoDragDrop(e.Item, DragDropEffects.Move)`.
-- Handle `DragEnter` → set `e.Effect = DragDropEffects.Move` when the data is a `TreeNode`.
-- Handle `DragOver` → auto-scroll and highlight the node under the cursor via `treeView.GetNodeAt(...)`.
-- Handle `DragDrop` → extract the dragged node's tag (e.g. `"Collection:<guid>"`), parse the target node's tag for the new parent id, call `await MoveChildAsync(...)`, then rebuild the affected tree branches.
-- Reject drops that would move a Project node or drop onto a non-Collection target (FolderReference, WebResource).
-
-### Tests to add
-
-- Move a Collection into a sibling Collection.
-- Move a FolderReference to the project root.
-- Reject moving a Collection into its own descendant (circular reference guard).
-- Verify `ParentId` is updated correctly after move.
+- **Open CMD / PowerShell here** — `MainForm.LaunchTerminal(folderPath, usePowerShell)` (`MainForm.cs`), wired into toolbar buttons (`BtnOpenCmd_Click` / `BtnOpenPowerShell_Click`) and the TreeView/ListView context menus for `FolderReference` nodes.
+- **Reveal in Explorer** — `Process.Start("explorer.exe", "/select,\"<path>\"")`, on both FolderReference and FileReference context menus.
+- **Copy path to clipboard** — `Clipboard.SetText(path)` on FolderReference/FileReference/WebResource context menus.
+- **Drag-and-drop node moving** — `ProjectManager.MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId)` (`ProjectManager.cs`) handles the reparent + circular-reference guard; `MainForm.cs` wires `treeView.AllowDrop`, `ItemDrag`/`DragEnter`/`DragOver`/`DragDrop`.
+- **Unified context menus + Properties verb** — TreeView and ListView right-click menus were consolidated; a Properties dialog was added for inspecting/editing node metadata.
+- **Windows 11 Fluent styling** — `ModernWindowStyler` applies DWM/UxTheme attributes (rounded corners, Mica/dark titlebar) at startup.
+- **F2 rename** — `MainForm.TreeView_KeyDown` handles `Keys.F2` on the selected TreeView node. (Del-to-delete and Enter-to-open in the TreeView are **not** wired up yet — only the address bar handles Enter today; still open items, see Roadmap.)
 
 ## Roadmap
 
@@ -146,12 +136,9 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 
 | Feature | Notes |
 |---|---|
-| **Open CMD / PowerShell here** | Right-click on FolderReference → launch terminal in that folder. See planned feature section above. |
-| **Drag-and-drop node moving** | Reparent any child by dragging within the TreeView. See planned feature section above. |
-| **Reveal in Explorer** | Right-click FolderReference → `Process.Start("explorer.exe", path)`. Two-liner, high value. |
-| **Copy path to clipboard** | Right-click FolderReference or WebResource → copy path/URL. Trivial to add. |
+| **Replace license public key + go public** | ⛔ Ship-blocker, not a feature: `LicenseManager.PublicKeyPem` is still the dev placeholder (accepts any key) and the repo must be public for auto-update to work. See `docs/LAUNCH_CHECKLIST.md` Section 0 & 2. |
+| **Keyboard navigation (remaining)** | F2 rename and address-bar Enter already work; still need Enter-to-open and Del-to-delete on the TreeView/ListView selection. |
 | **Import from clipboard / text** | Paste a folder path or URL and have ProjectExplorer auto-create the right child type. |
-| **Keyboard navigation** | Arrow keys in TreeView already work; add Enter to open, F2 to rename, Del to delete. |
 | **Localization (i18n) scaffolding** | Externalize all UI strings to `.resx` resource files before the codebase grows further. Establish `Strings.resx` (default/English) and the `.Designer.cs` accessor pattern now — every string added from day 1 goes in the right place. Actual translations added incrementally as language demand is confirmed. WinForms supports this natively; no third-party library needed. |
 
 ### Medium-term
