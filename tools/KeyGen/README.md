@@ -67,5 +67,5 @@ as the most sensitive secret in this project.
 ## Free-tier limits (for support conversations)
 
 Unlicensed installs are capped at **3 projects** / **25 leaf nodes** total
-(FolderReferences + WebResources; Collections don't count). See
+(FolderReferences + WebResources + FileReferences; Collections don't count). See
 `LicenseManager.FreeProjectLimit` / `FreeLeafNodeLimit`.
