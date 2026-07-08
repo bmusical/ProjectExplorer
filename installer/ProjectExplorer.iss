@@ -5,7 +5,7 @@
 ; Output lands in publish\ at the repo root, then run this script.
 
 #define AppName      "Project Nest Explorer"
-#define AppVersion   "1.0.2"
+#define AppVersion   "1.0.3"
 #define AppPublisher "HxM Blazor Software LLC"
 #define AppExeName   "ProjectNest.exe"
 #define AppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
