@@ -1,0 +1,74 @@
+name: Release
+
+# Fires when a bare version tag is pushed (e.g. "1.0.3" — no "v" prefix, per
+# this repo's convention documented in docs/RELEASE.md). Mirrors the manual
+# steps in installer/build-installer.ps1, just run on a GitHub-hosted Windows
+# VM instead of a developer's machine:
+#   1. dotnet publish a self-contained, single-file win-x64 build.
+#   2. Compile the Inno Setup installer around it.
+#   3. Attach the installer to the GitHub Release for this tag.
+#
+# The tag itself must already exist as a real Git tag pointing at a commit on
+# master where CHANGELOG.md / updates.xml / the csproj <Version> have already
+# been bumped to match — this workflow builds and publishes, it doesn't bump
+# versions.
+on:
+  push:
+    tags:
+      - "[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: write # required to create the GitHub Release and upload the asset
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest # Inno Setup and the win-x64 WinForms build both need real Windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=$($env:GITHUB_REF_NAME)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish self-contained win-x64 build
+        run: >
+          dotnet publish src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj
+          -c Release -r win-x64 --self-contained true
+          /p:PublishSingleFile=true
+          /p:PublishReadyToRun=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          /p:Version=${{ steps.version.outputs.version }}
+          /p:PublishDir=${{ github.workspace }}\publish
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        run: >
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe"
+          "/DAppVersion=${{ steps.version.outputs.version }}"
+          installer\ProjectExplorer.iss
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $changelog = Get-Content -Raw CHANGELOG.md
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=\n## \[|\z)"
+          if ($changelog -match $pattern) {
+            $Matches[1].Trim() | Set-Content -Path release-notes.md -Encoding utf8
+          } else {
+            "See CHANGELOG.md for details." | Set-Content -Path release-notes.md -Encoding utf8
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Project Nest Explorer ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: installer-output/ProjectNest-${{ steps.version.outputs.version }}-Setup.exe
