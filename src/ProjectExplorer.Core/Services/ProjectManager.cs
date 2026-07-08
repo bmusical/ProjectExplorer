@@ -52,6 +52,14 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    public async Task UpdateProjectAsync(Guid projectId, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        if (newDescription != null) project.Description = newDescription;
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     public async Task DeleteProjectAsync(Guid projectId)
     {
         _projects.RemoveAll(p => p.Id == projectId);
@@ -103,6 +111,16 @@ public class ProjectManager
         var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
         var parentList = project.FindParentList(collectionId) ?? throw new InvalidOperationException($"Cannot find parent list for collection {collectionId}.");
         parentList.RemoveAll(c => c.Id == collectionId);
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
+    public async Task UpdateCollectionAsync(Guid projectId, Guid collectionId, string? newDescription = null)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var collection = project.FindCollection(collectionId) ?? throw new InvalidOperationException($"Collection {collectionId} not found.");
+
+        if (newDescription != null) collection.Description = newDescription;
         project.Modified = DateTime.UtcNow;
         await _repository.SaveProjectAsync(project);
     }

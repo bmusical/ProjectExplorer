@@ -35,6 +35,23 @@ public class ProjectManagerTests
     }
 
     [Fact]
+    public async Task UpdateProject_ChangesDescription()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        Assert.Null(project.Description);
+
+        await mgr.UpdateProjectAsync(project.Id, newDescription: "Client website redesign");
+
+        var loaded = mgr.GetProject(project.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("Client website redesign", loaded!.Description);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        Assert.Equal("Client website redesign", reloaded.First(p => p.Id == project.Id).Description);
+    }
+
+    [Fact]
     public async Task CreateCollection_AddsToProject()
     {
         var mgr = await CreateManagerAsync();
@@ -64,6 +81,25 @@ public class ProjectManagerTests
         var top = loaded!.FindCollection(parentColl.Id);
         Assert.NotNull(top);
         Assert.Single(top!.Children);
+    }
+
+    [Fact]
+    public async Task UpdateCollection_ChangesDescription()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Assets");
+        Assert.Null(coll.Description);
+
+        await mgr.UpdateCollectionAsync(project.Id, coll.Id, newDescription: "Texture and audio assets");
+
+        var loaded = mgr.GetProject(project.Id)!.FindCollection(coll.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("Texture and audio assets", loaded!.Description);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        var reloadedColl = reloaded.First(p => p.Id == project.Id).FindCollection(coll.Id);
+        Assert.Equal("Texture and audio assets", reloadedColl!.Description);
     }
 
     [Fact]

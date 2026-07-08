@@ -7,6 +7,7 @@ partial class MainForm
     // Branded header band
     private Panel headerPanel;
     private PictureBox headerLogo;
+    private Label headerProduct;
     private Label headerTitle;
     private Label headerTagline;
 
@@ -29,6 +30,12 @@ partial class MainForm
 
     // List view (right panel)
     private ListView listView;
+
+    // File preview panel (right panel, shown instead of listView for a selected FileReference)
+    private FilePreviewPanel filePreviewPanel;
+
+    // Web resource preview panel (right panel, shown instead of listView for a selected WebResource)
+    private WebResourcePreviewPanel webResourcePreviewPanel;
 
     // Status bar
     private StatusStrip statusStrip;
@@ -246,7 +253,7 @@ partial class MainForm
         this.headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 56,
+            Height = 64,
             BackColor = accentBlue
         };
         // Subtle vertical gradient + bottom shadow line so the header reads as a
@@ -266,7 +273,7 @@ partial class MainForm
         {
             SizeMode = PictureBoxSizeMode.Zoom,
             Size = new Size(40, 40),
-            Location = new Point(12, 8),
+            Location = new Point(12, 12),
             BackColor = Color.Transparent
         };
         try
@@ -279,27 +286,39 @@ partial class MainForm
         }
         catch { /* logo is decorative — ignore load failures */ }
 
+        // Product line (eyebrow) — "Project Nest" is the product; the program below is
+        // "Project Nest Explorer". Same pattern as the About and Registration dialogs.
+        this.headerProduct = new Label
+        {
+            Text = "PROJECT NEST",
+            Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(150, 185, 240),
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Location = new Point(62, 8)
+        };
+
         this.headerTitle = new Label
         {
             Text = "Project Nest Explorer",
-            Font = new Font("Segoe UI", 15f, FontStyle.Bold),
+            Font = new Font("Segoe UI", 13f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
             BackColor = Color.Transparent,
-            Location = new Point(60, 7)
+            Location = new Point(60, 20)
         };
 
         this.headerTagline = new Label
         {
             Text = "All your projects, one place.",
-            Font = new Font("Segoe UI", 8.5f, FontStyle.Italic),
+            Font = new Font("Segoe UI", 8f, FontStyle.Italic),
             ForeColor = Color.FromArgb(200, 220, 255),
             AutoSize = true,
             BackColor = Color.Transparent,
-            Location = new Point(62, 33)
+            Location = new Point(62, 44)
         };
 
-        this.headerPanel.Controls.AddRange(new Control[] { this.headerLogo, this.headerTitle, this.headerTagline });
+        this.headerPanel.Controls.AddRange(new Control[] { this.headerLogo, this.headerProduct, this.headerTitle, this.headerTagline });
 
         // ── Tree View ──
         this.treeView = new TreeView
@@ -348,6 +367,16 @@ partial class MainForm
         this.listView.ColumnClick += ListView_ColumnClick;
         this.listView.MouseClick += ListView_MouseClick;
         this.Width = 1200;
+
+        // ── File Preview Panel (shown instead of listView for a selected FileReference) ──
+        this.filePreviewPanel = new FilePreviewPanel { Visible = false };
+        this.filePreviewPanel.OpenRequested += FilePreviewPanel_OpenRequested;
+        this.filePreviewPanel.PropertiesRequested += FilePreviewPanel_PropertiesRequested;
+
+        // ── Web Resource Preview Panel (shown instead of listView for a selected WebResource) ──
+        this.webResourcePreviewPanel = new WebResourcePreviewPanel { Visible = false };
+        this.webResourcePreviewPanel.OpenExternalRequested += WebResourcePreviewPanel_OpenExternalRequested;
+
         // ── Split Container ──
         this.splitMain = new SplitContainer
         {
@@ -356,6 +385,8 @@ partial class MainForm
             BackColor = SystemColors.Control
         };
         this.splitMain.Panel1.Controls.Add(this.treeView);
+        this.splitMain.Panel2.Controls.Add(this.filePreviewPanel);
+        this.splitMain.Panel2.Controls.Add(this.webResourcePreviewPanel);
         this.splitMain.Panel2.Controls.Add(this.listView);
 
         // ── Status Strip ──
