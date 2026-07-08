@@ -299,5 +299,5 @@ the judgment calls are left for you.)
 4. Test the installer on a clean VM.
 5. (Recommended) Sign the exe + installer.
 6. Commit & push `updates/updates.xml` (and version bump).
-7. `gh release create vX.Y.Z installer-output\ProjectNest-X.Y.Z-Setup.exe --title "..." --notes-file ...`
+7. `gh release create X.Y.Z installer-output\ProjectNest-X.Y.Z-Setup.exe --title "..." --notes-file ...`
 8. Verify an older install auto-updates to the new version.
