@@ -93,7 +93,7 @@ The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don'
 
 - **Key format**: ECDSA P-256 signed payloads of the form `email|FULL|yyyy-MM-dd`, encoded as `base64url(payload).base64url(signature)`. Verification is fully offline against an embedded public key — no license server.
 - **`tools/KeyGen`** is the key factory: `dotnet run -- setup` generates the keypair once (guard `private_key.pem` like cash, never commit it); `dotnet run -- generate --email <buyer>` mints a customer key per sale; `dotnet run -- verify --license <key>` sanity-checks one.
-- **⚠️ Dev-mode trap**: `LicenseManager.PublicKeyPem` currently ships as `"DEVELOPMENT_KEY_PLACEHOLDER"`, which makes the app accept *any* correctly-formatted string as a valid license. This **must** be replaced with the real generated public key before any public release — see `docs/LAUNCH_CHECKLIST.md` Section 2.
+- **Dev-mode placeholder — already replaced**: `LicenseManager.PublicKeyPem` used to ship as `"DEVELOPMENT_KEY_PLACEHOLDER"` (which makes the app accept *any* correctly-formatted string as a valid license), but the real ECDSA public key was embedded in commit `5a95f73` (2026-07-02). Verification is live, not dev mode. `docs/LAUNCH_CHECKLIST.md`'s pre-flight checkbox for this is stale and should be checked off.
 - **Packaging**: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true` → self-contained single-file `publish/ProjectNest.exe`.
 - **Installer**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) wraps the exe into `ProjectNest-<version>-Setup.exe`. Script at `installer/ProjectExplorer.iss`; fully scripted via `installer/build-installer.ps1`.
 - **Auto-update**: Wired up via `Autoupdater.NET.Official`, reading `updates/updates.xml` from the repo's `master` branch on GitHub (requires the repo to be public).
@@ -136,7 +136,7 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 
 | Feature | Notes |
 |---|---|
-| **Replace license public key + go public** | ⛔ Ship-blocker, not a feature: `LicenseManager.PublicKeyPem` is still the dev placeholder (accepts any key) and the repo must be public for auto-update to work. See `docs/LAUNCH_CHECKLIST.md` Section 0 & 2. |
+| **Make the repo public** | ⛔ Ship-blocker, not a feature: the license public key is already replaced (see Licensing & Distribution above), but the repo still needs to be public for the in-app auto-updater to reach `updates/updates.xml` on `raw.githubusercontent.com`. See `docs/LAUNCH_CHECKLIST.md` Section 0 & 5.1. |
 | **Keyboard navigation (remaining)** | F2 rename and address-bar Enter already work; still need Enter-to-open and Del-to-delete on the TreeView/ListView selection. |
 | **Import from clipboard / text** | Paste a folder path or URL and have ProjectExplorer auto-create the right child type. |
 | **Localization (i18n) scaffolding** | Externalize all UI strings to `.resx` resource files before the codebase grows further. Establish `Strings.resx` (default/English) and the `.Designer.cs` accessor pattern now — every string added from day 1 goes in the right place. Actual translations added incrementally as language demand is confirmed. WinForms supports this natively; no third-party library needed. |
