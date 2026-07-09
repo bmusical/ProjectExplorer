@@ -237,8 +237,26 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 Unsigned exes trigger **SmartScreen "Unknown publisher"** warnings that scare buyers and tank
 conversion.
 
-- [ ] 💡 Buy an **OV or EV code-signing certificate** (e.g. Sectigo, DigiCert). EV clears SmartScreen
-  immediately; OV builds reputation over time.
+- [ ] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+  (e.g. [SSLmentor lists it from $116/yr](https://www.sslmentor.com/certum/certumcodecloud); reseller
+  pricing shifts, so shop around at purchase time). It's signed via Certum's free
+  [SimplySign](https://www.certum.eu/en/simplysign/) mobile app instead of a physical USB token — the
+  cloud-hosted key still satisfies the CA/Browser Forum's hardware-key rule, you just approve each
+  signing session from your phone (a TOTP-style prompt, ~2hr authorized window) rather than plugging
+  in a dongle.
+  - ⚠️ Certum also sells a much cheaper **"Open Source Code Signing"** tier (~$50/yr), but that requires
+    the signed software to ship under an OSI-approved open-source license. ProjectExplorer ships under a
+    commercial EULA (`LICENSE-EULA.txt`) with paid license keys, so it does **not** qualify — use the
+    standard OV tier above, not the open-source one.
+  - Reseller-priced Sectigo/Comodo OV certs are a fine alternative (~$219/yr) if you'd rather have a more
+    globally-recognized CA name; Certum's SimplySign mainly wins on not requiring a separate token purchase.
+  - EV (e.g. [Certum EV Cloud](https://www.sslmentor.com/certum/certumcodecloudev) ~$226/yr, or
+    Sectigo/DigiCert EV ~$280–350+/yr with heavier business vetting) clears SmartScreen instantly instead
+    of building reputation over time — worth revisiting post-launch if OV's reputation-building window is
+    hurting early conversion, but overkill to start with for a low-volume v1.
+  - As of March 2026, CA/Browser Forum rules cap **all** code-signing certs (OV and EV) at 459 days
+    (~15 months) max validity — even a "multi-year" plan needs a free reissue partway through. Budget for
+    that regardless of vendor.
 - [ ] 💡 Sign **both** the app exe and the installer exe with `signtool`:
   ```powershell
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
@@ -247,7 +265,9 @@ conversion.
     "installer-output\ProjectNest-1.0.1-Setup.exe"
   ```
 - [ ] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
-  it's automatic.
+  it's scripted. Note: with SimplySign the *script* is automatic but each release still needs a manual
+  phone approval to open the ~2hr signing window first — it's not unattended/headless CI signing unless
+  you upgrade to a plan that supports that later.
 - [ ] 💡 If you can't sign yet: document that users will see a SmartScreen prompt and must click
   **More info → Run anyway**. Add this to the Gumroad post-purchase notes so it's not a surprise.
 
