@@ -6,6 +6,9 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Add a Help ▸ Help Contents… dialog (`F1`) summarizing core concepts, everyday actions, keyboard
+  shortcuts, licensing, and — up front — what the app does *not* do (it only manages references;
+  the only file it ever writes is `projects.json`). Mirrors the new `docs/HELP.md`.
 - Add an inline WebResource preview: selecting a WebResource tree node renders its URL via
   WebView2 in place of the ListView, and its ListView row now does the same on double-click
   (instead of launching the external browser directly). Both the tree/list context menus and the

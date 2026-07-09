@@ -83,6 +83,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.Core/Models/Project.cs` — root model with tree helpers (`FindCollection`, `FindParentList`, circular reference detection)
 - `src/ProjectExplorer.WinForms/Forms/MainForm.cs` — 2300+ line main window; TreeView (left) drives ListView (right) with navigation history stacks, drag-and-drop reparenting, and unified context menus
 - `src/ProjectExplorer.WinForms/Forms/RegistrationDialog.cs` — license key activation UI (Help ▸ Register / License…)
+- `src/ProjectExplorer.WinForms/Forms/HelpForm.cs` — in-app Help ▸ Help Contents… dialog (`F1`); content mirrors `docs/HELP.md`, keep both in sync when either changes
 - `src/ProjectExplorer.WinForms/Forms/ImageViewerForm.cs` — in-app image viewer for image FileReferences/folder contents
 - `src/ProjectExplorer.WinForms/Forms/FilePreviewPanel.cs` — inline preview panel shown in place of the ListView when a FileReference tree node is selected; renders image/text content when supported, always offers Open/Properties otherwise
 - `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
@@ -93,6 +94,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `tests/ProjectExplorer.Tests/ProjectManagerTests.cs` — xUnit tests for CRUD operations and tree traversal
 - `tests/ProjectExplorer.Tests/ImageViewingTests.cs` — xUnit tests for image detection/viewing behavior
 - `tests/ProjectExplorer.Tests/FilePreviewHelperTests.cs` — xUnit tests for `FilePreviewHelper`'s Image/Text/None classification
+- `docs/HELP.md` — user-facing help doc (what the app does/doesn't do, concepts, everyday actions, shortcuts, licensing); mirrored by the in-app `HelpForm.cs` dialog
 - `docs/LAUNCH_CHECKLIST.md` — the authoritative, start-to-finish runbook for licensing, packaging, Gumroad, and releases; consult it before touching anything in the Licensing or Distribution sections below
 - `docs/RELEASE.md` — condensed "cut a new release" steps, extracted from the checklist above
 - `tools/KeyGen/README.md` — how to generate the ECDSA keypair and mint/verify customer license keys
@@ -144,6 +146,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **F2 rename** — `MainForm.TreeView_KeyDown` handles `Keys.F2` on the selected TreeView node. (Del-to-delete and Enter-to-open in the TreeView are **not** wired up yet — only the address bar handles Enter today; still open items, see Roadmap.)
 - **FileReference inline preview** — selecting a FileReference tree node now shows `FilePreviewPanel` in place of the ListView instead of leaving the previously-viewed folder listing on screen. Renders images and common text formats inline (`FilePreviewHelper.GetPreviewKind`); always offers Open/Properties buttons regardless of whether the format is previewable.
 - **WebResource inline preview** — selecting a WebResource tree node shows `WebResourcePreviewPanel` in place of the ListView, rendering the URL inline via WebView2; double-clicking a WebResource row in the ListView now selects the corresponding tree node (same as Project/Collection/FolderRef) so it shows in the same preview instead of launching the external browser directly. Both the TreeView/ListView context menus and the preview panel itself offer an explicit "Open in External Browser" action.
+- **In-app Help** — Help ▸ Help Contents… (`F1`) opens `HelpForm`, a scrollable dialog covering core concepts, everyday actions, keyboard shortcuts, and licensing — leading with an explicit "what this app does NOT do" section (it only manages references; the sole file it ever writes is `projects.json`). Content is mirrored in `docs/HELP.md`, which is also linked from the README.
 
 ## Roadmap
 

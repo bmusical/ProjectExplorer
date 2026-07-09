@@ -62,6 +62,7 @@ partial class MainForm
     private ToolStripMenuItem menuProjectNewCollection;
     private ToolStripMenuItem menuProjectAddFolder;
     private ToolStripMenuItem menuHelp;
+    private ToolStripMenuItem menuHelpContents;
     private ToolStripMenuItem menuHelpRegister;
     private ToolStripMenuItem menuHelpCheckForUpdates;
     private ToolStripMenuItem menuHelpAbout;
@@ -214,12 +215,14 @@ partial class MainForm
             menuProjectNewCollection, menuProjectAddFolder
         });
 
+        this.menuHelpContents       = new ToolStripMenuItem { Text = "&Help Contents...", ShortcutKeys = Keys.F1 };
         this.menuHelpRegister       = new ToolStripMenuItem { Text = "&Register / License..." };
         this.menuHelpCheckForUpdates = new ToolStripMenuItem { Text = "Check for &Updates..." };
         this.menuHelpAbout           = new ToolStripMenuItem { Text = "&About Project Nest Explorer..." };
         this.menuHelp = new ToolStripMenuItem { Text = "&Help" };
         this.menuHelp.DropDownItems.AddRange(new ToolStripItem[]
         {
+            menuHelpContents, new ToolStripSeparator(),
             menuHelpRegister, new ToolStripSeparator(),
             menuHelpCheckForUpdates, new ToolStripSeparator(),
             menuHelpAbout
@@ -235,6 +238,7 @@ partial class MainForm
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;
+        this.menuHelpContents.Click         += (s, e) => new HelpForm().ShowDialog(this);
         this.menuHelpRegister.Click        += (s, e) => OpenRegistrationDialog();
         this.menuHelpCheckForUpdates.Click += (s, e) => CheckForUpdates(silent: false);
         this.menuHelpAbout.Click           += (s, e) => new AboutForm().ShowDialog(this);

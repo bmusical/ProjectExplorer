@@ -63,10 +63,15 @@ To build a distributable installer, see [`docs/RELEASE.md`](docs/RELEASE.md).
 | `tools/KeyGen` | Internal license key generator — see [`tools/KeyGen/README.md`](tools/KeyGen/README.md) |
 | `tests/ProjectExplorer.Tests` | xUnit test suite |
 | `installer/` | Inno Setup installer script and build automation |
-| `docs/` | Release runbook and launch checklist |
+| `docs/` | User-facing help doc, release runbook, and launch checklist |
 
 `CLAUDE.md` has a deeper architecture writeup, roadmap, and target-user notes for anyone
 contributing to the codebase.
+
+## Help
+
+See [`docs/HELP.md`](docs/HELP.md) for a full walkthrough — same content as the in-app Help ▸
+Help Contents… dialog (`F1`).
 
 ## Support
 
