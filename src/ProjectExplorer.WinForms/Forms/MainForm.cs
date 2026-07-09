@@ -45,6 +45,20 @@ public partial class MainForm : Form
     // Drag-drop state
     private TreeNode? _dragHighlightNode;
 
+    // ── Resource availability (unreachable folders/files/web resources) ──
+    // Cache survives tree rebuilds (RefreshTreeView() recreates TreeNodes/ListViewItems, but not
+    // this dictionary), keyed by ProjectChild.Id. Only FolderReference/FileReference/WebResource
+    // entries are ever present.
+    private readonly Dictionary<Guid, AvailabilityCheckResult> _availabilityCache = new();
+    private readonly HashSet<Guid> _availabilityChecksInFlight = new();
+    private readonly System.Windows.Forms.Timer _availabilityRetryTimer = new() { Interval = 20_000 };
+    private static readonly HttpClient _availabilityHttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+    // Cached rather than newed up per node/item: Font wraps a GDI handle, and
+    // ApplyAvailabilityStyle runs on every tree rebuild and every retry-timer tick.
+    private Font? _unavailableTreeFont;
+    private Font? _unavailableListFont;
+
     // Tree UI state persistence
     private static readonly string _uiSettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -108,6 +122,12 @@ public partial class MainForm : Form
         RestoreTreeState(treeView.Nodes, new HashSet<string>(persistedState.ExpandedTags), persistedState.SelectedTag);
         treeView.EndUpdate();
         treeView.SelectedNode?.EnsureVisible();
+
+        // Only network/removable/web resources that are currently unavailable get auto-retried;
+        // local-disk resources that vanish were likely moved or deleted, not just disconnected,
+        // so retrying them in the background would just be noise (see AddAvailabilityMenuItems).
+        _availabilityRetryTimer.Tick += async (s, e) => await RecheckUnavailableResourcesAsync();
+        _availabilityRetryTimer.Start();
     }
 
     /// <summary>
@@ -471,11 +491,13 @@ public partial class MainForm : Form
             var refNode = new TreeNode(folderRef.EffectiveName)
             {
                 Tag = TagFolderRef + $"{project.Id}:{folderRef.Id}",
-                ToolTipText = folderRef.Description ?? folderRef.RealPath,
+                ToolTipText = BuildAvailabilityTooltip(folderRef),
                 ImageIndex = GetImageIndex("Folder"),
                 SelectedImageIndex = GetImageIndex("FolderOpen")
             };
             parent.Nodes.Add(refNode);
+            ApplyAvailabilityStyle(refNode, folderRef.Id);
+            EnsureAvailabilityChecked(folderRef);
 
             // Add a dummy node so the + expander shows, then we lazy-load real subfolders
             if (Directory.Exists(folderRef.RealPath))
@@ -488,22 +510,26 @@ public partial class MainForm : Form
             var webNode = new TreeNode(webResource.EffectiveName)
             {
                 Tag = TagWebResource + $"{project.Id}:{webResource.Id}",
-                ToolTipText = webResource.Description ?? webResource.Url,
+                ToolTipText = BuildAvailabilityTooltip(webResource),
                 ImageIndex = GetImageIndex("WebResource"),
                 SelectedImageIndex = GetImageIndex("WebResource")
             };
             parent.Nodes.Add(webNode);
+            ApplyAvailabilityStyle(webNode, webResource.Id);
+            EnsureAvailabilityChecked(webResource);
         }
         else if (child is FileReference fileRef)
         {
             var fileNode = new TreeNode(fileRef.EffectiveName)
             {
                 Tag = TagFileRef + $"{project.Id}:{fileRef.Id}",
-                ToolTipText = fileRef.Description ?? fileRef.FilePath,
+                ToolTipText = BuildAvailabilityTooltip(fileRef),
                 ImageIndex = GetFileRefImageIndex(fileRef),
                 SelectedImageIndex = GetFileRefImageIndex(fileRef)
             };
             parent.Nodes.Add(fileNode);
+            ApplyAvailabilityStyle(fileNode, fileRef.Id);
+            EnsureAvailabilityChecked(fileRef);
         }
     }
 
@@ -537,6 +563,178 @@ public partial class MainForm : Form
     {
         return imageListSmall.Images.IndexOfKey(key);
     }
+
+    // ── Resource Availability ──
+
+    /// <summary>
+    /// Kicks off a background availability check the first time a FolderReference/FileReference/
+    /// WebResource is rendered this session. No-ops for anything already checked or in flight, and
+    /// for non-leaf types (Project/Collection have no availability concept).
+    /// </summary>
+    private void EnsureAvailabilityChecked(ProjectChild child)
+    {
+        if (child is not (FolderReference or FileReference or WebResource)) return;
+        if (_availabilityCache.ContainsKey(child.Id)) return;
+        _ = CheckAvailabilityAsync(child);
+    }
+
+    /// <summary>Forces a fresh check regardless of what's cached, e.g. from "Check Availability Now".</summary>
+    private Task ForceCheckAvailabilityAsync(ProjectChild child)
+    {
+        _availabilityCache.Remove(child.Id);
+        return CheckAvailabilityAsync(child);
+    }
+
+    private async Task CheckAvailabilityAsync(ProjectChild child)
+    {
+        if (!_availabilityChecksInFlight.Add(child.Id)) return;
+        try
+        {
+            AvailabilityCheckResult? result = child switch
+            {
+                FolderReference fr => await ResourceAvailabilityChecker.CheckFolderAsync(fr.RealPath),
+                FileReference file => await ResourceAvailabilityChecker.CheckFileAsync(file.FilePath),
+                WebResource wr => await ResourceAvailabilityChecker.CheckWebResourceAsync(wr.Url, _availabilityHttpClient),
+                _ => null
+            };
+            if (result == null) return;
+
+            _availabilityCache[child.Id] = result.Value;
+            UpdateAvailabilityVisuals(child);
+        }
+        catch
+        {
+            // Best-effort background check — leave the resource's availability as whatever it was
+            // (or unknown) rather than letting an unexpected failure surface to the user.
+        }
+        finally
+        {
+            _availabilityChecksInFlight.Remove(child.Id);
+        }
+    }
+
+    /// <summary>
+    /// Re-checks every currently-unavailable network/removable/web resource (the kinds that might
+    /// just be temporarily disconnected), skipping ones the user asked to stop auto-retrying via
+    /// the "Stop Auto-Retry" context menu action. Local-disk resources are never retried here —
+    /// a missing local file was moved or deleted, not disconnected, so polling it is pointless.
+    /// </summary>
+    private async Task RecheckUnavailableResourcesAsync()
+    {
+        var candidateIds = _availabilityCache
+            .Where(kv => kv.Value.Status == AvailabilityStatus.Unavailable &&
+                         kv.Value.LocationKind != ResourceLocationKind.LocalDisk)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var id in candidateIds)
+        {
+            var child = FindChildAnywhere(id);
+            if (child == null)
+            {
+                _availabilityCache.Remove(id);
+                continue;
+            }
+            if (child.Metadata.TryGetValue(ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, out var suppressed) && suppressed == "true")
+                continue;
+
+            await CheckAvailabilityAsync(child);
+        }
+    }
+
+    /// <summary>Finds a child by Id across every loaded project, not just the currently displayed one.</summary>
+    private ProjectChild? FindChildAnywhere(Guid childId)
+    {
+        foreach (var project in _projectManager.Projects)
+        {
+            var parentList = project.FindParentList(childId);
+            var child = parentList?.FirstOrDefault(c => c.Id == childId);
+            if (child != null) return child;
+        }
+        return null;
+    }
+
+    /// <summary>Updates an already-rendered TreeNode/ListViewItem's style in place, without rebuilding the tree.</summary>
+    private void UpdateAvailabilityVisuals(ProjectChild child)
+    {
+        var node = FindTreeNodeByChildId(treeView.Nodes, child.Id);
+        if (node != null)
+        {
+            node.ToolTipText = BuildAvailabilityTooltip(child);
+            ApplyAvailabilityStyle(node, child.Id);
+        }
+
+        foreach (ListViewItem item in listView.Items)
+        {
+            if (item.Tag is string tag && GetChildIdFromTag(tag) == child.Id)
+            {
+                ApplyAvailabilityStyle(item, child.Id);
+                break;
+            }
+        }
+    }
+
+    private static TreeNode? FindTreeNodeByChildId(TreeNodeCollection nodes, Guid childId)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (node.Tag is string tag && GetChildIdFromTag(tag) == childId)
+                return node;
+            var found = FindTreeNodeByChildId(node.Nodes, childId);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void ApplyAvailabilityStyle(TreeNode node, Guid childId)
+    {
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        node.ForeColor = unavailable ? Color.Gray : Color.Empty;
+        node.NodeFont = unavailable ? (_unavailableTreeFont ??= new Font(treeView.Font, FontStyle.Strikeout)) : null;
+    }
+
+    private void ApplyAvailabilityStyle(ListViewItem item, Guid childId)
+    {
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        item.ForeColor = unavailable ? Color.Gray : listView.ForeColor;
+        item.Font = unavailable ? (_unavailableListFont ??= new Font(listView.Font, FontStyle.Strikeout)) : listView.Font;
+    }
+
+    /// <summary>Builds a tree node tooltip: the item's normal description/path, plus an availability note when unavailable.</summary>
+    private string BuildAvailabilityTooltip(ProjectChild child)
+    {
+        var baseText = child switch
+        {
+            FolderReference fr => fr.Description ?? fr.RealPath,
+            FileReference file => file.Description ?? file.FilePath,
+            WebResource wr => wr.Description ?? wr.Url,
+            _ => ""
+        };
+
+        if (!_availabilityCache.TryGetValue(child.Id, out var result) || result.Status != AvailabilityStatus.Unavailable)
+            return baseText;
+
+        return baseText + Environment.NewLine + Environment.NewLine + DescribeUnavailable(result.LocationKind);
+    }
+
+    private static string DescribeUnavailable(ResourceLocationKind kind) => kind switch
+    {
+        ResourceLocationKind.LocalDisk =>
+            "⚠ Not found. It may have been moved, renamed, or deleted — use \"Locate...\" to relink it.",
+        ResourceLocationKind.NetworkOrRemovable =>
+            "⚠ Not reachable right now. This may be a temporarily disconnected network or removable drive — Project Nest Explorer will keep checking automatically.",
+        ResourceLocationKind.Web =>
+            "⚠ Couldn't be reached. The site may be temporarily down, or your internet connection may be offline.",
+        _ => "⚠ Could not be verified."
+    };
+
+    private static string DescribeUnavailableShort(ResourceLocationKind kind) => kind switch
+    {
+        ResourceLocationKind.LocalDisk => "moved or deleted?",
+        ResourceLocationKind.NetworkOrRemovable => "network/removable drive unreachable",
+        ResourceLocationKind.Web => "site unreachable",
+        _ => "could not verify"
+    };
 
     // ── Tree View Events ──
 
@@ -862,6 +1060,8 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fr.Id);
+                EnsureAvailabilityChecked(fr);
             }
             else if (child is WebResource wr)
             {
@@ -874,6 +1074,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(wr.Url);
                 item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, wr.Id);
+                EnsureAvailabilityChecked(wr);
             }
             else if (child is FileReference fileRef)
             {
@@ -886,6 +1088,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileRef.FilePath);
                 item.SubItems.Add(fileRef.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fileRef.Id);
+                EnsureAvailabilityChecked(fileRef);
             }
         }
     }
@@ -922,6 +1126,8 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fr.Id);
+                EnsureAvailabilityChecked(fr);
             }
             else if (child is WebResource wr)
             {
@@ -934,6 +1140,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(wr.Url);
                 item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, wr.Id);
+                EnsureAvailabilityChecked(wr);
             }
             else if (child is FileReference fileRef)
             {
@@ -946,6 +1154,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileRef.FilePath);
                 item.SubItems.Add(fileRef.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fileRef.Id);
+                EnsureAvailabilityChecked(fileRef);
             }
         }
     }
@@ -1802,8 +2012,68 @@ public partial class MainForm : Form
         });
     }
 
+    /// <summary>
+    /// Prepends the "unavailable" warning header plus Check Now / Locate / Stop-Resume-Retry
+    /// actions to a resource's context menu, when it's currently unavailable. No-ops otherwise.
+    /// </summary>
+    private void AddAvailabilityMenuItems(ContextMenuStrip menu, Guid projectId, ProjectChild child, string relinkLabel, Func<Task>? relinkAction)
+    {
+        if (!_availabilityCache.TryGetValue(child.Id, out var result) || result.Status != AvailabilityStatus.Unavailable)
+            return;
+
+        menu.Items.Add(new ToolStripMenuItem($"⚠ Unavailable — {DescribeUnavailableShort(result.LocationKind)}") { Enabled = false });
+        menu.Items.Add("Check Availability Now", null, async (s, e) => await ForceCheckAvailabilityAsync(child));
+
+        if (relinkAction != null)
+            menu.Items.Add(relinkLabel, null, async (s, e) => await relinkAction());
+
+        if (result.LocationKind != ResourceLocationKind.LocalDisk)
+        {
+            var suppressed = child.Metadata.TryGetValue(ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, out var v) && v == "true";
+            menu.Items.Add(suppressed ? "Resume Auto-Retry" : "Stop Auto-Retry", null, async (s, e) =>
+            {
+                await _projectManager.SetChildMetadataAsync(
+                    projectId, child.Id, ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, suppressed ? null : "true");
+            });
+        }
+
+        menu.Items.Add(new ToolStripSeparator());
+    }
+
+    private async Task LocateFolderReferenceAsync(Guid projectId, FolderReference folderRef)
+    {
+        using var dlg = new FolderBrowserDialog { Description = $"Select the new location for \"{folderRef.EffectiveName}\"" };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        await _projectManager.UpdateFolderReferenceAsync(projectId, folderRef.Id, newPath: dlg.SelectedPath);
+        await ForceCheckAvailabilityAsync(folderRef);
+        RefreshTreeView();
+    }
+
+    private async Task LocateFileReferenceAsync(Guid projectId, FileReference fileRef)
+    {
+        using var dlg = new OpenFileDialog { Title = $"Select the new location for \"{fileRef.EffectiveName}\"", CheckFileExists = true };
+        if (!string.IsNullOrEmpty(fileRef.Extension))
+        {
+            var ext = fileRef.Extension.TrimStart('.').ToUpperInvariant();
+            dlg.Filter = $"{ext} files (*{fileRef.Extension})|*{fileRef.Extension}|All files (*.*)|*.*";
+        }
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        await _projectManager.UpdateFileReferenceAsync(projectId, fileRef.Id, newPath: dlg.FileName);
+        await ForceCheckAvailabilityAsync(fileRef);
+        RefreshTreeView();
+    }
+
     private void AddFolderReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid folderRefId)
     {
+        var existingFr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+        if (existingFr != null)
+        {
+            AddAvailabilityMenuItems(menu, projectId, existingFr, "Locate Folder...",
+                async () => await LocateFolderReferenceAsync(projectId, existingFr));
+        }
+
         menu.Items.Add("Edit Description...", null, async (s, e) =>
         {
             var project = _projectManager.GetProject(projectId);
@@ -1862,6 +2132,10 @@ public partial class MainForm : Form
 
     private void AddWebResourceMenuItems(ContextMenuStrip menu, Guid projectId, Guid resourceId, string tag)
     {
+        var existingWr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+        if (existingWr != null)
+            AddAvailabilityMenuItems(menu, projectId, existingWr, relinkLabel: "", relinkAction: null);
+
         menu.Items.Add("Open in External Browser", null, (s, e) => LaunchWebResource(tag));
         menu.Items.Add("Copy URL", null, (s, e) =>
         {
@@ -1901,6 +2175,13 @@ public partial class MainForm : Form
 
     private void AddFileReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid fileRefId)
     {
+        var existingFile = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+        if (existingFile != null)
+        {
+            AddAvailabilityMenuItems(menu, projectId, existingFile, "Locate File...",
+                async () => await LocateFileReferenceAsync(projectId, existingFile));
+        }
+
         menu.Items.Add("Open", null, (s, e) =>
         {
             var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
@@ -2097,6 +2378,9 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        _availabilityRetryTimer.Stop();
+        _unavailableTreeFont?.Dispose();
+        _unavailableListFont?.Dispose();
         SaveTreeState();
         base.OnFormClosing(e);
     }
@@ -2229,6 +2513,7 @@ public partial class MainForm : Form
         if (tag.StartsWith(TagCollection)) return Guid.Parse(tag[TagCollection.Length..].Split(':')[1]);
         if (tag.StartsWith(TagFolderRef)) return Guid.Parse(tag[TagFolderRef.Length..].Split(':')[1]);
         if (tag.StartsWith(TagWebResource)) return Guid.Parse(tag[TagWebResource.Length..].Split(':')[1]);
+        if (tag.StartsWith(TagFileRef)) return Guid.Parse(tag[TagFileRef.Length..].Split(':')[1]);
         return Guid.Empty;
     }
 
