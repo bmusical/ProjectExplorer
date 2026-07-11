@@ -82,7 +82,7 @@ Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green
 Write-Host ""
 if ($UpdateXml) {
-    Write-Host "updates\updates.xml now points at $Version — that only belongs on master once the" -ForegroundColor Yellow
+    Write-Host "updates\updates.xml now points at $Version - that only belongs on master once the" -ForegroundColor Yellow
     Write-Host "release below already exists with its asset attached. If it doesn't yet, commit/push" -ForegroundColor Yellow
     Write-Host "this file separately, after step 2." -ForegroundColor Yellow
     Write-Host ""
