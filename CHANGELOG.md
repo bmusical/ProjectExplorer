@@ -6,6 +6,12 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-07-11
+
+- Add drag-drop conversion between Projects and Collections in the TreeView, plus tree reordering
+  with a live insertion-line indicator; fix gaps that could appear during drag-drop reordering.
+- Add Project reordering and Move Up/Down context-menu commands.
+- Add a "Focus on Run" setting.
 - Add a Help ▸ Help Contents… dialog (`F1`) summarizing core concepts, everyday actions, keyboard
   shortcuts, licensing, and — up front — what the app does *not* do (it only manages references;
   the only file it ever writes is `projects.json`). Mirrors the new `docs/HELP.md`.
