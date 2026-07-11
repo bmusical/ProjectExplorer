@@ -4,10 +4,15 @@
 # Usage:
 #   .\build-installer.ps1 -Version 1.2.0
 #   .\build-installer.ps1 -Version 1.2.0 -UpdateXml   # also updates updates\updates.xml
+#
+# Only pass -UpdateXml once the GitHub Release for this version already exists with the
+# installer attached — updates.xml is what the in-app auto-updater reads, publicly, so
+# pointing it at a version before that version is actually downloadable means any installed
+# copy checking for updates in that window 404s. See docs/RELEASE.md's manual path.
 
 param(
     [string]$Version   = "1.0.0",
-    [switch]$UpdateXml          # pass to bump updates\updates.xml after a successful build
+    [switch]$UpdateXml          # pass to bump updates\updates.xml — only after the release exists; see above
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,8 +81,21 @@ if ($UpdateXml)
 Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Next steps for a release:"
-Write-Host "  1. Commit and push updates\updates.xml"
-Write-Host "  2. Create GitHub Release: $Version"
-Write-Host "  3. Upload $setupExe as the release asset"
-Write-Host "  4. Existing users will be prompted to update on next launch"
+if ($UpdateXml) {
+    Write-Host "updates\updates.xml now points at $Version - that only belongs on master once the" -ForegroundColor Yellow
+    Write-Host "release below already exists with its asset attached. If it doesn't yet, commit/push" -ForegroundColor Yellow
+    Write-Host "this file separately, after step 2." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Next steps for a release:"
+    Write-Host "  1. Create GitHub Release: $Version (if not already done)"
+    Write-Host "  2. Upload $setupExe as the release asset (if not already done)"
+    Write-Host "  3. Commit and push updates\updates.xml"
+    Write-Host "  4. Existing users will be prompted to update on next launch"
+} else {
+    Write-Host "Next steps for a release:"
+    Write-Host "  1. Test/sign $setupExe as needed"
+    Write-Host "  2. Commit and push the version bump (not updates.xml yet)"
+    Write-Host "  3. Create GitHub Release: $Version, with $setupExe as the release asset"
+    Write-Host "  4. Re-run this script with -UpdateXml, then commit/push updates\updates.xml"
+    Write-Host "  5. Existing users will be prompted to update on next launch"
+}

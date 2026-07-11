@@ -17,6 +17,37 @@ internal static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
+        var appSettingsManager = new AppSettingsManager();
+        var appSettings = appSettingsManager.Load();
+
+        // ── Focus on Run: Prevent multiple copies ──────────────────────────
+        // Only "Prevent" launches register/check the single-instance guard, so an "Allow"
+        // launch never blocks and never gets signaled by a later "Prevent" launch either —
+        // each launch simply acts on its own current setting.
+        SingleInstanceGuard? instanceGuard = null;
+        if (appSettings.FocusOnRun == FocusOnRunMode.PreventMultipleCopies)
+        {
+            instanceGuard = new SingleInstanceGuard();
+            if (!instanceGuard.IsFirstInstance)
+            {
+                instanceGuard.SignalExistingInstance();
+                instanceGuard.Dispose();
+                return;
+            }
+        }
+
+        try
+        {
+            RunApplication(appSettingsManager, instanceGuard);
+        }
+        finally
+        {
+            instanceGuard?.Dispose();
+        }
+    }
+
+    private static void RunApplication(AppSettingsManager appSettingsManager, SingleInstanceGuard? instanceGuard)
+    {
         // ── Set up services ────────────────────────────────────────────────
         var repository     = new JsonProjectRepository();
         var projectManager = new ProjectManager(repository);
@@ -38,8 +69,15 @@ internal static class Program
             projectManager.CreateCollectionAsync(sample.Id, "Documentation").GetAwaiter().GetResult();
         }
 
-        var mainForm = new MainForm(projectManager, shellIconProvider, shellThumbnailProvider, shellPropertiesProvider, licenseManager, license);
+        var mainForm = new MainForm(projectManager, shellIconProvider, shellThumbnailProvider, shellPropertiesProvider,
+            licenseManager, license, appSettingsManager);
         mainForm.ListViewItemSorter = new ListViewColumnSorter();
+
+        instanceGuard?.ListenForActivation(() =>
+        {
+            if (mainForm.IsHandleCreated)
+                mainForm.BeginInvoke(mainForm.RestoreAndActivate);
+        });
 
         // Check for updates ~5 seconds after startup so the main window is visible first
         mainForm.Shown += (s, e) =>
