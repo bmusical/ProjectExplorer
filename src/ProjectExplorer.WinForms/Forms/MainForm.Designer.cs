@@ -50,6 +50,7 @@ partial class MainForm
     private MenuStrip menuStrip;
     private ToolStripMenuItem menuFile;
     private ToolStripMenuItem menuFileNewProject;
+    private ToolStripMenuItem menuFileSettings;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
@@ -194,8 +195,11 @@ partial class MainForm
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
         this.menuFileNewProject = new ToolStripMenuItem { Text = "New &Project...", ShortcutKeys = Keys.Control | Keys.N };
+        this.menuFileSettings = new ToolStripMenuItem { Text = "&Settings..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
-        this.menuFile.DropDownItems.AddRange(new ToolStripItem[] { menuFileNewProject, new ToolStripSeparator(), menuFileExit });
+        this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
+            menuFileNewProject, new ToolStripSeparator(), menuFileSettings, new ToolStripSeparator(), menuFileExit
+        });
 
         this.menuView = new ToolStripMenuItem { Text = "&View" };
         this.menuViewDetails = new ToolStripMenuItem { Text = "&Details", Checked = true };
@@ -235,6 +239,7 @@ partial class MainForm
         };
 
         this.menuFileNewProject.Click += MenuFileNewProject_Click;
+        this.menuFileSettings.Click += MenuFileSettings_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;

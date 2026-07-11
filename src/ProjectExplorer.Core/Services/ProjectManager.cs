@@ -306,9 +306,17 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
-    // ── Move (reparent) ──
+    // ── Move (reparent) / reorder ──
 
-    public async Task MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId)
+    /// <summary>
+    /// Moves a child to a (possibly the same) parent container. Pass beforeSiblingId = null to
+    /// append at the end (original reparent-only behavior); pass the Id of a sibling already in
+    /// the destination container to insert immediately before it instead, including within the
+    /// same container (pure reorder). Resolving position by sibling Id — rather than a numeric
+    /// index — sidesteps off-by-one errors from the source removal shifting indices when
+    /// reordering within the same list.
+    /// </summary>
+    public async Task MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId, Guid? beforeSiblingId = null)
     {
         var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
 
@@ -321,25 +329,31 @@ public class ProjectManager
                 ?? throw new InvalidOperationException($"Destination collection {newParentCollectionId} not found.")
             : project.Children;
 
-        if (ReferenceEquals(sourceList, destList)) return;
+        var sameContainer = ReferenceEquals(sourceList, destList);
+        if (sameContainer && beforeSiblingId == null) return;
 
         var originalParentId = child.ParentId;
-        var originalSortOrder = child.SortOrder;
+        var originalIndex = sourceList.IndexOf(child);
 
         sourceList.Remove(child);
+
+        var insertIndex = beforeSiblingId.HasValue
+            ? destList.FindIndex(c => c.Id == beforeSiblingId.Value)
+            : -1;
+        if (insertIndex < 0) insertIndex = destList.Count;
+
         child.ParentId = newParentCollectionId ?? project.Id;
-        child.SortOrder = destList.Count;
-        destList.Add(child);
+        destList.Insert(insertIndex, child);
+        Renumber(destList);
+        if (!sameContainer) Renumber(sourceList);
 
         if (project.HasCircularReferences())
         {
             destList.Remove(child);
             child.ParentId = originalParentId;
-            child.SortOrder = originalSortOrder;
-            sourceList.Add(child);
-            var restored = sourceList.OrderBy(c => c.SortOrder).ToList();
-            sourceList.Clear();
-            sourceList.AddRange(restored);
+            sourceList.Insert(originalIndex, child);
+            Renumber(sourceList);
+            if (!sameContainer) Renumber(destList);
             throw new InvalidOperationException("Cannot move a collection into one of its own descendants.");
         }
 
@@ -347,7 +361,152 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    /// <summary>Swaps a child one position earlier among its siblings. No-op if already first.</summary>
+    public async Task MoveChildUpAsync(Guid projectId, Guid childId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var list = project.FindParentList(childId) ?? throw new InvalidOperationException($"Child {childId} not found in project.");
+        var child = list.First(c => c.Id == childId);
+        var ordered = list.OrderBy(c => c.SortOrder).ToList();
+        var index = ordered.IndexOf(child);
+        if (index <= 0) return;
+
+        var parentCollectionId = child.ParentId == project.Id ? (Guid?)null : child.ParentId;
+        await MoveChildAsync(projectId, childId, parentCollectionId, ordered[index - 1].Id);
+    }
+
+    /// <summary>Swaps a child one position later among its siblings. No-op if already last.</summary>
+    public async Task MoveChildDownAsync(Guid projectId, Guid childId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var list = project.FindParentList(childId) ?? throw new InvalidOperationException($"Child {childId} not found in project.");
+        var child = list.First(c => c.Id == childId);
+        var ordered = list.OrderBy(c => c.SortOrder).ToList();
+        var index = ordered.IndexOf(child);
+        if (index < 0 || index >= ordered.Count - 1) return;
+
+        var parentCollectionId = child.ParentId == project.Id ? (Guid?)null : child.ParentId;
+        var beforeSiblingId = index + 2 < ordered.Count ? ordered[index + 2].Id : (Guid?)null;
+        await MoveChildAsync(projectId, childId, parentCollectionId, beforeSiblingId);
+    }
+
+    // ── Move / reorder Projects (top-level; Project isn't a ProjectChild, so it has no
+    // SortOrder — order is simply the _projects list order, which SaveAllAsync persists
+    // as JSON array order and LoadAllAsync reads back the same way) ──
+
+    public async Task MoveProjectAsync(Guid projectId, Guid? beforeProjectId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        if (beforeProjectId == projectId) return;
+
+        _projects.Remove(project);
+        var insertIndex = beforeProjectId.HasValue ? _projects.FindIndex(p => p.Id == beforeProjectId.Value) : -1;
+        if (insertIndex < 0) insertIndex = _projects.Count;
+        _projects.Insert(insertIndex, project);
+
+        await _repository.SaveAllAsync(_projects);
+    }
+
+    /// <summary>Swaps a project one position earlier among top-level projects. No-op if already first.</summary>
+    public async Task MoveProjectUpAsync(Guid projectId)
+    {
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index <= 0) return;
+        await MoveProjectAsync(projectId, _projects[index - 1].Id);
+    }
+
+    /// <summary>Swaps a project one position later among top-level projects. No-op if already last.</summary>
+    public async Task MoveProjectDownAsync(Guid projectId)
+    {
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index < 0 || index >= _projects.Count - 1) return;
+        var beforeId = index + 2 < _projects.Count ? _projects[index + 2].Id : (Guid?)null;
+        await MoveProjectAsync(projectId, beforeId);
+    }
+
+    // ── Convert (Project <-> Collection) ──
+
+    /// <summary>
+    /// Converts an entire Project into a Collection nested under another project's tree,
+    /// preserving the project's children and Id (so any references to its Id remain valid)
+    /// and removing the original Project. Used by the "drag a project onto a collection" gesture.
+    /// </summary>
+    public async Task<Collection> ConvertProjectToCollectionAsync(Guid projectId, Guid targetProjectId, Guid? targetParentCollectionId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var targetProject = GetProject(targetProjectId) ?? throw new InvalidOperationException($"Project {targetProjectId} not found.");
+
+        if (targetProjectId == projectId)
+            throw new InvalidOperationException("Cannot convert a project into a collection inside itself.");
+
+        var destList = targetParentCollectionId.HasValue
+            ? targetProject.FindCollection(targetParentCollectionId.Value)?.Children
+                ?? throw new InvalidOperationException($"Destination collection {targetParentCollectionId} not found.")
+            : targetProject.Children;
+
+        var collection = new Collection
+        {
+            Id = project.Id,
+            ParentId = targetParentCollectionId ?? targetProject.Id,
+            SortOrder = destList.Count,
+            Name = project.Name,
+            Description = project.Description,
+            Color = project.Color,
+            Children = project.Children
+        };
+        destList.Add(collection);
+
+        if (targetProject.HasCircularReferences())
+        {
+            destList.Remove(collection);
+            throw new InvalidOperationException("Cannot convert this project into a collection here.");
+        }
+
+        _projects.Remove(project);
+        targetProject.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(targetProject);
+        await _repository.DeleteProjectAsync(project.Id);
+        return collection;
+    }
+
+    /// <summary>
+    /// Converts a Collection into a new top-level Project, preserving the collection's
+    /// children and Id and removing it from its original parent. Used by the
+    /// "drag a collection onto the Projects root" gesture.
+    /// </summary>
+    public async Task<Project> ConvertCollectionToProjectAsync(Guid projectId, Guid collectionId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var collection = project.FindCollection(collectionId) ?? throw new InvalidOperationException($"Collection {collectionId} not found.");
+        var parentList = project.FindParentList(collectionId) ?? throw new InvalidOperationException($"Cannot find parent list for collection {collectionId}.");
+
+        var newProject = new Project
+        {
+            Id = collection.Id,
+            Name = collection.Name,
+            Description = collection.Description,
+            Color = collection.Color,
+            Children = collection.Children,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow
+        };
+
+        parentList.Remove(collection);
+        _projects.Add(newProject);
+
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+        await _repository.SaveProjectAsync(newProject);
+        return newProject;
+    }
+
     // ── Helpers ──
+
+    private static void Renumber(List<ProjectChild> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+            list[i].SortOrder = i;
+    }
 
     private static int GetNextSortOrder(Project project, Guid? parentCollectionId)
     {
