@@ -1,4 +1,4 @@
-# build-installer.ps1 — run from the repo root or the installer\ folder
+# build-installer.ps1 - run from the repo root or the installer\ folder
 # Requires: .NET 10 SDK, Inno Setup 6 (iscc.exe on PATH or at default install path)
 #
 # Usage:
@@ -6,19 +6,23 @@
 #   .\build-installer.ps1 -Version 1.2.0 -UpdateXml   # also updates updates\updates.xml
 #
 # Only pass -UpdateXml once the GitHub Release for this version already exists with the
-# installer attached — updates.xml is what the in-app auto-updater reads, publicly, so
+# installer attached - updates.xml is what the in-app auto-updater reads, publicly, so
 # pointing it at a version before that version is actually downloadable means any installed
 # copy checking for updates in that window 404s. See docs/RELEASE.md's manual path.
+#
+# Prefer .\installer\cut-release.ps1 instead if you just want to cut a normal release -
+# it handles tagging and publishing for you via the GitHub CLI. This script is for
+# building/testing the installer locally (e.g. before code-signing).
 
 param(
     [string]$Version   = "1.0.0",
-    [switch]$UpdateXml          # pass to bump updates\updates.xml — only after the release exists; see above
+    [switch]$UpdateXml          # pass to bump updates\updates.xml - only after the release exists; see above
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
-# ── 1. Publish ────────────────────────────────────────────────────────────────
+# --- 1. Publish ---
 
 Write-Host "==> Publishing Project Nest Explorer $Version (win-x64, self-contained)..." -ForegroundColor Cyan
 
@@ -34,7 +38,7 @@ dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.
 
 if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish failed"; exit 1 }
 
-# ── 2. Inno Setup ─────────────────────────────────────────────────────────────
+# --- 2. Inno Setup ---
 
 $iscc = Get-Command iscc -ErrorAction SilentlyContinue
 if (-not $iscc) {
@@ -55,7 +59,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
 
 Write-Host "==> Installer: $setupExe" -ForegroundColor Green
 
-# ── 3. Update updates.xml (optional) ─────────────────────────────────────────
+# --- 3. Update updates.xml (optional) ---
 
 if ($UpdateXml)
 {
@@ -76,7 +80,7 @@ if ($UpdateXml)
     Write-Host "    changelog : $changelogUrl"
 }
 
-# ── 4. Summary ────────────────────────────────────────────────────────────────
+# --- 4. Summary ---
 
 Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green
