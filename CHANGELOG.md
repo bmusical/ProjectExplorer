@@ -6,6 +6,13 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Flag unavailable Folder/File References and Web Resources (disconnected network/removable
+  drives, moved/deleted local files, unreachable sites): grey + strikethrough styling with a
+  tooltip explaining local-disk vs. network/web unavailability, automatic background re-checking
+  of network/removable/web resources every 20 seconds, and new right-click actions — "Check
+  Availability Now", "Locate Folder…/Locate File…" to relink a moved item, and "Stop/Resume
+  Auto-Retry" to silence polling for a resource that's gone for good.
+
 ## [1.0.4] — 2026-07-11
 
 - Add drag-drop conversion between Projects and Collections in the TreeView, plus tree reordering

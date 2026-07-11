@@ -183,6 +183,25 @@ public class HelpForm : Form
             "View ▸ Details / Extra Large Icons / Large Icons / Small Icons / List / Tile " +
             "switches how folder contents are displayed.");
 
+        AppendHeading("Unavailable folders, files, and web resources");
+        AppendParagraph(
+            "A Folder Reference, File Reference, or Web Resource can point at something that isn't " +
+            "reachable right now — a network/removable drive got disconnected, a local file was " +
+            "moved or deleted, or a website is temporarily down. When that happens, the item shows " +
+            "greyed out with a strikethrough in both the tree and list, and its tooltip explains why.");
+        AppendBullet(
+            "Local disk — not found; likely moved, renamed, or deleted. Use \"Locate Folder…\"/" +
+            "\"Locate File…\" on its right-click menu to point it at the new location, or remove it.");
+        AppendBullet(
+            "Network/removable drive or web resource — not reachable right now, which may just be " +
+            "temporary. It's automatically re-checked every 20 seconds and reverts to normal as " +
+            "soon as it's reachable again — no action needed. \"Stop Auto-Retry\" on its right-click " +
+            "menu turns that off for a resource you know is gone for good (\"Resume Auto-Retry\" " +
+            "turns it back on).");
+        AppendBullet(
+            "\"Check Availability Now\" on any unavailable item's right-click menu re-checks it " +
+            "immediately instead of waiting for the next automatic retry.");
+
         AppendHeading("Everyday actions (right-click menu)");
         AppendBullet(
             "Project — New Collection…, Add Folder…/File…/Web Resource…, " +
@@ -197,6 +216,11 @@ public class HelpForm : Form
             "File Reference — Open, Open Containing Folder, Copy Path, Properties, Edit…, " +
             "Move Up/Down, Remove from Project.");
         AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project.");
+        AppendBullet(
+            "When a Folder Reference, File Reference, or Web Resource is unavailable, its menu also " +
+            "adds Check Availability Now. Folder/File references add Locate Folder…/Locate File… " +
+            "to retarget moved local items, and network/removable/web resources add Stop-Resume " +
+            "Auto-Retry.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
             "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +
@@ -232,9 +256,10 @@ public class HelpForm : Form
 
         AppendHeading("Checking for updates");
         AppendParagraph(
-            "Help ▸ Check for Updates… checks for a newer version. This — along with " +
-            "loading Web Resource previews you've added — is the only thing in the app that reaches " +
-            "the internet on its own; everything else works fully offline.");
+            "Help ▸ Check for Updates… checks for a newer version. Besides that, loading Web " +
+            "Resource previews you've added, and checking whether a Web Resource is currently " +
+            "reachable (see \"Unavailable folders, files, and web resources\" above), everything " +
+            "else works fully offline.");
 
         AppendHeading("Getting help");
         AppendParagraph("Questions, bugs, or anything not covered here: support@blaznaccess.com");

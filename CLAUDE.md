@@ -91,6 +91,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.WinForms/Forms/ImageViewerForm.cs` — in-app image viewer for image FileReferences/folder contents
 - `src/ProjectExplorer.WinForms/Forms/FilePreviewPanel.cs` — inline preview panel shown in place of the ListView when a FileReference tree node is selected; renders image/text content when supported, always offers Open/Properties otherwise
 - `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
+- `src/ProjectExplorer.Core/Services/ResourceAvailabilityChecker.cs` — classifies a FolderReference/FileReference/WebResource's location (local disk vs. network/removable drive vs. web via `ResourceLocationKind`) and checks reachability (`AvailabilityStatus`); stateless, no caching. `MainForm.cs` owns the per-session cache, the "unavailable" grey-out/strikethrough styling, and the retry timer — see Availability & Broken References below
 - `src/ProjectExplorer.WinForms/Forms/WebResourcePreviewPanel.cs` — inline preview panel shown in place of the ListView when a WebResource tree node is selected (a ListView row for one routes here too, via `SelectTreeNodeByTag`); renders the URL with WebView2 (`Microsoft.Web.WebView2` package — requires the WebView2 Runtime, falls back to a message + "Open in External Browser" if it's missing), always offers "Open in External Browser"
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
 - `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
@@ -107,6 +108,22 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 ### Adding a New Child Type
 
 The pattern established by `WebResource` and `FileReference` is: add model → add `ChildType` enum value → handle in `JsonProjectRepository` deserialization switch → add `ProjectManager` CRUD methods → wire up context menu and dialog in `MainForm` → add tests.
+
+### Resource Availability (broken/unreachable references)
+
+FolderReferences, FileReferences, and WebResources can point at things that are temporarily or
+permanently gone — a network/removable drive disconnected, or a local file/folder moved or
+deleted. `ResourceAvailabilityChecker` (Core) classifies a path/URL's `ResourceLocationKind`
+(`LocalDisk`, `NetworkOrRemovable`, `Web`) and checks `AvailabilityStatus` (`Available`/
+`Unavailable`); it's stateless — no caching, no timers, fully unit-tested independent of WinForms.
+
+`MainForm.cs` is where the session-scoped behavior lives:
+
+- **Cache**: `_availabilityCache` (keyed by `ProjectChild.Id`) survives `RefreshTreeView()` rebuilds. `EnsureAvailabilityChecked` fires a background check the first time a node/item renders; `ForceCheckAvailabilityAsync` bypasses the cache for "Check Availability Now".
+- **Visuals**: unavailable TreeNodes/ListViewItems render grey + strikethrough (`ApplyAvailabilityStyle`); the TreeNode tooltip explains *why* — local-disk unavailability reads as "likely moved or deleted", network/removable/web reads as "may be temporarily disconnected" (`DescribeUnavailable`). `UpdateAvailabilityVisuals` patches an already-rendered node/item in place (no tree rebuild) so the 20-second retry timer doesn't disrupt scroll position or expand state.
+- **Auto-retry**: only `NetworkOrRemovable`/`Web` resources that are currently unavailable get re-checked by `_availabilityRetryTimer` (`RecheckUnavailableResourcesAsync`) — a missing local-disk file was moved or deleted, not disconnected, so polling it is pointless and it's left alone (user must use "Locate...").
+- **Context menu** (`AddAvailabilityMenuItems`, called from `AddFolderReferenceMenuItems`/`AddFileReferenceMenuItems`/`AddWebResourceMenuItems`): when unavailable, prepends a disabled "⚠ Unavailable — ..." header, "Check Availability Now", "Locate Folder.../Locate File..." (browse to relink — not offered for WebResource, whose existing "Edit..." already re-targets the URL), and "Stop Auto-Retry"/"Resume Auto-Retry" for network/web resources (persisted per-resource via `ProjectManager.SetChildMetadataAsync` under the `ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey` metadata key — reuses the existing generic `ProjectChild.Metadata` dictionary rather than adding a new persisted field).
+- **Network disclosure**: checking a WebResource's availability makes an outbound HTTP request (GET with `HttpCompletionOption.ResponseHeadersRead`, any response status counts as available). This happens automatically the first time a WebResource is shown and periodically while it's unavailable — see the note in `docs/HELP.md`'s "Checking for updates" section, which is the one place the app's "works fully offline" claim needs this caveat.
 
 ## Licensing & Distribution
 
@@ -152,6 +169,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **FileReference inline preview** — selecting a FileReference tree node now shows `FilePreviewPanel` in place of the ListView instead of leaving the previously-viewed folder listing on screen. Renders images and common text formats inline (`FilePreviewHelper.GetPreviewKind`); always offers Open/Properties buttons regardless of whether the format is previewable.
 - **WebResource inline preview** — selecting a WebResource tree node shows `WebResourcePreviewPanel` in place of the ListView, rendering the URL inline via WebView2; double-clicking a WebResource row in the ListView now selects the corresponding tree node (same as Project/Collection/FolderRef) so it shows in the same preview instead of launching the external browser directly. Both the TreeView/ListView context menus and the preview panel itself offer an explicit "Open in External Browser" action.
 - **In-app Help** — Help ▸ Help Contents… (`F1`) opens `HelpForm`, a scrollable dialog covering core concepts, everyday actions, keyboard shortcuts, and licensing — leading with an explicit "what this app does NOT do" section (it only manages references; everything it writes lives under `%APPDATA%\ProjectExplorer\`: `projects.json`, `license.json`, `uisettings.json`, `appsettings.json`). Content is mirrored in `docs/HELP.md`, which is also linked from the README.
+- **Broken/unavailable reference handling** (supersedes the old "Folder watcher" roadmap item, and extends it to files and web resources too) — unreachable FolderReferences/FileReferences/WebResources render grey + strikethrough in both the TreeView and ListView, with a tooltip distinguishing "likely moved or deleted" (local disk) from "may be temporarily disconnected" (network/removable drive or web). Network/removable/web resources are auto-rechecked every 20 seconds while unavailable; local-disk ones aren't, since a missing local file needs relinking, not retrying. Context menus gain "Check Availability Now", "Locate Folder…/Locate File…" (browse to relink), and "Stop/Resume Auto-Retry" when a resource is currently unavailable. See **Resource Availability** under Architecture above.
 
 ## Roadmap
 
@@ -172,7 +190,6 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 |---|---|
 | **Search / filter** | Filter the TreeView or ListView by name across all projects. Critical once collections grow large. |
 | **Recently opened** | Track last-accessed folders/URLs per project session; surface in a "Recent" panel. |
-| **Folder watcher** | Flag FolderReferences whose paths no longer exist (drive unmounted, folder renamed). |
 | **Export / share a project** | Export a project definition as a `.peproj` JSON file to hand off to a colleague. |
 | **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously. |
 

@@ -372,6 +372,39 @@ public class ProjectManagerTests
         Assert.Equal(2, LicenseManager.CountLeafNodes(mgr.Projects));
     }
 
+    [Fact]
+    public async Task SetChildMetadata_SetsAndPersistsValue()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        var fr = await mgr.AddFolderReferenceAsync(project.Id, @"C:\Code");
+
+        await mgr.SetChildMetadataAsync(project.Id, fr.Id, "availabilitySuppressAutoRetry", "true");
+
+        var loaded = mgr.GetProject(project.Id);
+        var loadedFr = Assert.IsType<FolderReference>(loaded!.Children[0]);
+        Assert.Equal("true", loadedFr.Metadata["availabilitySuppressAutoRetry"]);
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        var reloadedFr = (FolderReference)reloaded.First(p => p.Id == project.Id).Children[0];
+        Assert.Equal("true", reloadedFr.Metadata["availabilitySuppressAutoRetry"]);
+    }
+
+    [Fact]
+    public async Task SetChildMetadata_NullValue_RemovesKey()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P1");
+        var fr = await mgr.AddFolderReferenceAsync(project.Id, @"C:\Code");
+        await mgr.SetChildMetadataAsync(project.Id, fr.Id, "availabilitySuppressAutoRetry", "true");
+
+        await mgr.SetChildMetadataAsync(project.Id, fr.Id, "availabilitySuppressAutoRetry", null);
+
+        var loaded = mgr.GetProject(project.Id);
+        var loadedFr = Assert.IsType<FolderReference>(loaded!.Children[0]);
+        Assert.False(loadedFr.Metadata.ContainsKey("availabilitySuppressAutoRetry"));
+    }
+
     // ── MoveChildAsync: reorder + cross-container move ──
 
     [Fact]

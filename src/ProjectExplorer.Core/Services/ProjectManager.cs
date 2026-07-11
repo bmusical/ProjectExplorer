@@ -277,6 +277,22 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    // ── Metadata (per-child key/value, used e.g. to suppress availability auto-retry) ──
+
+    public async Task SetChildMetadataAsync(Guid projectId, Guid childId, string key, string? value)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var parentList = project.FindParentList(childId) ?? throw new InvalidOperationException($"Cannot find parent list for child {childId}.");
+        var child = parentList.FirstOrDefault(c => c.Id == childId)
+            ?? throw new InvalidOperationException($"Child {childId} not found.");
+
+        if (value == null) child.Metadata.Remove(key);
+        else child.Metadata[key] = value;
+
+        project.Modified = DateTime.UtcNow;
+        await _repository.SaveProjectAsync(project);
+    }
+
     // ── Reordering ──
 
     public async Task ReorderChildrenAsync(Guid projectId, Guid? parentCollectionId, List<Guid> orderedChildIds)
