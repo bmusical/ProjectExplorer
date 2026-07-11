@@ -18,18 +18,24 @@ existing.
    (`<Version>`, `<AssemblyVersion>`, `<FileVersion>`).
 2. **Update `CHANGELOG.md`** with a new `## [X.Y.Z] — YYYY-MM-DD` section.
 3. **Commit and push** those two changes to `master`.
-4. **Push the tag**, `X.Y.Z` (no `v` prefix — this repo standardized on bare version tags; a `v`
-   prefix also won't match the workflow's trigger pattern, so it simply won't run):
-   ```bash
-   git tag X.Y.Z
-   git push origin X.Y.Z
+4. **Run the release script**, which tags, pushes, and watches the build for you in one go —
+   no other git or GitHub UI steps needed:
+   ```powershell
+   .\installer\cut-release.ps1 -Version X.Y.Z
    ```
-   (Or create the GitHub Release directly through the web UI with tag `X.Y.Z` targeting `master`
-   and no files attached — publishing it creates the tag, which fires the same workflow. Title
-   convention: `Project Nest Explorer X.Y.Z`.)
-5. **Watch the Actions run.** It publishes the self-contained `win-x64` build, compiles the
-   installer, creates/updates the GitHub Release with `ProjectNest-X.Y.Z-Setup.exe` attached, and
-   only then commits `updates/updates.xml` pointing at this version.
+   It double-checks the csproj version and `CHANGELOG.md` section from steps 1–2 actually made it
+   to `master`, pushes the tag (no `v` prefix — this repo standardized on bare version tags, and a
+   `v` prefix also won't match the workflow's trigger pattern, so it simply wouldn't run), then
+   streams the GitHub Actions run live in your terminal via `gh run watch` until it finishes.
+   Requires the [GitHub CLI](https://cli.github.com/), already logged in (`gh auth login`).
+
+   Prefer to do it by hand instead? `git tag X.Y.Z && git push origin X.Y.Z`, or create the GitHub
+   Release directly through the web UI with tag `X.Y.Z` targeting `master` and no files attached
+   (publishing it creates the tag, which fires the same workflow) — title convention is
+   `Project Nest Explorer X.Y.Z`.
+5. **The workflow itself** publishes the self-contained `win-x64` build, compiles the installer,
+   creates/updates the GitHub Release with `ProjectNest-X.Y.Z-Setup.exe` attached, and only then
+   commits `updates/updates.xml` pointing at this version.
 6. **Verify the update path**: install an older version, launch it, and confirm it detects the new
    release, downloads, and upgrades cleanly. User data in
    `%APPDATA%\ProjectExplorer\projects.json` must survive the upgrade (the installer's
