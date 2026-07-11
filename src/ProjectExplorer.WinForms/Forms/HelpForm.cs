@@ -199,12 +199,25 @@ public class HelpForm : Form
         AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Remove from Project.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
-            "projects.json — see the note at the top of this page. Drag-and-drop reordering in the " +
-            "tree is the same: it only changes placement inside that one file.");
+            "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +
+            "the same: it only changes placement inside that one file. Drop onto a Collection or " +
+            "Project to move something inside it, or drop just above/below a row (watch for the " +
+            "insertion line) to reorder it among its siblings. Two gestures convert between " +
+            "container types: drag a Project onto a Collection to turn it into a collection " +
+            "nested there, or drag a Collection onto the \"Projects\" root to turn it into its " +
+            "own top-level project.");
 
         AppendHeading("Keyboard shortcuts");
         AppendBullet("Ctrl+N — New Project…");
         AppendBullet("F2 — Rename the selected tree item.");
+
+        AppendHeading("Settings");
+        AppendParagraph(
+            "File ▸ Settings… currently has one option, Focus on Run: \"Prevent multiple copies\" " +
+            "(default) switches to the already-running window instead of opening a second one; " +
+            "\"Allow multiple copies\" always opens a new window. Either way, if the main window's " +
+            "saved position has drifted off every screen you currently have connected, it's moved " +
+            "back onto your primary screen the next time it becomes visible.");
 
         AppendHeading("Free tier & licensing");
         AppendParagraph(

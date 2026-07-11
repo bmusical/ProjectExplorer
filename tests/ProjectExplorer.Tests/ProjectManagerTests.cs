@@ -371,4 +371,114 @@ public class ProjectManagerTests
 
         Assert.Equal(2, LicenseManager.CountLeafNodes(mgr.Projects));
     }
+
+    // ── MoveChildAsync: reorder + cross-container move ──
+
+    [Fact]
+    public async Task MoveChildAsync_ReorderWithinSameContainer_InsertsBeforeSibling()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+        var c = await mgr.CreateCollectionAsync(project.Id, "C");
+
+        // Move C to before A: expect order [C, A, B]
+        await mgr.MoveChildAsync(project.Id, c.Id, null, a.Id);
+
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { c.Id, a.Id, b.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveChildAsync_ReorderToEnd_WhenNoBeforeSibling()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+
+        await mgr.MoveChildAsync(project.Id, a.Id, null, beforeSiblingId: null);
+
+        // beforeSiblingId null + same container is a legacy no-op guard — order unchanged.
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { a.Id, b.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveChildAsync_CrossContainer_InsertsAtRequestedPosition()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Target");
+        var existing = await mgr.AddFolderReferenceAsync(project.Id, @"C:\Existing", coll.Id);
+        var mover = await mgr.AddFolderReferenceAsync(project.Id, @"C:\Mover");
+
+        await mgr.MoveChildAsync(project.Id, mover.Id, coll.Id, existing.Id);
+
+        var loadedColl = mgr.GetProject(project.Id)!.FindCollection(coll.Id)!;
+        var order = loadedColl.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { mover.Id, existing.Id }, order);
+        Assert.Equal(coll.Id, mover.ParentId);
+    }
+
+    // ── Convert Project <-> Collection ──
+
+    [Fact]
+    public async Task ConvertProjectToCollectionAsync_MovesChildrenAndRemovesOriginalProject()
+    {
+        var mgr = await CreateManagerAsync();
+        var source = await mgr.CreateProjectAsync("Source");
+        await mgr.AddFolderReferenceAsync(source.Id, @"C:\Assets", displayName: "Assets");
+        var target = await mgr.CreateProjectAsync("Target");
+        var hostColl = await mgr.CreateCollectionAsync(target.Id, "Archive");
+
+        var collection = await mgr.ConvertProjectToCollectionAsync(source.Id, target.Id, hostColl.Id);
+
+        Assert.Equal(source.Id, collection.Id);
+        Assert.Equal("Source", collection.Name);
+        Assert.Single(collection.Children);
+        Assert.Null(mgr.GetProject(source.Id));
+
+        var reloadedTarget = mgr.GetProject(target.Id)!.FindCollection(hostColl.Id)!;
+        var moved = reloadedTarget.Children.OfType<Collection>().Single();
+        Assert.Equal("Source", moved.Name);
+        Assert.Single(moved.Children);
+
+        var reloadedFromDisk = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        Assert.DoesNotContain(reloadedFromDisk, p => p.Id == source.Id);
+    }
+
+    [Fact]
+    public async Task ConvertProjectToCollectionAsync_IntoOwnCollection_Throws()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Nested");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => mgr.ConvertProjectToCollectionAsync(project.Id, project.Id, coll.Id));
+    }
+
+    [Fact]
+    public async Task ConvertCollectionToProjectAsync_CreatesTopLevelProjectAndRemovesCollection()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var coll = await mgr.CreateCollectionAsync(project.Id, "Archive");
+        await mgr.AddFolderReferenceAsync(project.Id, @"D:\Old", coll.Id);
+
+        var newProject = await mgr.ConvertCollectionToProjectAsync(project.Id, coll.Id);
+
+        Assert.Equal(coll.Id, newProject.Id);
+        Assert.Equal("Archive", newProject.Name);
+        Assert.Single(newProject.Children);
+        Assert.Contains(mgr.Projects, p => p.Id == newProject.Id);
+
+        var reloadedSource = mgr.GetProject(project.Id)!;
+        Assert.Null(reloadedSource.FindCollection(coll.Id));
+
+        var reloadedFromDisk = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        Assert.Contains(reloadedFromDisk, p => p.Id == newProject.Id);
+    }
 }
