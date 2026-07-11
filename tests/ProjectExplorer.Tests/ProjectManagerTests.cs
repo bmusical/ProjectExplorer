@@ -422,6 +422,97 @@ public class ProjectManagerTests
         Assert.Equal(coll.Id, mover.ParentId);
     }
 
+    // ── Move Up / Move Down (menu-driven reorder, no drag-and-drop precision needed) ──
+
+    [Fact]
+    public async Task MoveChildUpAsync_SwapsWithPreviousSibling()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+        var c = await mgr.CreateCollectionAsync(project.Id, "C");
+
+        await mgr.MoveChildUpAsync(project.Id, c.Id);
+
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { a.Id, c.Id, b.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveChildUpAsync_AlreadyFirst_NoOp()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+
+        await mgr.MoveChildUpAsync(project.Id, a.Id);
+
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { a.Id, b.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveChildDownAsync_SwapsWithNextSibling()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+        var c = await mgr.CreateCollectionAsync(project.Id, "C");
+
+        await mgr.MoveChildDownAsync(project.Id, a.Id);
+
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { b.Id, a.Id, c.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveChildDownAsync_AlreadyLast_NoOp()
+    {
+        var mgr = await CreateManagerAsync();
+        var project = await mgr.CreateProjectAsync("P");
+        var a = await mgr.CreateCollectionAsync(project.Id, "A");
+        var b = await mgr.CreateCollectionAsync(project.Id, "B");
+
+        await mgr.MoveChildDownAsync(project.Id, b.Id);
+
+        var order = mgr.GetProject(project.Id)!.Children.OrderBy(x => x.SortOrder).Select(x => x.Id).ToList();
+        Assert.Equal(new[] { a.Id, b.Id }, order);
+    }
+
+    [Fact]
+    public async Task MoveProjectAsync_ReordersTopLevelProjectsAndPersists()
+    {
+        var mgr = await CreateManagerAsync();
+        var a = await mgr.CreateProjectAsync("A");
+        var b = await mgr.CreateProjectAsync("B");
+        var c = await mgr.CreateProjectAsync("C");
+
+        await mgr.MoveProjectAsync(c.Id, a.Id);
+
+        Assert.Equal(new[] { "C", "A", "B" }, mgr.Projects.Select(p => p.Name));
+
+        var reloaded = await new JsonProjectRepository(_tempDir).LoadAllAsync();
+        Assert.Equal(new[] { "C", "A", "B" }, reloaded.Select(p => p.Name));
+    }
+
+    [Fact]
+    public async Task MoveProjectUpAndDown_SwapWithNeighbor()
+    {
+        var mgr = await CreateManagerAsync();
+        var a = await mgr.CreateProjectAsync("A");
+        var b = await mgr.CreateProjectAsync("B");
+        var c = await mgr.CreateProjectAsync("C");
+
+        await mgr.MoveProjectDownAsync(a.Id);
+        Assert.Equal(new[] { "B", "A", "C" }, mgr.Projects.Select(p => p.Name));
+
+        await mgr.MoveProjectUpAsync(c.Id);
+        Assert.Equal(new[] { "B", "C", "A" }, mgr.Projects.Select(p => p.Name));
+    }
+
     // ── Convert Project <-> Collection ──
 
     [Fact]

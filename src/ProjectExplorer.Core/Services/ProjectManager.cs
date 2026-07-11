@@ -361,6 +361,69 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
+    /// <summary>Swaps a child one position earlier among its siblings. No-op if already first.</summary>
+    public async Task MoveChildUpAsync(Guid projectId, Guid childId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var list = project.FindParentList(childId) ?? throw new InvalidOperationException($"Child {childId} not found in project.");
+        var child = list.First(c => c.Id == childId);
+        var ordered = list.OrderBy(c => c.SortOrder).ToList();
+        var index = ordered.IndexOf(child);
+        if (index <= 0) return;
+
+        var parentCollectionId = child.ParentId == project.Id ? (Guid?)null : child.ParentId;
+        await MoveChildAsync(projectId, childId, parentCollectionId, ordered[index - 1].Id);
+    }
+
+    /// <summary>Swaps a child one position later among its siblings. No-op if already last.</summary>
+    public async Task MoveChildDownAsync(Guid projectId, Guid childId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        var list = project.FindParentList(childId) ?? throw new InvalidOperationException($"Child {childId} not found in project.");
+        var child = list.First(c => c.Id == childId);
+        var ordered = list.OrderBy(c => c.SortOrder).ToList();
+        var index = ordered.IndexOf(child);
+        if (index < 0 || index >= ordered.Count - 1) return;
+
+        var parentCollectionId = child.ParentId == project.Id ? (Guid?)null : child.ParentId;
+        var beforeSiblingId = index + 2 < ordered.Count ? ordered[index + 2].Id : (Guid?)null;
+        await MoveChildAsync(projectId, childId, parentCollectionId, beforeSiblingId);
+    }
+
+    // ── Move / reorder Projects (top-level; Project isn't a ProjectChild, so it has no
+    // SortOrder — order is simply the _projects list order, which SaveAllAsync persists
+    // as JSON array order and LoadAllAsync reads back the same way) ──
+
+    public async Task MoveProjectAsync(Guid projectId, Guid? beforeProjectId)
+    {
+        var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
+        if (beforeProjectId == projectId) return;
+
+        _projects.Remove(project);
+        var insertIndex = beforeProjectId.HasValue ? _projects.FindIndex(p => p.Id == beforeProjectId.Value) : -1;
+        if (insertIndex < 0) insertIndex = _projects.Count;
+        _projects.Insert(insertIndex, project);
+
+        await _repository.SaveAllAsync(_projects);
+    }
+
+    /// <summary>Swaps a project one position earlier among top-level projects. No-op if already first.</summary>
+    public async Task MoveProjectUpAsync(Guid projectId)
+    {
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index <= 0) return;
+        await MoveProjectAsync(projectId, _projects[index - 1].Id);
+    }
+
+    /// <summary>Swaps a project one position later among top-level projects. No-op if already last.</summary>
+    public async Task MoveProjectDownAsync(Guid projectId)
+    {
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index < 0 || index >= _projects.Count - 1) return;
+        var beforeId = index + 2 < _projects.Count ? _projects[index + 2].Id : (Guid?)null;
+        await MoveProjectAsync(projectId, beforeId);
+    }
+
     // ── Convert (Project <-> Collection) ──
 
     /// <summary>

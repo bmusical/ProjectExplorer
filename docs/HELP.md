@@ -61,22 +61,27 @@ place where files actually live.
 
 | On this item | You can |
 |---|---|
-| **Project** | New Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Delete Project |
-| **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Delete Collection |
-| **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Remove from Project |
-| **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Remove from Project |
-| **Web Resource** | Open in External Browser, Copy URL, Edit…, Remove from Project |
+| **Project** | New Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Project |
+| **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection |
+| **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project |
+| **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Move Up/Down, Remove from Project |
+| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project |
 
 "Remove from Project" and "Delete Project/Collection" only remove entries from your
 `projects.json` tree — see the note at the top of this document.
 
 You can also drag and drop items in the tree to reorganize them: drop onto a Collection or
 Project to move something inside it, or drop just above/below a row (watch for the insertion
-line) to reorder it relative to its siblings without changing its parent. Two special gestures
-convert between the two container types instead of just moving something: drag a Project onto
-a Collection to turn that project into a collection nested there, or drag a Collection onto the
-"Projects" root to turn it into its own top-level project (its contents come along either way).
-All of this only changes placement in `projects.json`, same as any other edit here.
+line) to reorder it relative to its siblings without changing its parent — this includes
+Projects themselves, dragged onto one another. Two special gestures convert between the two
+container types instead of just moving something: drag a Project onto a Collection to turn
+that project into a collection nested there, or drag a Collection onto the "Projects" root to
+turn it into its own top-level project (its contents come along either way). If the exact drop
+position is fiddly to hit, every item's right-click menu also has **Move Up**/**Move Down**,
+which does the same repositioning without needing to drag at all. All of this only changes
+placement in `projects.json`, same as any other edit here. (Reparenting via drag stays within
+the same Project — moving something into a *different* project isn't supported yet except via
+the two conversion gestures above.)
 
 ## Keyboard shortcuts
 

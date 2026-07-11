@@ -1811,6 +1811,42 @@ public partial class MainForm : Form
         menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(projectId, parentCollectionId));
     }
 
+    /// <summary>
+    /// Move Up/Move Down for a top-level Project — a precision-free alternative to dragging
+    /// for repositioning siblings, since Projects/Collections/etc. only get a few pixels of
+    /// "insertion line" hit zone during drag-and-drop.
+    /// </summary>
+    private void AddProjectMoveMenuItems(ContextMenuStrip menu, Guid projectId)
+    {
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Move Up", null, async (s, e) =>
+        {
+            await _projectManager.MoveProjectUpAsync(projectId);
+            RefreshTreeView();
+        });
+        menu.Items.Add("Move Down", null, async (s, e) =>
+        {
+            await _projectManager.MoveProjectDownAsync(projectId);
+            RefreshTreeView();
+        });
+    }
+
+    /// <summary>Move Up/Move Down for any ProjectChild (Collection/FolderReference/WebResource/FileReference).</summary>
+    private void AddChildMoveMenuItems(ContextMenuStrip menu, Guid projectId, Guid childId)
+    {
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Move Up", null, async (s, e) =>
+        {
+            await _projectManager.MoveChildUpAsync(projectId, childId);
+            RefreshTreeView();
+        });
+        menu.Items.Add("Move Down", null, async (s, e) =>
+        {
+            await _projectManager.MoveChildDownAsync(projectId, childId);
+            RefreshTreeView();
+        });
+    }
+
     private void AddProjectMenuItems(ContextMenuStrip menu, Guid projectId, Action rename)
     {
         AddNewChildMenuItems(menu, projectId, null);
@@ -1831,6 +1867,7 @@ public partial class MainForm : Form
                 }
             }
         });
+        AddProjectMoveMenuItems(menu, projectId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Delete Project", null, async (s, e) =>
         {
@@ -1867,6 +1904,7 @@ public partial class MainForm : Form
                 }
             }
         });
+        AddChildMoveMenuItems(menu, projectId, collectionId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Delete Collection", null, async (s, e) =>
         {
@@ -1925,6 +1963,7 @@ public partial class MainForm : Form
             var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
             if (fr != null && Directory.Exists(fr.RealPath)) _shellPropertiesProvider.ShowPropertiesDialog(fr.RealPath, this.Handle);
         });
+        AddChildMoveMenuItems(menu, projectId, folderRefId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Remove from Project", null, async (s, e) =>
         {
@@ -1964,6 +2003,7 @@ public partial class MainForm : Form
                 }
             }
         });
+        AddChildMoveMenuItems(menu, projectId, resourceId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Remove from Project", null, async (s, e) =>
         {
@@ -2018,6 +2058,7 @@ public partial class MainForm : Form
                 }
             }
         });
+        AddChildMoveMenuItems(menu, projectId, fileRefId);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Remove from Project", null, async (s, e) =>
         {
@@ -2197,7 +2238,7 @@ public partial class MainForm : Form
     // (reorder as a sibling) or highlight the whole row (drop into it as a container).
     private enum DropZone { None, Before, Into, After }
 
-    private enum DropKind { ReparentOrReorder, ConvertProjectToCollection, ConvertCollectionToProject }
+    private enum DropKind { ReparentOrReorder, ReorderProjects, ConvertProjectToCollection, ConvertCollectionToProject }
 
     private sealed class DropPlan
     {
@@ -2249,7 +2290,7 @@ public partial class MainForm : Form
         }
 
         var pt = treeView.PointToClient(new Point(e.X, e.Y));
-        var (targetNode, zone) = GetDropZone(pt);
+        var (targetNode, zone) = GetDropZone(draggedNode, pt);
         var plan = targetNode != null ? ComputeDropPlan(draggedNode, targetNode, zone) : null;
 
         if (plan == null)
@@ -2294,7 +2335,7 @@ public partial class MainForm : Form
         if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode) return;
 
         var pt = treeView.PointToClient(new Point(e.X, e.Y));
-        var (targetNode, zone) = GetDropZone(pt);
+        var (targetNode, zone) = GetDropZone(draggedNode, pt);
         var plan = targetNode != null ? ComputeDropPlan(draggedNode, targetNode, zone) : null;
         if (plan == null) return;
 
@@ -2306,6 +2347,12 @@ public partial class MainForm : Form
             {
                 case DropKind.ReparentOrReorder:
                     await _projectManager.MoveChildAsync(plan.ProjectId, plan.ChildId, plan.DestParentCollectionId, plan.BeforeSiblingId);
+                    RefreshTreeView();
+                    SelectTreeNodeByTag(dragTag);
+                    break;
+
+                case DropKind.ReorderProjects:
+                    await _projectManager.MoveProjectAsync(plan.ProjectId, plan.BeforeSiblingId);
                     RefreshTreeView();
                     SelectTreeNodeByTag(dragTag);
                     break;
@@ -2364,28 +2411,45 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Determines which row the cursor is over and which third of its height it's in.
-    /// Project/root rows are Into-only (Projects aren't reorderable among themselves —
-    /// there's no SortOrder for them); Collections get Before/Into/After; leaf rows
-    /// (FolderReference/WebResource/FileReference) get Before/After only, since they can't
-    /// contain children.
+    /// Determines which row the cursor is over and which zone of its height it's in.
+    /// Project rows are Into-only for anything except another Project (Projects have no
+    /// "into" of their own — they never nest under each other, only under the Projects
+    /// root); dragging one Project onto another gets Before/After only, to reorder them.
+    /// Collections get Before/Into/After. Leaf rows (FolderReference/WebResource/
+    /// FileReference) get Before/After only, since they can't contain children.
     /// </summary>
-    private (TreeNode? Node, DropZone Zone) GetDropZone(Point clientPt)
+    private (TreeNode? Node, DropZone Zone) GetDropZone(TreeNode draggedNode, Point clientPt)
     {
-        var targetNode = treeView.GetNodeAt(clientPt);
+        // Hit-test at a fixed near-left X rather than the cursor's actual X: TreeNode.Bounds
+        // (and the row highlight it drives) only spans the icon+label, so a cursor sitting to
+        // the right of a short or deeply-indented label — a very normal place for it to be
+        // mid-drag — would otherwise miss the row entirely and read as "no valid target here".
+        var targetNode = treeView.GetNodeAt(new Point(2, clientPt.Y));
         if (targetNode == null) return (null, DropZone.None);
 
+        var dragTag = draggedNode.Tag?.ToString() ?? "";
         var tag = targetNode.Tag?.ToString() ?? "";
-        if (tag == TagProjectsRoot || tag.StartsWith(TagProject))
+
+        if (tag == TagProjectsRoot)
             return (targetNode, DropZone.Into);
+
+        if (tag.StartsWith(TagProject))
+        {
+            if (!dragTag.StartsWith(TagProject))
+                return (targetNode, DropZone.Into);
+
+            var pBounds = targetNode.Bounds;
+            var pFrac = pBounds.Height == 0 ? 0.5 : (double)(clientPt.Y - pBounds.Top) / pBounds.Height;
+            return (targetNode, pFrac < 0.5 ? DropZone.Before : DropZone.After);
+        }
 
         var bounds = targetNode.Bounds;
         var frac = bounds.Height == 0 ? 0.5 : (double)(clientPt.Y - bounds.Top) / bounds.Height;
 
         if (tag.StartsWith(TagCollection))
         {
-            if (frac < 0.25) return (targetNode, DropZone.Before);
-            if (frac > 0.75) return (targetNode, DropZone.After);
+            if (frac < 0.2) return (targetNode, DropZone.Before);
+            if (frac > 0.8) return (targetNode, DropZone.After);
             return (targetNode, DropZone.Into);
         }
 
@@ -2400,23 +2464,45 @@ public partial class MainForm : Form
         var dragTag = draggedNode.Tag?.ToString() ?? "";
         var targetTag = targetNode.Tag?.ToString() ?? "";
 
-        // Drag a Project onto a Collection's middle zone: convert the project into a
-        // collection nested there.
         if (dragTag.StartsWith(TagProject))
         {
-            if (zone != DropZone.Into || !targetTag.StartsWith(TagCollection)) return null;
             var draggedProjectId = GetProjectIdFromTag(dragTag);
-            var hostProjectId = GetProjectIdFromTag(targetTag);
-            if (hostProjectId == draggedProjectId) return null; // can't nest a project inside its own collection
-            return new DropPlan
+
+            // Drag a Project onto another Project: reorder them (Projects never nest under
+            // each other, so this is never an "into" — see GetDropZone).
+            if (targetTag.StartsWith(TagProject) && zone != DropZone.Into)
             {
-                Kind = DropKind.ConvertProjectToCollection,
-                HighlightNode = targetNode,
-                Zone = DropZone.Into,
-                ProjectId = draggedProjectId,
-                TargetProjectId = hostProjectId,
-                DestParentCollectionId = GetCollectionIdFromTag(targetTag)
-            };
+                var beforeProjectId = zone == DropZone.Before
+                    ? GetProjectIdFromTag(targetTag)
+                    : NextSiblingIdSkipping(targetNode, draggedNode, GetProjectIdFromTag);
+                return new DropPlan
+                {
+                    Kind = DropKind.ReorderProjects,
+                    HighlightNode = targetNode,
+                    Zone = zone,
+                    ProjectId = draggedProjectId,
+                    BeforeSiblingId = beforeProjectId
+                };
+            }
+
+            // Drag a Project onto a Collection's middle zone: convert the project into a
+            // collection nested there.
+            if (zone == DropZone.Into && targetTag.StartsWith(TagCollection))
+            {
+                var hostProjectId = GetProjectIdFromTag(targetTag);
+                if (hostProjectId == draggedProjectId) return null; // can't nest a project inside its own collection
+                return new DropPlan
+                {
+                    Kind = DropKind.ConvertProjectToCollection,
+                    HighlightNode = targetNode,
+                    Zone = DropZone.Into,
+                    ProjectId = draggedProjectId,
+                    TargetProjectId = hostProjectId,
+                    DestParentCollectionId = GetCollectionIdFromTag(targetTag)
+                };
+            }
+
+            return null;
         }
 
         // Drag a Collection onto the Projects root: convert it into a new top-level project.
@@ -2462,17 +2548,9 @@ public partial class MainForm : Form
             highlightNode = parentNode;
             destParentId = GetCollectionIdFromTag(parentTag);
 
-            if (zone == DropZone.Before)
-            {
-                beforeSiblingId = GetChildIdFromTag(targetTag);
-            }
-            else
-            {
-                var next = targetNode.NextNode;
-                while (next != null && ReferenceEquals(next, draggedNode))
-                    next = next.NextNode;
-                beforeSiblingId = next?.Tag is string nextTag ? GetChildIdFromTag(nextTag) : null;
-            }
+            beforeSiblingId = zone == DropZone.Before
+                ? GetChildIdFromTag(targetTag)
+                : NextSiblingIdSkipping(targetNode, draggedNode, GetChildIdFromTag);
         }
 
         return new DropPlan
@@ -2485,6 +2563,20 @@ public partial class MainForm : Form
             DestParentCollectionId = destParentId,
             BeforeSiblingId = beforeSiblingId
         };
+    }
+
+    /// <summary>
+    /// For an "After" zone drop: the Id of whichever sibling currently follows targetNode,
+    /// skipping over draggedNode itself if it happens to be that very next sibling (dragging
+    /// an item to sit "after" its own immediately-preceding sibling is a same-position no-op,
+    /// not "move to the end"). Null means "append at the end" (targetNode is last).
+    /// </summary>
+    private static Guid? NextSiblingIdSkipping(TreeNode targetNode, TreeNode draggedNode, Func<string, Guid> parseId)
+    {
+        var next = targetNode.NextNode;
+        while (next != null && ReferenceEquals(next, draggedNode))
+            next = next.NextNode;
+        return next?.Tag is string nextTag ? parseId(nextTag) : null;
     }
 
     private static bool IsAncestorOf(TreeNode possibleAncestor, TreeNode node)

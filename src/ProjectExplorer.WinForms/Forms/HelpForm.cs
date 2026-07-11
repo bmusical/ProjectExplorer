@@ -186,26 +186,28 @@ public class HelpForm : Form
         AppendHeading("Everyday actions (right-click menu)");
         AppendBullet(
             "Project — New Collection…, Add Folder…/File…/Web Resource…, " +
-            "Rename, Edit Description…, Delete Project.");
+            "Rename, Edit Description…, Move Up/Down, Delete Project.");
         AppendBullet(
             "Collection — New Sub-Collection…, Add Folder…/File…/Web " +
-            "Resource…, Rename, Edit Description…, Delete Collection.");
+            "Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection.");
         AppendBullet(
             "Folder Reference — Open in Explorer, Open Command Prompt Here, Open PowerShell Here, " +
-            "Copy Path, Properties, Edit Description…, Remove from Project.");
+            "Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project.");
         AppendBullet(
             "File Reference — Open, Open Containing Folder, Copy Path, Properties, Edit…, " +
-            "Remove from Project.");
-        AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Remove from Project.");
+            "Move Up/Down, Remove from Project.");
+        AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
             "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +
             "the same: it only changes placement inside that one file. Drop onto a Collection or " +
             "Project to move something inside it, or drop just above/below a row (watch for the " +
-            "insertion line) to reorder it among its siblings. Two gestures convert between " +
-            "container types: drag a Project onto a Collection to turn it into a collection " +
-            "nested there, or drag a Collection onto the \"Projects\" root to turn it into its " +
-            "own top-level project.");
+            "insertion line) to reorder it among its siblings — including Projects, dragged onto " +
+            "one another. Two gestures convert between container types: drag a Project onto a " +
+            "Collection to turn it into a collection nested there, or drag a Collection onto the " +
+            "\"Projects\" root to turn it into its own top-level project. If a drop position is " +
+            "fiddly to hit exactly, every item's Move Up/Move Down menu items do the same " +
+            "repositioning without dragging.");
 
         AppendHeading("Keyboard shortcuts");
         AppendBullet("Ctrl+N — New Project…");
