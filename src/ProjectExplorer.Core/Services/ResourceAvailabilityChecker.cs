@@ -13,8 +13,8 @@ public static class ResourceAvailabilityChecker
     /// Metadata key (in <see cref="ProjectChild.Metadata"/>) a user can set to "true" to stop the
     /// automatic background re-check of a resource that's currently unavailable — e.g. a network
     /// drive they know is gone for good and don't want polled. Only meaningful for
-    /// <see cref="ResourceLocationKind.NetworkOrRemovable"/>/<see cref="ResourceLocationKind.Web"/>
-    /// resources; local-disk resources are never auto-retried in the first place.
+    /// <see cref="ResourceLocationKind.NetworkOrRemovable"/> resources; local-disk resources are
+    /// never auto-retried in the first place, and neither are Web resources (checked on-demand only).
     /// </summary>
     public const string SuppressAutoRetryMetadataKey = "availabilitySuppressAutoRetry";
 
@@ -109,8 +109,10 @@ public static class ResourceAvailabilityChecker
     public static async Task<AvailabilityCheckResult> CheckWebResourceAsync(
         string? url, HttpClient httpClient, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        // A URL typed without a scheme (e.g. "example.com") is resolved as "https://example.com" here
+        // too -- otherwise a perfectly working link would render broken purely for lacking "https://",
+        // which contradicts "only a confirmed HTTP error marks a WebResource unavailable" below.
+        if (!WebResource.TryGetNavigableUri(url, out var uri))
         {
             return new AvailabilityCheckResult(AvailabilityStatus.Unavailable, ResourceLocationKind.Web, DateTime.UtcNow);
         }

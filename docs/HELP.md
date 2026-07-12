@@ -72,12 +72,13 @@ explains why:
 - **Network/removable drive** — not reachable right now, which may just be temporary. Project
   Nest Explorer automatically re-checks these every 20 seconds and the item reverts to normal as
   soon as it's reachable again — no action needed.
-- **Web resource** — the site returned an error the last time it was checked. Project Nest
-  Explorer automatically re-checks it every 20 seconds and the item reverts to normal as soon as
-  it loads successfully again — no action needed.
+- **Web resource** — the site returned an error the last time it was checked. Web resources
+  aren't polled in the background — click **Refresh** on its right-click menu to check again, and
+  it reverts to normal as soon as the page loads successfully.
 
-If you know a resource is gone for good and don't want it checked anymore, use **Stop Auto-Retry**
-on its right-click menu (**Resume Auto-Retry** turns it back on).
+If you know a network/removable drive is gone for good and don't want it checked anymore, use
+**Stop Auto-Retry** on its right-click menu (**Resume Auto-Retry** turns it back on). Web
+resources have no auto-retry to stop — they're only ever checked when shown or refreshed.
 
 Right-click an unavailable Folder/File Reference any time for **Check Availability Now** to
 re-check immediately instead of waiting for the next automatic retry. A Web Resource's equivalent
@@ -95,7 +96,7 @@ double-check its status, for any reason.
 | **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection |
 | **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate Folder… / Stop-Resume Auto-Retry when unavailable)* |
 | **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate File… / Stop-Resume Auto-Retry when unavailable)* |
-| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project, Refresh *(+ Stop-Resume Auto-Retry when unavailable)* |
+| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project, Refresh |
 
 "Remove from Project" and "Delete Project/Collection" only remove entries from your
 `projects.json` tree — see the note at the top of this document.

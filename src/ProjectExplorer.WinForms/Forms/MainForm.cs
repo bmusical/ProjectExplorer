@@ -126,9 +126,10 @@ public partial class MainForm : Form
         RestoreTreeState(treeView.Nodes, new HashSet<string>(persistedState.ExpandedTags), persistedState.SelectedTag);
         treeView.EndUpdate();
         treeView.SelectedNode?.EnsureVisible();
-        // Only network/removable/web resources that are currently unavailable get auto-retried;
-        // local-disk resources that vanish were likely moved or deleted, not just disconnected,
-        // so retrying them in the background would just be noise (see AddAvailabilityMenuItems).
+        // Only network/removable resources that are currently unavailable get auto-retried; local-disk
+        // resources that vanish were likely moved or deleted, not just disconnected, and web resources
+        // are checked on-demand (shown, or "Refresh") rather than polled, so retrying either of those
+        // in the background would just be noise (see AddAvailabilityMenuItems).
         _availabilityRetryTimer.Tick += async (s, e) => await RecheckUnavailableResourcesAsync();
         _availabilityRetryTimer.Start();
         EnsureVisibleOnScreen();
@@ -690,19 +691,19 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Re-checks every currently-unavailable network/removable/web resource (the kinds that might
-    /// just be temporarily disconnected), skipping ones the user asked to stop auto-retrying via
-    /// the "Stop Auto-Retry" context menu action. Local-disk resources are never retried here —
-    /// a missing local file was moved or deleted, not disconnected, so polling it is pointless.
-    /// Also retries Web resources cached as <see cref="AvailabilityStatus.Unknown"/> (a prior check
-    /// that failed to connect at all, rather than getting back a real HTTP error) so a transient
-    /// blip doesn't get stuck unchecked forever — it renders normally either way; only a confirmed
-    /// HTTP error status renders as unavailable.
+    /// Re-checks every currently-unavailable network/removable resource (the kind that might just be
+    /// temporarily disconnected), skipping ones the user asked to stop auto-retrying via the "Stop
+    /// Auto-Retry" context menu action. Local-disk resources are never retried here — a missing local
+    /// file was moved or deleted, not disconnected, so polling it is pointless. Web resources aren't
+    /// retried here either — polling a URL repeatedly in the background is unwanted network chatter
+    /// for something the user can just click "Refresh" on; a WebResource only ever gets (re-)checked
+    /// when it's shown or explicitly refreshed (see <see cref="EnsureAvailabilityChecked"/> /
+    /// <see cref="ForceCheckAvailabilityAsync"/>).
     /// </summary>
     private async Task RecheckUnavailableResourcesAsync()
     {
         var candidateIds = _availabilityCache
-            .Where(kv => kv.Value.LocationKind != ResourceLocationKind.LocalDisk &&
+            .Where(kv => kv.Value.LocationKind == ResourceLocationKind.NetworkOrRemovable &&
                          (kv.Value.Status == AvailabilityStatus.Unavailable || kv.Value.Status == AvailabilityStatus.Unknown))
             .Select(kv => kv.Key)
             .ToList();
@@ -804,7 +805,7 @@ public partial class MainForm : Form
         ResourceLocationKind.NetworkOrRemovable =>
             "⚠ Not reachable right now. This may be a temporarily disconnected network or removable drive — Project Nest Explorer will keep checking automatically.",
         ResourceLocationKind.Web =>
-            "⚠ The site returned an error (e.g. a 404) the last time it was checked — Project Nest Explorer will keep checking automatically, and this clears as soon as it loads again.",
+            "⚠ The site returned an error (e.g. a 404) the last time it was checked — use \"Refresh\" to check again; this clears as soon as it loads.",
         _ => "⚠ Could not be verified."
     };
 
@@ -2175,7 +2176,9 @@ public partial class MainForm : Form
         if (relinkAction != null)
             menu.Items.Add(relinkLabel, null, async (s, e) => await relinkAction());
 
-        if (result.LocationKind != ResourceLocationKind.LocalDisk)
+        // Only NetworkOrRemovable is ever auto-retried in the background (see
+        // RecheckUnavailableResourcesAsync) — Web resources have nothing to stop/resume.
+        if (result.LocationKind == ResourceLocationKind.NetworkOrRemovable)
         {
             var suppressed = child.Metadata.TryGetValue(ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, out var v) && v == "true";
             menu.Items.Add(suppressed ? "Resume Auto-Retry" : "Stop Auto-Retry", null, async (s, e) =>
@@ -2953,11 +2956,17 @@ public partial class MainForm : Form
 
     private void LaunchWebResource(WebResource webResource)
     {
-        if (string.IsNullOrWhiteSpace(webResource.Url)) return;
+        // Must resolve to an http(s) URI before handing it to ShellExecute -- a scheme-less string
+        // like "example.com" is otherwise treated as a local file path rather than a URL to browse to.
+        if (!WebResource.TryGetNavigableUri(webResource.Url, out var uri))
+        {
+            MessageBox.Show($"\"{webResource.Url}\" is not a valid URL.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
 
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(webResource.Url) { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.ToString()) { UseShellExecute = true });
         }
         catch (Exception ex)
         {

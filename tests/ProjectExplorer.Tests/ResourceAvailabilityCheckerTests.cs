@@ -163,4 +163,23 @@ public class ResourceAvailabilityCheckerTests
         var result = await ResourceAvailabilityChecker.CheckWebResourceAsync("ftp://example.com/file", client);
         Assert.Equal(AvailabilityStatus.Unavailable, result.Status);
     }
+
+    [Fact]
+    public async Task CheckWebResourceAsync_NoScheme_SuccessResponse_IsAvailable()
+    {
+        // A URL typed without "https://" (e.g. "example.com") must not be treated as broken just
+        // for lacking a scheme -- it's resolved as "https://example.com" and actually checked.
+        Uri? requestedUri = null;
+        using var client = new HttpClient(new StubHandler(req =>
+        {
+            requestedUri = req.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }));
+
+        var result = await ResourceAvailabilityChecker.CheckWebResourceAsync("example.com", client);
+
+        Assert.Equal(AvailabilityStatus.Available, result.Status);
+        Assert.Equal("https", requestedUri?.Scheme);
+        Assert.Equal("example.com", requestedUri?.Host);
+    }
 }
