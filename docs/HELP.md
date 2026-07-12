@@ -81,10 +81,11 @@ on its right-click menu (**Resume Auto-Retry** turns it back on).
 
 Right-click an unavailable Folder/File Reference any time for **Check Availability Now** to
 re-check immediately instead of waiting for the next automatic retry. A Web Resource's equivalent
-is labeled **Refresh**, and it's always on its right-click menu, even when it isn't currently
-flagged — some sites keep failing the automated check (e.g. one that blocks non-browser requests)
-even though they load fine for you, so you can force a fresh check any time without waiting for
-it to first show as broken.
+is labeled **Refresh**, and it's always on its right-click menu — not just when the item is
+flagged unavailable. That's partly for the case where a site keeps failing the automated check
+(e.g. one that blocks non-browser requests) even though it loads fine for you, but it's really
+just a normal, everyday action: click **Refresh** on any Web Resource any time you want to
+double-check its status, for any reason.
 
 ## Everyday actions (right-click menu)
 

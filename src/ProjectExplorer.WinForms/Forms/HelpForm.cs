@@ -209,9 +209,10 @@ public class HelpForm : Form
             "immediately instead of waiting for the next automatic retry.");
         AppendBullet(
             "A Web Resource's \"Refresh\" (its equivalent of \"Check Availability Now\") is always " +
-            "on its right-click menu, even when it isn't currently flagged — some sites keep " +
-            "failing the automated check (e.g. one that blocks non-browser requests) even though " +
-            "they load fine for you, so you can force a fresh check any time.");
+            "on its right-click menu, not just when it's flagged unavailable. That's partly for " +
+            "sites that keep failing the automated check (e.g. one that blocks non-browser " +
+            "requests) even though they load fine for you, but it's really just a normal, " +
+            "everyday action you can use on any Web Resource any time, for any reason.");
 
         AppendHeading("Everyday actions (right-click menu)");
         AppendBullet(
