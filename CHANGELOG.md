@@ -22,9 +22,10 @@ Releases tagged `<version>` (no `v` prefix).
   created, then closing the app.
 - F2 now also renames the selected Project/Collection from the ListView, not just the TreeView.
 - Add a manual "Refresh" to every Web Resource's right-click menu regardless of its current
-  status, not just when already flagged unavailable — some sites keep failing the automated check
-  (e.g. one that blocks non-browser requests) even though they load fine in a real browser, so a
-  way to force a fresh check without waiting for it to first show as broken was needed.
+  status, not just when already flagged unavailable — useful both as a workaround for a site that
+  keeps failing the automated check (e.g. one that blocks non-browser requests) even though it
+  loads fine in a real browser, and simply as a normal, everyday way to double-check a link's
+  status any time, for any reason.
 
 ## [1.0.4] — 2026-07-11
 
