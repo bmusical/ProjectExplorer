@@ -51,6 +51,7 @@ partial class MainForm
     private ToolStripMenuItem menuFile;
     private ToolStripMenuItem menuFileNewProject;
     private ToolStripMenuItem menuFileSettings;
+    private ToolStripMenuItem menuFileExportMyData;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
@@ -196,9 +197,11 @@ partial class MainForm
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
         this.menuFileNewProject = new ToolStripMenuItem { Text = "New &Project...", ShortcutKeys = Keys.Control | Keys.N };
         this.menuFileSettings = new ToolStripMenuItem { Text = "&Settings..." };
+        this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
         this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
-            menuFileNewProject, new ToolStripSeparator(), menuFileSettings, new ToolStripSeparator(), menuFileExit
+            menuFileNewProject, new ToolStripSeparator(), menuFileSettings, new ToolStripSeparator(),
+            menuFileExportMyData, new ToolStripSeparator(), menuFileExit
         });
 
         this.menuView = new ToolStripMenuItem { Text = "&View" };
@@ -240,6 +243,7 @@ partial class MainForm
 
         this.menuFileNewProject.Click += MenuFileNewProject_Click;
         this.menuFileSettings.Click += MenuFileSettings_Click;
+        this.menuFileExportMyData.Click += MenuFileExportMyData_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;

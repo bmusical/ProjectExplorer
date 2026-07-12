@@ -4,6 +4,14 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
+## [Unreleased]
+
+- Add **File ▸ Export All My Data...**: bundles everything Project Nest Explorer has written to
+  `%APPDATA%\ProjectExplorer\` (`projects.json`, `license.json`, `uisettings.json`,
+  `appsettings.json` — whichever of these already exist) into a single zip file you choose where to
+  save. This is a GDPR-style "give me all my data" export for backing up or handing off, not an
+  operational backup/restore feature — there is deliberately no matching "Import".
+
 ## [1.0.5] — 2026-07-12
 
 - Fix "Open in External Browser" (and the equivalent button in the Web Resource preview panel)

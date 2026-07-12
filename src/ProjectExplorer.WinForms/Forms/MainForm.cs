@@ -2555,6 +2555,39 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// A GDPR-style "give me all my data" export: zips up whatever this app has actually written
+    /// to %APPDATA%\ProjectExplorer\ (projects.json, license.json, uisettings.json,
+    /// appsettings.json) so the user can hand it off or archive it. Not a backup/restore feature —
+    /// there is deliberately no matching "Import".
+    /// </summary>
+    private void MenuFileExportMyData_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Export All My Data",
+            Filter = "Zip archive (*.zip)|*.zip|All files (*.*)|*.*",
+            FileName = $"ProjectNestExplorer-MyData-{DateTime.Now:yyyy-MM-dd}.zip"
+        };
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var included = new UserDataExportService().ExportAll(dlg.FileName);
+
+            var message = included.Count > 0
+                ? $"Exported {included.Count} file(s) to:\n{dlg.FileName}\n\nIncluded: {string.Join(", ", included)}"
+                : $"Nothing has been saved yet, so an empty archive was created at:\n{dlg.FileName}";
+
+            MessageBox.Show(this, message, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Failed to export data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     // ── Drag and Drop ──
 
     // Where the cursor sits over a row, driving whether we show an insertion line
