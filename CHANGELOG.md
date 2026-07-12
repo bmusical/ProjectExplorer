@@ -4,7 +4,7 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
-## [Unreleased]
+## [1.0.5] — 2026-07-12
 
 - Flag unavailable Folder/File References and Web Resources (disconnected network/removable
   drives, moved/deleted local files, web resources whose site returns an HTTP error): grey +
