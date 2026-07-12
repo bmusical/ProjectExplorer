@@ -19,6 +19,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# PowerShell 7.3+ turns ANY stderr write from a native command into a terminating error when
+# $ErrorActionPreference is "Stop" -- regardless of stream redirects like "*> $null" below, which
+# only affect where the output goes, not whether PowerShell treats it as an error. gh and git both
+# routinely write normal, successful-run output to stderr (gh auth status always does, even when
+# logged in; git fetch/push write progress lines there too), which was aborting this script before
+# it could even reach its own $LASTEXITCODE checks below. This script already checks $LASTEXITCODE
+# explicitly after every native call that matters, so turning this off just restores that as the
+# sole source of truth for success/failure.
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $repoRoot
 
