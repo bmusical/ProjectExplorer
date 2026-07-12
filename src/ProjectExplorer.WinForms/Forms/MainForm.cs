@@ -694,12 +694,16 @@ public partial class MainForm : Form
     /// just be temporarily disconnected), skipping ones the user asked to stop auto-retrying via
     /// the "Stop Auto-Retry" context menu action. Local-disk resources are never retried here —
     /// a missing local file was moved or deleted, not disconnected, so polling it is pointless.
+    /// Also retries Web resources cached as <see cref="AvailabilityStatus.Unknown"/> (a prior check
+    /// that failed to connect at all, rather than getting back a real HTTP error) so a transient
+    /// blip doesn't get stuck unchecked forever — it renders normally either way; only a confirmed
+    /// HTTP error status renders as unavailable.
     /// </summary>
     private async Task RecheckUnavailableResourcesAsync()
     {
         var candidateIds = _availabilityCache
-            .Where(kv => kv.Value.Status == AvailabilityStatus.Unavailable &&
-                         kv.Value.LocationKind != ResourceLocationKind.LocalDisk)
+            .Where(kv => kv.Value.LocationKind != ResourceLocationKind.LocalDisk &&
+                         (kv.Value.Status == AvailabilityStatus.Unavailable || kv.Value.Status == AvailabilityStatus.Unknown))
             .Select(kv => kv.Key)
             .ToList();
 
@@ -800,7 +804,7 @@ public partial class MainForm : Form
         ResourceLocationKind.NetworkOrRemovable =>
             "⚠ Not reachable right now. This may be a temporarily disconnected network or removable drive — Project Nest Explorer will keep checking automatically.",
         ResourceLocationKind.Web =>
-            "⚠ Couldn't be reached. The site may be temporarily down, or your internet connection may be offline.",
+            "⚠ The site returned an error (e.g. a 404) the last time it was checked — Project Nest Explorer will keep checking automatically, and this clears as soon as it loads again.",
         _ => "⚠ Could not be verified."
     };
 
@@ -808,7 +812,7 @@ public partial class MainForm : Form
     {
         ResourceLocationKind.LocalDisk => "moved or deleted?",
         ResourceLocationKind.NetworkOrRemovable => "network/removable drive unreachable",
-        ResourceLocationKind.Web => "site unreachable",
+        ResourceLocationKind.Web => "site returned an error",
         _ => "could not verify"
     };
 
@@ -1049,6 +1053,24 @@ public partial class MainForm : Form
                 treeView.SelectedNode.BeginEdit();
                 e.Handled = true;
             }
+        }
+    }
+
+    /// <summary>
+    /// F2 rename from the ListView. Unlike the TreeView (<see cref="TreeView_KeyDown"/>), the
+    /// ListView has no inline label editing, so this routes through the same dialog-based rename
+    /// the right-click "Rename" menu item already uses (<see cref="RenameViaDialog"/>) — e.g. when
+    /// renaming a top-level Project while its row is selected in the ListView rather than the tree.
+    /// </summary>
+    private void ListView_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.F2 || listView.SelectedItems.Count != 1) return;
+
+        var tag = listView.SelectedItems[0].Tag?.ToString() ?? "";
+        if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection))
+        {
+            RenameViaDialog(tag);
+            e.Handled = true;
         }
     }
 
@@ -2496,8 +2518,12 @@ public partial class MainForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _availabilityRetryTimer.Stop();
-        _unavailableTreeFont?.Dispose();
-        _unavailableListFont?.Dispose();
+        // Deliberately NOT disposing _unavailableTreeFont/_unavailableListFont here: they're still
+        // assigned to TreeNode.NodeFont/ListViewItem.Font on every unavailable row, and the TreeView
+        // can still receive a WM_NOTIFY/NM_CUSTOMDRAW repaint between OnFormClosing and the window
+        // actually being destroyed. Disposing them here left those controls pointing at a Font whose
+        // GDI handle was already gone, and TreeView.CustomDraw's Font.ToHfont() call would throw
+        // ArgumentException on that last repaint. The process exit reclaims these either way.
         SaveTreeState();
         SaveWindowBounds();
         base.OnFormClosing(e);

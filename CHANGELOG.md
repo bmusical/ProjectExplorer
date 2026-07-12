@@ -7,11 +7,20 @@ Releases tagged `<version>` (no `v` prefix).
 ## [Unreleased]
 
 - Flag unavailable Folder/File References and Web Resources (disconnected network/removable
-  drives, moved/deleted local files, unreachable sites): grey + strikethrough styling with a
-  tooltip explaining local-disk vs. network/web unavailability, automatic background re-checking
-  of network/removable/web resources every 20 seconds, and new right-click actions — "Check
-  Availability Now", "Locate Folder…/Locate File…" to relink a moved item, and "Stop/Resume
-  Auto-Retry" to silence polling for a resource that's gone for good.
+  drives, moved/deleted local files, web resources whose site returns an HTTP error): grey +
+  strikethrough styling with a tooltip explaining local-disk vs. network vs. web unavailability,
+  automatic background re-checking of network/removable/web resources every 20 seconds, and new
+  right-click actions — "Check Availability Now", "Locate Folder…/Locate File…" to relink a moved
+  item, and "Stop/Resume Auto-Retry" to silence polling for a resource that's gone for good.
+- Fix Web Resources showing the broken (grey/strikethrough) styling for links that were actually
+  fine — a connection failure, DNS hiccup, or timeout no longer flags a link as unavailable, since
+  those are just as likely a transient network blip as a dead link; only a confirmed HTTP error
+  response from the site itself (a 404, a 500, etc.) does now, and it clears automatically the
+  next time the site loads successfully.
+- Fix a crash-on-exit (`Font.ToHfont()` / `ArgumentException` in `TreeView.CustomDraw`) that could
+  happen after using the app long enough for an unavailable-resource strikethrough font to be
+  created, then closing the app.
+- F2 now also renames the selected Project/Collection from the ListView, not just the TreeView.
 
 ## [1.0.4] — 2026-07-11
 

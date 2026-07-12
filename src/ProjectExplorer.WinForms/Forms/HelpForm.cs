@@ -185,21 +185,27 @@ public class HelpForm : Form
 
         AppendHeading("Unavailable folders, files, and web resources");
         AppendParagraph(
-            "A Folder Reference, File Reference, or Web Resource can point at something that isn't " +
-            "reachable right now — a network/removable drive got disconnected, a local file was " +
-            "moved or deleted, or a website is temporarily down. When that happens, the item shows " +
+            "A Folder Reference or File Reference can point at something that's gone missing — a " +
+            "network/removable drive got disconnected, or a local file was moved or deleted. A Web " +
+            "Resource shows this only when the site itself actively returns an error (a 404, a " +
+            "500, etc.) — never just because a check couldn't connect, since that's just as likely " +
+            "a passing network blip as a dead link. When one of these happens, the item shows " +
             "greyed out with a strikethrough in both the tree and list, and its tooltip explains why.");
         AppendBullet(
             "Local disk — not found; likely moved, renamed, or deleted. Use \"Locate Folder…\"/" +
             "\"Locate File…\" on its right-click menu to point it at the new location, or remove it.");
         AppendBullet(
-            "Network/removable drive or web resource — not reachable right now, which may just be " +
-            "temporary. It's automatically re-checked every 20 seconds and reverts to normal as " +
-            "soon as it's reachable again — no action needed. \"Stop Auto-Retry\" on its right-click " +
-            "menu turns that off for a resource you know is gone for good (\"Resume Auto-Retry\" " +
-            "turns it back on).");
+            "Network/removable drive — not reachable right now, which may just be temporary. It's " +
+            "automatically re-checked every 20 seconds and reverts to normal as soon as it's " +
+            "reachable again — no action needed.");
         AppendBullet(
-            "\"Check Availability Now\" on any unavailable item's right-click menu re-checks it " +
+            "Web resource — the site returned an error the last time it was checked. It's " +
+            "automatically re-checked every 20 seconds and reverts to normal as soon as it loads " +
+            "successfully again — no action needed.");
+        AppendBullet(
+            "\"Stop Auto-Retry\" on a network/removable or web resource's right-click menu turns " +
+            "off the automatic re-check for one you know is gone for good (\"Resume Auto-Retry\" " +
+            "turns it back on). \"Check Availability Now\" on any unavailable item re-checks it " +
             "immediately instead of waiting for the next automatic retry.");
 
         AppendHeading("Everyday actions (right-click menu)");
@@ -235,7 +241,7 @@ public class HelpForm : Form
 
         AppendHeading("Keyboard shortcuts");
         AppendBullet("Ctrl+N — New Project…");
-        AppendBullet("F2 — Rename the selected tree item.");
+        AppendBullet("F2 — Rename the selected Project or Collection (works from either the tree or the list).");
 
         AppendHeading("Settings");
         AppendParagraph(

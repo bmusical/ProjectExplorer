@@ -98,9 +98,13 @@ public static class ResourceAvailabilityChecker
     }
 
     /// <summary>
-    /// Checks whether a WebResource's URL is currently reachable. Any HTTP response — even an
-    /// error status — counts as available, since it means the host answered; only a connection
-    /// failure, DNS failure, or timeout counts as unavailable.
+    /// Checks whether a WebResource's URL is currently reachable. Only an explicit HTTP error
+    /// response (status &gt;= 400 — a 404, a 500, etc.) marks it <see cref="AvailabilityStatus.Unavailable"/>;
+    /// a successful response (any status &lt; 400) marks it <see cref="AvailabilityStatus.Available"/>.
+    /// A connection failure, DNS failure, or timeout proves nothing either way — it's just as
+    /// likely a transient network blip, VPN hiccup, or a site that's slow/unusual about answering
+    /// bots — so those are reported as <see cref="AvailabilityStatus.Unknown"/> rather than
+    /// confidently flagging the link as broken.
     /// </summary>
     public static async Task<AvailabilityCheckResult> CheckWebResourceAsync(
         string? url, HttpClient httpClient, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
@@ -118,11 +122,12 @@ public static class ResourceAvailabilityChecker
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            return new AvailabilityCheckResult(AvailabilityStatus.Available, ResourceLocationKind.Web, DateTime.UtcNow);
+            var status = (int)response.StatusCode >= 400 ? AvailabilityStatus.Unavailable : AvailabilityStatus.Available;
+            return new AvailabilityCheckResult(status, ResourceLocationKind.Web, DateTime.UtcNow);
         }
         catch
         {
-            return new AvailabilityCheckResult(AvailabilityStatus.Unavailable, ResourceLocationKind.Web, DateTime.UtcNow);
+            return new AvailabilityCheckResult(AvailabilityStatus.Unknown, ResourceLocationKind.Web, DateTime.UtcNow);
         }
     }
 }
