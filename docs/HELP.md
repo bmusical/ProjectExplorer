@@ -133,9 +133,18 @@ Either way, if the main window's last saved position has drifted off every scree
 have connected (for example, it was on a second monitor that's since been unplugged), it's
 automatically moved back onto your primary screen the next time it becomes visible.
 
+## Exporting your data
+
+**File ▸ Export All My Data...** bundles everything Project Nest Explorer has written to
+`%APPDATA%\ProjectExplorer\` — whichever of `projects.json`, `license.json`, `uisettings.json`,
+and `appsettings.json` already exist — into a single zip file you choose where to save. This is a
+"give me all my data" export for backing up your setup or handing it to yourself on another
+computer; it's one-way, so there's no matching "Import" — see the note at the top of this document
+for how to move that same folder to a new machine by hand if you want it live there again.
+
 ## Free tier & licensing
 
-Project Nest Explorer is free for up to **3 projects** and **25 folder/file/web references**
+Project Nest Explorer is free for up to **5 projects** and **50 folder/file/web references**
 total (Collections themselves don't count against the limit). A one-time license key removes that
 limit entirely.
 

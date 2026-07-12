@@ -259,9 +259,18 @@ public class HelpForm : Form
             "saved position has drifted off every screen you currently have connected, it's moved " +
             "back onto your primary screen the next time it becomes visible.");
 
+        AppendHeading("Exporting your data");
+        AppendParagraph(
+            "File ▸ Export All My Data… bundles everything Project Nest Explorer has written to " +
+            "%APPDATA%\\ProjectExplorer\\ — whichever of projects.json, license.json, " +
+            "uisettings.json, and appsettings.json already exist — into a single zip file you " +
+            "choose where to save. This is a \"give me all my data\" export for backing up your " +
+            "setup or handing it to yourself on another computer; it's one-way, so there's no " +
+            "matching \"Import\".");
+
         AppendHeading("Free tier & licensing");
         AppendParagraph(
-            "Free for up to 3 projects and 25 folder/file/web references total (Collections don't " +
+            "Free for up to 5 projects and 50 folder/file/web references total (Collections don't " +
             "count against the limit). A one-time license key removes that limit.");
         AppendBullet(
             "Help ▸ Register / License… to enter a key or see your current free-tier usage.");

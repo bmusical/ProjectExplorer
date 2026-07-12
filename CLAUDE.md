@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Project Nest Explorer** (repo/codebase name: ProjectExplorer; publisher: HxM Blazor Software LLC) is a Windows Forms desktop app (.NET 10) that solves a real problem: instead of opening 10–15 File Explorer windows every day to navigate a project's scattered folders and web resources, you open one tool. It organizes projects as a hierarchy of **Collections**, **FolderReferences** (real disk folders), **FileReferences** (individual files), and **WebResources** (URLs) — bringing local folders, files, and project-related web resources together in one place.
 
-It ships as a commercial product: a free tier (3 projects / 25 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
+It ships as a commercial product: a free tier (5 projects / 50 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
 
 ### Naming: Product vs. Program
 
@@ -93,6 +93,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.WinForms/Forms/FilePreviewPanel.cs` — inline preview panel shown in place of the ListView when a FileReference tree node is selected; renders image/text content when supported, always offers Open/Properties otherwise
 - `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
 - `src/ProjectExplorer.Core/Services/ResourceAvailabilityChecker.cs` — classifies a FolderReference/FileReference/WebResource's location (local disk vs. network/removable drive vs. web via `ResourceLocationKind`) and checks reachability (`AvailabilityStatus`); stateless, no caching. `MainForm.cs` owns the per-session cache, the "unavailable" grey-out/strikethrough styling, and the retry timer — see Availability & Broken References below
+- `src/ProjectExplorer.Core/Services/UserDataExportService.cs` — zips whichever of `projects.json`/`license.json`/`uisettings.json`/`appsettings.json` currently exist in the storage directory into one file the user picks, for `File ▸ Export All My Data...` (`MainForm.cs`) — see Recently Shipped below
 - `src/ProjectExplorer.WinForms/Forms/WebResourcePreviewPanel.cs` — inline preview panel shown in place of the ListView when a WebResource tree node is selected (a ListView row for one routes here too, via `SelectTreeNodeByTag`); renders the URL with WebView2 (`Microsoft.Web.WebView2` package — requires the WebView2 Runtime, falls back to a message + "Open in External Browser" if it's missing), always offers "Open in External Browser"
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
 - `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
@@ -102,6 +103,7 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `tests/ProjectExplorer.Tests/FilePreviewHelperTests.cs` — xUnit tests for `FilePreviewHelper`'s Image/Text/None classification
 - `tests/ProjectExplorer.Tests/ResourceAvailabilityCheckerTests.cs` — xUnit tests for `ResourceAvailabilityChecker`'s path classification and folder/file/web availability checks
 - `tests/ProjectExplorer.Tests/WebResourceTests.cs` — xUnit tests for `WebResource.TryGetNavigableUri`'s scheme-less URL normalization
+- `tests/ProjectExplorer.Tests/UserDataExportServiceTests.cs` — xUnit tests for `UserDataExportService`'s known-file scoping, content fidelity, and overwrite behavior
 - `docs/HELP.md` — user-facing help doc (what the app does/doesn't do, concepts, everyday actions, shortcuts, licensing); mirrored by the in-app `HelpForm.cs` dialog
 - `docs/LAUNCH_CHECKLIST.md` — the authoritative, start-to-finish runbook for licensing, packaging, Gumroad, and releases; consult it before touching anything in the Licensing or Distribution sections below
 - `docs/RELEASE.md` — condensed "cut a new release" steps, extracted from the checklist above
@@ -141,7 +143,7 @@ on "we couldn't connect," otherwise perfectly-working links flash broken on ever
 
 ## Licensing & Distribution
 
-The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don't count); a license key unlocks unlimited use. Enforced by `LicenseManager` in `ProjectExplorer.Core`.
+The app is freemium: **Free = 5 projects, 50 leaf references** (Collections don't count); a license key unlocks unlimited use. Enforced by `LicenseManager` in `ProjectExplorer.Core`.
 
 - **Key format**: ECDSA P-256 signed payloads of the form `email|FULL|yyyy-MM-dd`, encoded as `base64url(payload).base64url(signature)`. Verification is fully offline against an embedded public key — no license server.
 - **`tools/KeyGen`** is the key factory: `dotnet run -- setup` generates the keypair once (guard `private_key.pem` like cash, never commit it); `dotnet run -- generate --email <buyer>` mints a customer key per sale; `dotnet run -- verify --license <key>` sanity-checks one.
@@ -184,6 +186,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **WebResource inline preview** — selecting a WebResource tree node shows `WebResourcePreviewPanel` in place of the ListView, rendering the URL inline via WebView2; double-clicking a WebResource row in the ListView now selects the corresponding tree node (same as Project/Collection/FolderRef) so it shows in the same preview instead of launching the external browser directly. Both the TreeView/ListView context menus and the preview panel itself offer an explicit "Open in External Browser" action.
 - **In-app Help** — Help ▸ Help Contents… (`F1`) opens `HelpForm`, a scrollable dialog covering core concepts, everyday actions, keyboard shortcuts, and licensing — leading with an explicit "what this app does NOT do" section (it only manages references; everything it writes lives under `%APPDATA%\ProjectExplorer\`: `projects.json`, `license.json`, `uisettings.json`, `appsettings.json`). Content is mirrored in `docs/HELP.md`, which is also linked from the README.
 - **Broken/unavailable reference handling** (supersedes the old "Folder watcher" roadmap item, and extends it to files and web resources too) — unreachable FolderReferences/FileReferences/WebResources render grey + strikethrough in both the TreeView and ListView, with a tooltip distinguishing "likely moved or deleted" (local disk) from "may be temporarily disconnected" (network/removable drive) from "the site returned an error" (web). Network/removable resources are auto-rechecked every 20 seconds while unavailable; local-disk ones aren't, since a missing local file needs relinking, not retrying; web resources aren't polled either — they're checked when shown or via the manual "Refresh" action, not on a timer. Context menus gain "Check Availability Now", "Locate Folder…/Locate File…" (browse to relink), and "Stop/Resume Auto-Retry" (network/removable only) when a resource is currently unavailable. See **Resource Availability** under Architecture above.
+- **Export All My Data (GDPR-style)** — `File ▸ Export All My Data...` (`MainForm.cs`) zips whichever of `projects.json`, `license.json`, `uisettings.json`, `appsettings.json` currently exist under `%APPDATA%\ProjectExplorer\` into a single file the user picks a destination for, via `UserDataExportService.ExportAll` (Core). This is a one-shot "give me all my data" export to answer a personal-data request or just let a user grab a copy of everything the app holds about them — deliberately *not* an operational backup/restore feature, so there is no matching Import. Distinct from the still-unbuilt "Export / share a project" Medium-term roadmap item below, which is about handing off one project's tree to a colleague, not a full-data dump.
 
 ## Roadmap
 
@@ -203,7 +206,7 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 |---|---|
 | **Search / filter** | Filter the TreeView or ListView by name across all projects. Critical once collections grow large. |
 | **Recently opened** | Track last-accessed folders/URLs per project session; surface in a "Recent" panel. |
-| **Export / share a project** | Export a project definition as a `.peproj` JSON file to hand off to a colleague. |
+| **Export / share a project** | Export a single project definition as a `.peproj` JSON file to hand off to a colleague. Distinct from the already-shipped `File ▸ Export All My Data...` (see Recently Shipped), which dumps everything for one user rather than one project for sharing. |
 | **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously. |
 
 ### Far-term (needs user validation first)

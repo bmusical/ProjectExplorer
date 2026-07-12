@@ -110,7 +110,7 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
 
 - [ ] ⛔ Build the app with the real public key, generate a key with the real private key, paste it
   into **Help ▸ Register / License…**, and confirm it activates and persists across restarts.
-- [ ] 💡 Note the current limits so your store copy matches: **Free = 3 projects, 25 references.**
+- [ ] 💡 Note the current limits so your store copy matches: **Free = 5 projects, 50 references.**
   Licensed = unlimited. (Defined in `LicenseManager.cs`.)
 
 > **Known limitation (fine to ship, good to know):** keys are per-email but not hardware-locked and
