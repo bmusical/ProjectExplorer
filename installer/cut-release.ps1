@@ -19,17 +19,31 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-# PowerShell 7.3+ turns ANY stderr write from a native command into a terminating error when
-# $ErrorActionPreference is "Stop" -- regardless of stream redirects like "*> $null" below, which
-# only affect where the output goes, not whether PowerShell treats it as an error. gh and git both
+# PowerShell (all versions, not just 7.3+) converts every line a native command writes to STDERR
+# into an error record, and with $ErrorActionPreference = "Stop" that gets promoted into a
+# terminating exception -- at the moment the native command writes it, before a redirect like
+# "*> $null" or "2>$null" on the same line ever gets a chance to discard it. gh and git both
 # routinely write normal, successful-run output to stderr (gh auth status always does, even when
 # logged in; git fetch/push write progress lines there too), which was aborting this script before
-# it could even reach its own $LASTEXITCODE checks below. This script already checks $LASTEXITCODE
-# explicitly after every native call that matters, so turning this off just restores that as the
-# sole source of truth for success/failure.
+# it could even reach its own $LASTEXITCODE checks below. Invoke-NativeQuiet below temporarily
+# relaxes $ErrorActionPreference to "Continue" around just the native call itself so that stderr
+# chatter can't terminate the script; $LASTEXITCODE is untouched either way and stays the one
+# source of truth this script already checks explicitly after every call that matters.
 $PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $repoRoot
+
+function Invoke-NativeQuiet {
+    param([Parameter(Mandatory = $true)][scriptblock]$ScriptBlock)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $ScriptBlock
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
 
 try {
     # --- 0. Sanity checks ---
@@ -39,14 +53,14 @@ try {
         exit 1
     }
 
-    gh auth status *> $null
+    Invoke-NativeQuiet { gh auth status *> $null }
     if ($LASTEXITCODE -ne 0) {
         Write-Error "gh is not authenticated. Run 'gh auth login' first."
         exit 1
     }
 
     Write-Host "==> Fetching latest master..." -ForegroundColor Cyan
-    git fetch origin master
+    Invoke-NativeQuiet { git fetch origin master }
     if ($LASTEXITCODE -ne 0) { Write-Error "git fetch failed"; exit 1 }
 
     $csprojPath = Join-Path $repoRoot "src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj"
@@ -65,14 +79,14 @@ try {
         exit 1
     }
 
-    $localMaster = git rev-parse master 2>$null
-    $remoteMaster = git rev-parse origin/master
+    $localMaster = Invoke-NativeQuiet { git rev-parse master 2>$null }
+    $remoteMaster = Invoke-NativeQuiet { git rev-parse origin/master }
     if ($localMaster -and $localMaster -ne $remoteMaster) {
         Write-Error "Your local master doesn't match origin/master. Push your version bump commit to master first, then re-run this script."
         exit 1
     }
 
-    $existingTag = git ls-remote --tags origin "refs/tags/$Version"
+    $existingTag = Invoke-NativeQuiet { git ls-remote --tags origin "refs/tags/$Version" }
     if ($existingTag) {
         Write-Error "Tag $Version already exists on origin. If a previous attempt half-finished, delete that tag/release on GitHub first, or pick a new version."
         exit 1
@@ -81,8 +95,8 @@ try {
     # --- 1. Tag origin/master and push ---
 
     Write-Host "==> Tagging $Version at origin/master and pushing..." -ForegroundColor Cyan
-    git tag $Version origin/master
-    git push origin $Version
+    Invoke-NativeQuiet { git tag $Version origin/master }
+    Invoke-NativeQuiet { git push origin $Version }
     if ($LASTEXITCODE -ne 0) { Write-Error "Pushing the tag failed"; exit 1 }
 
     Write-Host "==> Tag pushed. Waiting for the Release workflow to start..." -ForegroundColor Cyan
@@ -90,7 +104,7 @@ try {
 
     # --- 2. Watch the workflow run live, right here in the terminal ---
 
-    $runId = gh run list --workflow=release.yml --branch=$Version --limit=1 --json databaseId --jq ".[0].databaseId"
+    $runId = Invoke-NativeQuiet { gh run list --workflow=release.yml --branch=$Version --limit=1 --json databaseId --jq ".[0].databaseId" }
 
     if (-not $runId) {
         Write-Host "Could not find the run automatically yet. Check it here:" -ForegroundColor Yellow
@@ -98,7 +112,7 @@ try {
     }
     else {
         Write-Host "==> Watching run $runId (this takes a few minutes - Windows build + Inno Setup)..." -ForegroundColor Cyan
-        gh run watch $runId --exit-status
+        Invoke-NativeQuiet { gh run watch $runId --exit-status }
         if ($LASTEXITCODE -ne 0) {
             Write-Host ""
             Write-Host "==> The workflow run failed. Logs:" -ForegroundColor Red
