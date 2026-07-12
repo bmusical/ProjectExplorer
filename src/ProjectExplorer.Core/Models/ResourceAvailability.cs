@@ -17,7 +17,12 @@ public enum ResourceLocationKind
 /// <summary>Result of the most recent availability check for a resource.</summary>
 public enum AvailabilityStatus
 {
-    /// <summary>Not checked yet this session.</summary>
+    /// <summary>
+    /// Not checked yet this session, or (for a WebResource) the last check couldn't reach the
+    /// server at all -- a connection/DNS failure or timeout, as opposed to getting back an actual
+    /// HTTP error status. Either way this renders as a normal, unflagged resource; only a
+    /// confirmed <see cref="Unavailable"/> result shows the broken styling.
+    /// </summary>
     Unknown,
     Available,
     Unavailable

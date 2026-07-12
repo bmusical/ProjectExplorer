@@ -59,18 +59,25 @@ place where files actually live.
 
 ## Unavailable folders, files, and web resources
 
-A Folder Reference, File Reference, or Web Resource can point at something that isn't reachable
-right now — a network or removable drive got disconnected, a local file was moved or deleted, or a
-website is temporarily down. When that happens, the item shows **greyed out with a strikethrough**
-in both the tree and list, and its tooltip explains why:
+A Folder Reference or File Reference can point at something that's gone missing — a network or
+removable drive got disconnected, or a local file was moved or deleted. A Web Resource shows this
+only when the site itself actively returns an error (a 404, a 500, etc.) — never just because a
+check couldn't connect, since that's just as likely a passing network blip as a dead link, and
+flagging it either way would make perfectly working links flash broken. When one of these happens,
+the item shows **greyed out with a strikethrough** in both the tree and list, and its tooltip
+explains why:
 
 - **Local disk** — not found; it was likely moved, renamed, or deleted. Use **Locate Folder…**/
   **Locate File…** on its right-click menu to point it at the new location, or remove it.
-- **Network/removable drive or web resource** — not reachable right now, which may just be
-  temporary. Project Nest Explorer automatically re-checks these every 20 seconds and the item
-  reverts to normal as soon as it's reachable again — no action needed. If you know a resource is
-  gone for good and don't want it checked anymore, use **Stop Auto-Retry** on its right-click menu
-  (**Resume Auto-Retry** turns it back on).
+- **Network/removable drive** — not reachable right now, which may just be temporary. Project
+  Nest Explorer automatically re-checks these every 20 seconds and the item reverts to normal as
+  soon as it's reachable again — no action needed.
+- **Web resource** — the site returned an error the last time it was checked. Project Nest
+  Explorer automatically re-checks it every 20 seconds and the item reverts to normal as soon as
+  it loads successfully again — no action needed.
+
+If you know a resource is gone for good and don't want it checked anymore, use **Stop Auto-Retry**
+on its right-click menu (**Resume Auto-Retry** turns it back on).
 
 Right-click an unavailable item any time for **Check Availability Now** to re-check immediately
 instead of waiting for the next automatic retry.
@@ -106,7 +113,7 @@ the two conversion gestures above.)
 | Shortcut | Action |
 |---|---|
 | `Ctrl+N` | New Project… |
-| `F2` | Rename the selected tree item |
+| `F2` | Rename the selected Project or Collection (works from either the tree or the list) |
 
 ## Settings
 

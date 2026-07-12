@@ -128,21 +128,24 @@ public class ResourceAvailabilityCheckerTests
     }
 
     [Fact]
-    public async Task CheckWebResourceAsync_ErrorStatusCode_StillCountsAsAvailable()
+    public async Task CheckWebResourceAsync_ErrorStatusCode_IsUnavailable()
     {
-        // The host answered — a 404/500 means the page/app has a problem, not that the
-        // network path to it is down, so it shouldn't be flagged the same as "unreachable".
+        // An explicit HTTP error response (404/500/etc.) is the one confident signal that the
+        // resource itself is actually broken, so this is the only case that should flag it.
         using var client = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
         var result = await ResourceAvailabilityChecker.CheckWebResourceAsync("https://example.com/missing", client);
-        Assert.Equal(AvailabilityStatus.Available, result.Status);
+        Assert.Equal(AvailabilityStatus.Unavailable, result.Status);
     }
 
     [Fact]
-    public async Task CheckWebResourceAsync_ConnectionFailure_IsUnavailable()
+    public async Task CheckWebResourceAsync_ConnectionFailure_IsUnknown()
     {
+        // A connection/DNS failure or timeout proves nothing either way -- it's just as likely a
+        // transient network blip as a genuinely dead link -- so it must NOT flag the resource as
+        // broken (that would render active, working links as grey/strikethrough).
         using var client = new HttpClient(new ThrowingHandler());
         var result = await ResourceAvailabilityChecker.CheckWebResourceAsync("https://example.com", client);
-        Assert.Equal(AvailabilityStatus.Unavailable, result.Status);
+        Assert.Equal(AvailabilityStatus.Unknown, result.Status);
     }
 
     [Fact]

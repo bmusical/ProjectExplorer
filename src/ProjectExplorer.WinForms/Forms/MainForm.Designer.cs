@@ -375,6 +375,7 @@ partial class MainForm
         this.listView.DoubleClick += ListView_DoubleClick;
         this.listView.ColumnClick += ListView_ColumnClick;
         this.listView.MouseClick += ListView_MouseClick;
+        this.listView.KeyDown += ListView_KeyDown;
         this.Width = 1200;
 
         // ── File Preview Panel (shown instead of listView for a selected FileReference) ──
