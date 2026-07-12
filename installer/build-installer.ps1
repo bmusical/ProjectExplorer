@@ -20,6 +20,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# See the matching comment in cut-release.ps1: PowerShell 7.3+ turns any stderr write from a native
+# command (dotnet, iscc.exe) into a terminating error under $ErrorActionPreference = "Stop", even
+# for a successful run. This script already checks $LASTEXITCODE explicitly after both, so that
+# stays the sole source of truth for success/failure.
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
 # --- 1. Publish ---
