@@ -199,14 +199,15 @@ public class HelpForm : Form
             "automatically re-checked every 20 seconds and reverts to normal as soon as it's " +
             "reachable again — no action needed.");
         AppendBullet(
-            "Web resource — the site returned an error the last time it was checked. It's " +
-            "automatically re-checked every 20 seconds and reverts to normal as soon as it loads " +
-            "successfully again — no action needed.");
+            "Web resource — the site returned an error the last time it was checked. Web resources " +
+            "aren't polled in the background — click \"Refresh\" on its right-click menu to check " +
+            "again, and it reverts to normal as soon as the page loads successfully.");
         AppendBullet(
-            "\"Stop Auto-Retry\" on a network/removable or web resource's right-click menu turns " +
-            "off the automatic re-check for one you know is gone for good (\"Resume Auto-Retry\" " +
-            "turns it back on). \"Check Availability Now\" on any unavailable item re-checks it " +
-            "immediately instead of waiting for the next automatic retry.");
+            "\"Stop Auto-Retry\" on a network/removable resource's right-click menu turns off the " +
+            "automatic re-check for one you know is gone for good (\"Resume Auto-Retry\" turns it " +
+            "back on) — web resources have no auto-retry to stop. \"Check Availability Now\" on an " +
+            "unavailable Folder/File Reference re-checks it immediately instead of waiting for the " +
+            "next automatic retry.");
         AppendBullet(
             "A Web Resource's \"Refresh\" (its equivalent of \"Check Availability Now\") is always " +
             "on its right-click menu, not just when it's flagged unavailable. That's partly for " +
@@ -232,8 +233,8 @@ public class HelpForm : Form
             "Remove from Project, Refresh.");
         AppendBullet(
             "When a Folder Reference or File Reference is unavailable, its menu also adds Check " +
-            "Availability Now and Locate Folder…/Locate File… to retarget the moved item. " +
-            "Network/removable/web resources also add Stop-Resume Auto-Retry when unavailable.");
+            "Availability Now and Locate Folder…/Locate File… to retarget the moved item. A " +
+            "network/removable one also adds Stop-Resume Auto-Retry when unavailable.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
             "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +

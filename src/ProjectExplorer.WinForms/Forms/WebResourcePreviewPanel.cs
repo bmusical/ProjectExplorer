@@ -1,5 +1,6 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using ProjectExplorer.Core.Models;
 
 namespace ProjectExplorer.WinForms;
 
@@ -112,7 +113,7 @@ public sealed class WebResourcePreviewPanel : Panel
 
     private async void Navigate(string url)
     {
-        if (!TryGetNavigableUri(url, out var uri))
+        if (!WebResource.TryGetNavigableUri(url, out var uri))
         {
             ShowUnavailable("This URL could not be parsed.");
             return;
@@ -128,17 +129,6 @@ public sealed class WebResourcePreviewPanel : Panel
         }
 
         NavigateCore(uri.ToString());
-    }
-
-    private static bool TryGetNavigableUri(string url, out Uri uri)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out uri!) &&
-            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-        {
-            return true;
-        }
-
-        return Uri.TryCreate("https://" + url, UriKind.Absolute, out uri!);
     }
 
     private async Task EnsureCoreAsync()

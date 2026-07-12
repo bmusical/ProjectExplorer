@@ -6,12 +6,23 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Fix "Open in External Browser" (and the equivalent button in the Web Resource preview panel)
+  launching a URL as a local file instead of opening it in the default browser, when the stored
+  URL was typed without an "http://"/"https://" scheme (e.g. "example.com"). Such URLs are now
+  resolved as "https://…" consistently everywhere a Web Resource is launched or checked.
+- Fix Web Resource availability checks always reporting a scheme-less URL as unavailable
+  (strikethrough) even though it opened fine, for the same missing-scheme reason as above.
+- Web Resources are no longer polled in the background while unavailable — they're only checked
+  when first shown or via the manual "Refresh" action, so "Stop/Resume Auto-Retry" no longer
+  appears on their right-click menu (there's nothing to stop). Folder/File References on a
+  network or removable drive are unaffected and still auto-retry every 20 seconds.
 - Flag unavailable Folder/File References and Web Resources (disconnected network/removable
   drives, moved/deleted local files, web resources whose site returns an HTTP error): grey +
   strikethrough styling with a tooltip explaining local-disk vs. network vs. web unavailability,
-  automatic background re-checking of network/removable/web resources every 20 seconds, and new
-  right-click actions — "Check Availability Now", "Locate Folder…/Locate File…" to relink a moved
-  item, and "Stop/Resume Auto-Retry" to silence polling for a resource that's gone for good.
+  automatic background re-checking of unavailable network/removable resources every 20 seconds,
+  and new right-click actions — "Check Availability Now", "Locate Folder…/Locate File…" to relink
+  a moved item, and "Stop/Resume Auto-Retry" (network/removable only) to silence polling for a
+  drive that's gone for good.
 - Fix Web Resources showing the broken (grey/strikethrough) styling for links that were actually
   fine — a connection failure, DNS hiccup, or timeout no longer flags a link as unavailable, since
   those are just as likely a transient network blip as a dead link; only a confirmed HTTP error
