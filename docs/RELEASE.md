@@ -65,14 +65,23 @@ therefore makes the installer downloadable) as soon as it's built.
    certificate — see `docs/LAUNCH_CHECKLIST.md` Section 6. Unsigned exes trigger SmartScreen
    warnings that hurt conversion.
 5. **Commit and push** the version bump (`updates/updates.xml` is *not* part of this commit).
-6. **Create the GitHub Release**, tagged `X.Y.Z`:
+6. **Create the GitHub Release**, tagged `X.Y.Z`. There's no checked-in release-notes file to point
+   `--notes-file` at — pull the notes straight from the `CHANGELOG.md` section you just added in
+   step 1, the same way `.github/workflows/release.yml` does it for the automated path:
+   ```powershell
+   $version = "X.Y.Z"
+   $changelog = Get-Content -Raw CHANGELOG.md
+   $changelog -match "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=\n## \[|\z)" | Out-Null
+   $Matches[1].Trim() | Set-Content -Path release-notes.md -Encoding utf8
+   ```
    ```bash
    gh release create X.Y.Z \
      "installer-output/ProjectNest-X.Y.Z-Setup.exe" \
      --title "Project Nest Explorer X.Y.Z" \
-     --notes-file docs/release-notes/X.Y.Z.md
+     --notes-file release-notes.md
    ```
-   The uploaded asset filename **must exactly match** the `<url>` this produces in
+   `release-notes.md` is a scratch file (gitignored) — delete it after, or just leave it for next
+   time. The uploaded asset filename **must exactly match** the `<url>` this produces in
    `updates/updates.xml` (`ProjectNest-X.Y.Z-Setup.exe`) or auto-update downloads will break.
 7. **Only now**, re-run the build script with `-UpdateXml` (or hand-edit `updates/updates.xml`) to
    point at the release you just published, and commit/push that on its own:
