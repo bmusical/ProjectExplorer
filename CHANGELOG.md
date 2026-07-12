@@ -4,7 +4,7 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
-## [Unreleased]
+## [1.0.5] — 2026-07-12
 
 - Fix "Open in External Browser" (and the equivalent button in the Web Resource preview panel)
   launching a URL as a local file instead of opening it in the default browser, when the stored
