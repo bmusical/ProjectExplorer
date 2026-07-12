@@ -207,6 +207,11 @@ public class HelpForm : Form
             "off the automatic re-check for one you know is gone for good (\"Resume Auto-Retry\" " +
             "turns it back on). \"Check Availability Now\" on any unavailable item re-checks it " +
             "immediately instead of waiting for the next automatic retry.");
+        AppendBullet(
+            "A Web Resource's \"Refresh\" (its equivalent of \"Check Availability Now\") is always " +
+            "on its right-click menu, even when it isn't currently flagged — some sites keep " +
+            "failing the automated check (e.g. one that blocks non-browser requests) even though " +
+            "they load fine for you, so you can force a fresh check any time.");
 
         AppendHeading("Everyday actions (right-click menu)");
         AppendBullet(
@@ -221,12 +226,13 @@ public class HelpForm : Form
         AppendBullet(
             "File Reference — Open, Open Containing Folder, Copy Path, Properties, Edit…, " +
             "Move Up/Down, Remove from Project.");
-        AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project.");
         AppendBullet(
-            "When a Folder Reference, File Reference, or Web Resource is unavailable, its menu also " +
-            "adds Check Availability Now. Folder/File references add Locate Folder…/Locate File… " +
-            "to retarget moved local items, and network/removable/web resources add Stop-Resume " +
-            "Auto-Retry.");
+            "Web Resource — Open in External Browser, Copy URL, Edit…, Move Up/Down, " +
+            "Remove from Project, Refresh.");
+        AppendBullet(
+            "When a Folder Reference or File Reference is unavailable, its menu also adds Check " +
+            "Availability Now and Locate Folder…/Locate File… to retarget the moved item. " +
+            "Network/removable/web resources also add Stop-Resume Auto-Retry when unavailable.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
             "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +
