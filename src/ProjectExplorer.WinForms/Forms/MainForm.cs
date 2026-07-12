@@ -2150,15 +2150,27 @@ public partial class MainForm : Form
 
     /// <summary>
     /// Prepends the "unavailable" warning header plus Check Now / Locate / Stop-Resume-Retry
-    /// actions to a resource's context menu, when it's currently unavailable. No-ops otherwise.
+    /// actions to a resource's context menu, when it's currently unavailable. No-ops otherwise,
+    /// unless <paramref name="alwaysOfferCheckNow"/> is set — WebResource passes true, since a
+    /// site can keep failing the same automated check (e.g. one that blocks non-browser requests)
+    /// even though it loads fine for the user, and they need a way to force a recheck without
+    /// waiting for the status to already say Unavailable.
     /// </summary>
-    private void AddAvailabilityMenuItems(ContextMenuStrip menu, Guid projectId, ProjectChild child, string relinkLabel, Func<Task>? relinkAction)
+    private void AddAvailabilityMenuItems(ContextMenuStrip menu, Guid projectId, ProjectChild child, string relinkLabel, Func<Task>? relinkAction, bool alwaysOfferCheckNow = false, string checkNowLabel = "Check Availability Now")
     {
-        if (!_availabilityCache.TryGetValue(child.Id, out var result) || result.Status != AvailabilityStatus.Unavailable)
+        _availabilityCache.TryGetValue(child.Id, out var result);
+        if (result.Status != AvailabilityStatus.Unavailable)
+        {
+            if (alwaysOfferCheckNow)
+            {
+                menu.Items.Add(checkNowLabel, null, async (s, e) => await ForceCheckAvailabilityAsync(child));
+                menu.Items.Add(new ToolStripSeparator());
+            }
             return;
+        }
 
         menu.Items.Add(new ToolStripMenuItem($"⚠ Unavailable — {DescribeUnavailableShort(result.LocationKind)}") { Enabled = false });
-        menu.Items.Add("Check Availability Now", null, async (s, e) => await ForceCheckAvailabilityAsync(child));
+        menu.Items.Add(checkNowLabel, null, async (s, e) => await ForceCheckAvailabilityAsync(child));
 
         if (relinkAction != null)
             menu.Items.Add(relinkLabel, null, async (s, e) => await relinkAction());
@@ -2271,7 +2283,7 @@ public partial class MainForm : Form
     {
         var existingWr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
         if (existingWr != null)
-            AddAvailabilityMenuItems(menu, projectId, existingWr, relinkLabel: "", relinkAction: null);
+            AddAvailabilityMenuItems(menu, projectId, existingWr, relinkLabel: "", relinkAction: null, alwaysOfferCheckNow: true, checkNowLabel: "Refresh");
 
         menu.Items.Add("Open in External Browser", null, (s, e) => LaunchWebResource(tag));
         menu.Items.Add("Copy URL", null, (s, e) =>

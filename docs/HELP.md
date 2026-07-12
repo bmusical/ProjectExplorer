@@ -79,8 +79,12 @@ explains why:
 If you know a resource is gone for good and don't want it checked anymore, use **Stop Auto-Retry**
 on its right-click menu (**Resume Auto-Retry** turns it back on).
 
-Right-click an unavailable item any time for **Check Availability Now** to re-check immediately
-instead of waiting for the next automatic retry.
+Right-click an unavailable Folder/File Reference any time for **Check Availability Now** to
+re-check immediately instead of waiting for the next automatic retry. A Web Resource's equivalent
+is labeled **Refresh**, and it's always on its right-click menu, even when it isn't currently
+flagged — some sites keep failing the automated check (e.g. one that blocks non-browser requests)
+even though they load fine for you, so you can force a fresh check any time without waiting for
+it to first show as broken.
 
 ## Everyday actions (right-click menu)
 
@@ -90,7 +94,7 @@ instead of waiting for the next automatic retry.
 | **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection |
 | **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate Folder… / Stop-Resume Auto-Retry when unavailable)* |
 | **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate File… / Stop-Resume Auto-Retry when unavailable)* |
-| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project *(+ Check Availability Now / Stop-Resume Auto-Retry when unavailable)* |
+| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project, Refresh *(+ Stop-Resume Auto-Retry when unavailable)* |
 
 "Remove from Project" and "Delete Project/Collection" only remove entries from your
 `projects.json` tree — see the note at the top of this document.
