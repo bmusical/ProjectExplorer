@@ -270,7 +270,7 @@ public class HelpForm : Form
 
         AppendHeading("Free tier & licensing");
         AppendParagraph(
-            "Free for up to 3 projects and 25 folder/file/web references total (Collections don't " +
+            "Free for up to 5 projects and 50 folder/file/web references total (Collections don't " +
             "count against the limit). A one-time license key removes that limit.");
         AppendBullet(
             "Help ▸ Register / License… to enter a key or see your current free-tier usage.");

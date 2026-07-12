@@ -144,7 +144,7 @@ for how to move that same folder to a new machine by hand if you want it live th
 
 ## Free tier & licensing
 
-Project Nest Explorer is free for up to **3 projects** and **25 folder/file/web references**
+Project Nest Explorer is free for up to **5 projects** and **50 folder/file/web references**
 total (Collections themselves don't count against the limit). A one-time license key removes that
 limit entirely.
 

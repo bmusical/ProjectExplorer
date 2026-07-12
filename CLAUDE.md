@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Project Nest Explorer** (repo/codebase name: ProjectExplorer; publisher: HxM Blazor Software LLC) is a Windows Forms desktop app (.NET 10) that solves a real problem: instead of opening 10–15 File Explorer windows every day to navigate a project's scattered folders and web resources, you open one tool. It organizes projects as a hierarchy of **Collections**, **FolderReferences** (real disk folders), **FileReferences** (individual files), and **WebResources** (URLs) — bringing local folders, files, and project-related web resources together in one place.
 
-It ships as a commercial product: a free tier (3 projects / 25 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
+It ships as a commercial product: a free tier (5 projects / 50 leaf references) gated by an offline, ECDSA-signed license key system, sold via Gumroad. See **Licensing & Distribution** below.
 
 ### Naming: Product vs. Program
 
@@ -143,7 +143,7 @@ on "we couldn't connect," otherwise perfectly-working links flash broken on ever
 
 ## Licensing & Distribution
 
-The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don't count); a license key unlocks unlimited use. Enforced by `LicenseManager` in `ProjectExplorer.Core`.
+The app is freemium: **Free = 5 projects, 50 leaf references** (Collections don't count); a license key unlocks unlimited use. Enforced by `LicenseManager` in `ProjectExplorer.Core`.
 
 - **Key format**: ECDSA P-256 signed payloads of the form `email|FULL|yyyy-MM-dd`, encoded as `base64url(payload).base64url(signature)`. Verification is fully offline against an embedded public key — no license server.
 - **`tools/KeyGen`** is the key factory: `dotnet run -- setup` generates the keypair once (guard `private_key.pem` like cash, never commit it); `dotnet run -- generate --email <buyer>` mints a customer key per sale; `dotnet run -- verify --license <key>` sanity-checks one.

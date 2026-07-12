@@ -9,7 +9,7 @@ agree, do not install or use the Software.
 1. LICENSE GRANT
 Subject to this Agreement, we grant you a non-exclusive, non-transferable
 license to install and use the Software:
-  - Free tier: up to 3 projects and 25 folder/file/web references, at no cost.
+  - Free tier: up to 5 projects and 50 folder/file/web references, at no cost.
   - Licensed tier: unlimited use, once activated with a valid license key
     issued to you.
 You may use the Software for personal use or internally within your business

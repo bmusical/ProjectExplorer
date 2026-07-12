@@ -8,7 +8,7 @@ namespace ProjectExplorer.Core.Services;
 /// <summary>
 /// Manages free-tier limits and license key verification for Project Nest Explorer.
 ///
-/// Free tier: up to 3 projects and 25 leaf nodes (FolderReferences + WebResources)
+/// Free tier: up to 5 projects and 50 leaf nodes (FolderReferences + WebResources)
 /// total across all projects. Collections are not counted — they are just containers.
 ///
 /// Keys are ECDSA-signed payloads: "email|FULL|yyyy-MM-dd"
@@ -17,8 +17,8 @@ namespace ProjectExplorer.Core.Services;
 public sealed class LicenseManager
 {
     // ── Free-tier limits ──────────────────────────────────────────────────────
-    public const int FreeProjectLimit  = 3;
-    public const int FreeLeafNodeLimit = 25;
+    public const int FreeProjectLimit  = 5;
+    public const int FreeLeafNodeLimit = 50;
 
     // ── Key verification ──────────────────────────────────────────────────────
     // Replace with your real ECDSA P-256 public key (PEM) after generating your keypair.

@@ -5,7 +5,7 @@ this is the "key factory" you run yourself to mint license keys.
 
 ## How the license system works
 
-Project Nest Explorer is freemium: **Free = 3 projects, 25 leaf references** (Collections don't
+Project Nest Explorer is freemium: **Free = 5 projects, 50 leaf references** (Collections don't
 count). A license key removes those limits. Verification happens **entirely offline** — the app
 embeds a public key and checks signatures locally, so there's no license server to run or pay for.
 

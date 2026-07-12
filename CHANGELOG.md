@@ -6,6 +6,8 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Raise the free-tier limits from 3 projects / 25 leaf references to **5 projects / 50 leaf
+  references** (`LicenseManager.FreeProjectLimit` / `FreeLeafNodeLimit`).
 - Add **File ▸ Export All My Data...**: bundles everything Project Nest Explorer has written to
   `%APPDATA%\ProjectExplorer\` (`projects.json`, `license.json`, `uisettings.json`,
   `appsettings.json` — whichever of these already exist) into a single zip file you choose where to
