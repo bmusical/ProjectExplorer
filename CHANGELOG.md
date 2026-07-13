@@ -6,6 +6,8 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+## [1.0.6] — 2026-07-13
+
 - Remove the "Allow multiple copies" option from Settings — single-instance enforcement (a
   second launch switches to the already-running window) is now always on. Two windows against
   the same `projects.json` could silently overwrite each other's changes, since each window only
