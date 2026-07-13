@@ -1,71 +1,75 @@
-# KeyGen — Project Nest License Key Generator
+# KeyGen — License Key Generator
 
-Internal CLI for HxM Blazor Software LLC. Generates and verifies the ECDSA-signed
-license keys that unlock Project Nest Explorer. **Internal use only — do not
-distribute this tool.**
+Internal console tool for **Project Nest Explorer**'s license system. Not shipped to customers —
+this is the "key factory" you run yourself to mint license keys.
 
-## One-time setup
+## How the license system works
 
-A real keypair is already live: `public_key.pem` in this folder matches the
-`PublicKeyPem` constant embedded in
-`src/ProjectExplorer.Core/Services/LicenseManager.cs`, which is what ships
-inside the app.
+Project Nest Explorer is freemium: **Free = 5 projects, 50 leaf references** (Collections don't
+count). A license key removes those limits. Verification happens **entirely offline** — the app
+embeds a public key and checks signatures locally, so there's no license server to run or pay for.
 
-**Do not run `dotnet run -- setup` again.** It overwrites `public_key.pem` and
-`private_key.pem` unconditionally and generates a brand-new keypair — since
-the shipped app only trusts the public key baked into `LicenseManager.cs`,
-that would silently invalidate every license key already sold. Only run
-`setup` if you are deliberately rotating keys (and are prepared to reissue
-every customer's license and ship an app update with the new public key).
+- A license key is an **ECDSA P-256 signed** payload of the form `email|FULL|yyyy-MM-dd`.
+- The key string shipped to a customer is `base64url(payload).base64url(signature)`.
+- The app (`src/ProjectExplorer.Core/Services/LicenseManager.cs`) holds the **public** key and can
+  only *verify* signatures, never create them.
+- This tool holds the **private** key and is the only thing that can *mint* valid keys.
 
-If you ever do need a fresh keypair:
-```
-cd tools/KeyGen
+## Commands
+
+Run all commands from this directory (`tools/KeyGen`):
+
+### 1. `setup` — generate your production keypair (run once, ever)
+
+```bash
 dotnet run -- setup
 ```
-- `private_key.pem` — **never commit, never share.** Keep it offline (password
-  manager, encrypted drive). Anyone who gets it can mint valid licenses for
-  anyone; if you lose it, you can no longer issue new licenses at all.
-- `public_key.pem` — safe to keep in the repo. Paste it into `LicenseManager.cs`
-  → `PublicKeyPem` so the app can verify keys offline (no network call).
 
-## Generate a license key for a customer
+Writes `public_key.pem` and `private_key.pem` to the current directory and prints the public key
+to the console.
 
-```
-cd tools/KeyGen
+- Copy the printed public key into `LicenseManager.cs` as the `PublicKeyPem` constant. **If that
+  constant is ever set to the literal string `"DEVELOPMENT_KEY_PLACEHOLDER"`, the app accepts any
+  correctly-formatted string as a valid key — dev mode only, never ship it.** (For the current
+  build this has already been done: the real key was embedded in commit `5a95f73`.) If you ever
+  need to rotate keys — e.g. the private key is compromised — regenerate here and repeat this step.
+- `*.pem` is already git-ignored (see repo `.gitignore`). Never commit `private_key.pem`.
+- **Guard `private_key.pem` like cash.** Anyone who has it can mint free keys for your product.
+  Store it offline (encrypted USB, password manager attachment, or a secrets vault) with at least
+  one backup in a separate location. If you lose it, you can never sign a key that validates
+  against the public key you've already shipped — you'd have to rebuild and re-release with a new
+  keypair.
+
+### 2. `generate` — mint a key for a customer (run per sale)
+
+```bash
 dotnet run -- generate --email customer@example.com
+# or, if the private key isn't in the current directory:
+dotnet run -- generate --email customer@example.com --key /path/to/private_key.pem
 ```
 
-Optional: `--key path\to\private_key.pem` if the private key isn't in the
-current folder.
+Prints a `LICENSE KEY` line — copy/paste that value and deliver it to the customer. They paste it
+into **Help ▸ Register / License…** in the app.
 
-Copy the full string printed under **"LICENSE KEY"** (format `payload.signature`)
-and send it to the customer. They paste it into Project Nest Explorer's
-registration dialog (`RegistrationDialog`) and click **Activate**.
+### 3. `verify` — sanity-check a key before sending it
 
-## Verify a key
-
-Useful when a customer says activation failed:
-
-```
-cd tools/KeyGen
-dotnet run -- verify --license "PASTE_THEIR_KEY_HERE"
+```bash
+dotnet run -- verify --license "PASTED.KEY"
+# or against a specific public key file:
+dotnet run -- verify --license "PASTED.KEY" --key /path/to/public_key.pem
 ```
 
-Uses `public_key.pem` by default. Reports `VALID` (with the decoded email/date)
-or `INVALID`.
+Reports whether the signature is valid and, if so, prints the decoded payload.
 
-## How a key works
+## Known limitations (by design, fine for v1)
 
-Payload: `email|FULL|yyyy-MM-dd`, signed with ECDSA P-256 / SHA-256, each part
-base64url-encoded, joined as `payload.signature`. It's a perpetual "full"
-unlock — no expiry, no per-key revocation. If a single key leaks or gets
-shared around, the only way to shut it off is rotating the whole keypair,
-which invalidates every other customer's license too. Treat `private_key.pem`
-as the most sensitive secret in this project.
+Keys are per-email but not hardware-locked, and there's no revocation list — a customer could
+share their key with someone else. For an indie-priced tool this is a normal, accepted trade-off
+(no license server, no privacy concerns, no support burden). If piracy ever becomes a real
+problem, options are: add a machine ID to the payload, or add an online activation check. Don't
+build that preemptively.
 
-## Free-tier limits (for support conversations)
+## See also
 
-Unlicensed installs are capped at **3 projects** / **25 leaf nodes** total
-(FolderReferences + WebResources + FileReferences; Collections don't count). See
-`LicenseManager.FreeProjectLimit` / `FreeLeafNodeLimit`.
+`docs/LAUNCH_CHECKLIST.md` Section 2 covers this same flow in the context of the full launch
+runbook (branding, Gumroad delivery model, testing the activation loop end-to-end).

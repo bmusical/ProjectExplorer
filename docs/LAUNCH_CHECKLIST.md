@@ -20,13 +20,13 @@
 
 ## 0. Pre-flight — the two things that will bite you
 
-- [ ] ⛔ **Replace the license public key.** Right now `LicenseManager.cs` has
-  `PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER"`. **While that placeholder is present, the app
-  accepts ANY correctly-formatted string as a valid license** (dev mode). If you ship like this,
-  every "key" works and nobody needs to pay. See **Section 2**.
-- [ ] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
+- [x] ⛔ **Replace the license public key.** *(Done — commit `5a95f73` embedded the real ECDSA
+  public key in `LicenseManager.cs`. Dev mode, where the app would accept ANY correctly-formatted
+  string as a valid license, is no longer active.)* See **Section 2**.
+- [x] ⛔ **Make the repository public** (or host `updates.xml` somewhere public). The in-app
   updater fetches `https://raw.githubusercontent.com/bmusical/ProjectExplorer/master/updates/updates.xml`.
-  If the repo is private, that URL 404s and auto-update silently fails. See **Section 5**.
+  If the repo is private, that URL 404s and auto-update silently fails. *(Done — repo flipped to
+  public on 2026-07-08; verified the raw URL now returns 200.)* See **Section 5**.
 
 ---
 
@@ -49,7 +49,7 @@
 - [ ] 🔧 Register / confirm ownership of the domain used in those URLs.
 - [ ] 🔧 Set up the support inbox (e.g. `support@yourdomain.com`) and make sure you actually receive mail there.
 - [ ] 💡 Write a one-line tagline (already in-app: *"All your projects, one place."*) and keep it consistent across Gumroad, the landing page, and the About box.
-- [ ] 💡 Decide on a EULA / license terms. A short plain-English "personal + commercial use, no redistribution of the key" is enough for v1. Add it as `LICENSE-EULA.txt` and reference it from the installer (`InfoBeforeFile`).
+- [x] 💡 Decide on a EULA / license terms. *(Done — `LICENSE-EULA.txt` at repo root covers personal + internal commercial use, no key redistribution, no reverse engineering/reselling/competing-product use, "as-is" warranty disclaimer. Wired into the installer via `LicenseFile=` in `installer/ProjectExplorer.iss`, so Setup shows an Accept/Decline page before install.)*
 
 ---
 
@@ -75,8 +75,8 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
 
 ### 2.2 Embed the PUBLIC key into the app
 
-- [ ] ⛔ Open `src/ProjectExplorer.Core/Services/LicenseManager.cs`.
-- [ ] ⛔ Replace:
+- [x] ⛔ Open `src/ProjectExplorer.Core/Services/LicenseManager.cs`.
+- [x] ⛔ Replace:
   ```csharp
   private const string PublicKeyPem = "DEVELOPMENT_KEY_PLACEHOLDER";
   ```
@@ -88,8 +88,10 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
       "-----END PUBLIC KEY-----";
   ```
   (The public key is safe to embed and ship — it can only *verify*, not *sign*.)
+  *(Done in commit `5a95f73` — `LicenseManager.cs` now embeds a real PEM key, not the placeholder.)*
 - [ ] ⛔ Rebuild and confirm dev mode is OFF: a made-up string like `foo|FULL|2025-01-01` should now
   be **rejected** in the Registration dialog. Only keys signed by your private key should activate.
+  *(Code change is in place; still worth a manual rebuild-and-verify pass before shipping.)*
 
 ### 2.3 Mint a key for a customer (🔁 per sale)
 
@@ -108,7 +110,7 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
 
 - [ ] ⛔ Build the app with the real public key, generate a key with the real private key, paste it
   into **Help ▸ Register / License…**, and confirm it activates and persists across restarts.
-- [ ] 💡 Note the current limits so your store copy matches: **Free = 3 projects, 25 references.**
+- [ ] 💡 Note the current limits so your store copy matches: **Free = 5 projects, 50 references.**
   Licensed = unlimited. (Defined in `LicenseManager.cs`.)
 
 > **Known limitation (fine to ship, good to know):** keys are per-email but not hardware-locked and
@@ -196,8 +198,10 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 
 ### 5.1 Make the update feed reachable (⛔ one-time)
 
-- [ ] ⛔ **The repository must be PUBLIC** for `raw.githubusercontent.com/.../updates.xml` to load.
-  - Go to repo **Settings → General → Danger Zone → Change visibility → Public**.
+- [x] ⛔ **The repository must be PUBLIC** for `raw.githubusercontent.com/.../updates.xml` to load.
+  *(Done — repo visibility changed to Public on 2026-07-08 via Settings → General → Danger Zone.
+  The repo name stays `ProjectExplorer` — see CLAUDE.md's Naming section for why that's
+  intentionally distinct from the "Project Nest" / "Project Nest Explorer" branding.)*
   - Alternatively, keep the repo private and host `updates.xml` on your public website, then update
     the `UpdateCheckUrl` constant in `MainForm.cs` to that URL. (Public repo is simpler.)
 - [x] ✅ **Branch name mismatch fixed:** the updater URL in `MainForm.cs` now points at **`/master/`**,
@@ -205,20 +209,26 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 
 ### 5.2 Cut a release (🔁 every release)
 
-- [ ] 🔁 Commit & push the updated `updates/updates.xml`.
-- [ ] 🔁 Create a git tag and GitHub Release named **`<version>`** (no `v` prefix, e.g. `1.0.1`):
-  ```bash
-  gh release create 1.0.1 \
-    "installer-output/ProjectNest-1.0.1-Setup.exe" \
-    --title "Project Nest Explorer 1.0.1" \
-    --notes-file docs/release-notes/1.0.1.md
+**`updates/updates.xml` is owned by `.github/workflows/release.yml`, not you — never commit it as
+part of a version bump.** The repo is public, so committing it before the GitHub Release and
+installer asset exist would advertise a version that 404s for anyone who checks for updates in
+that window.
+
+- [ ] 🔁 Bump `<Version>` / `AssemblyVersion` / `FileVersion` in `ProjectExplorer.WinForms.csproj`
+  and add a new `## [X.Y.Z] — YYYY-MM-DD` section to `CHANGELOG.md`. Commit and push both to `master`.
+- [ ] 🔁 Tag and push (no `v` prefix — a `v`-prefixed tag won't match the workflow's trigger
+  pattern and simply won't run):
+  ```powershell
+  .\installer\cut-release.ps1 -Version 1.0.1
   ```
+  This double-checks the csproj/`CHANGELOG.md` bump made it to `master`, pushes the tag, and streams
+  the GitHub Actions run live via `gh run watch`. (Or by hand: `git tag 1.0.1 && git push origin
+  1.0.1`.) The workflow builds the installer, creates the GitHub Release with
+  `ProjectNest-1.0.1-Setup.exe` attached, and only then commits `updates/updates.xml` pointing at
+  this version — see `docs/RELEASE.md` for the full step-by-step and the manual/offline fallback
+  (clean-VM testing, code-signing before the release goes public) if you need either first.
 - [ ] 🔁 **The uploaded asset filename MUST exactly match** the `<url>` in `updates.xml`
   (`ProjectNest-<version>-Setup.exe`). A mismatch = broken auto-update download.
-- [ ] 🔁 Write release notes (what changed). These are linked from the update dialog via `<changelog>`.
-- [ ] 🔁 Bump `<Version>` / `AssemblyVersion` / `FileVersion` in
-  `ProjectExplorer.WinForms.csproj` for the next cycle (the build script passes `-Version`, but keep
-  the csproj in sync so debug builds report the right version too).
 
 ### 5.3 Verify the update path (🔁 first few releases)
 
@@ -233,8 +243,26 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 Unsigned exes trigger **SmartScreen "Unknown publisher"** warnings that scare buyers and tank
 conversion.
 
-- [ ] 💡 Buy an **OV or EV code-signing certificate** (e.g. Sectigo, DigiCert). EV clears SmartScreen
-  immediately; OV builds reputation over time.
+- [ ] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+  (e.g. [SSLmentor lists it from $116/yr](https://www.sslmentor.com/certum/certumcodecloud); reseller
+  pricing shifts, so shop around at purchase time). It's signed via Certum's free
+  [SimplySign](https://www.certum.eu/en/simplysign/) mobile app instead of a physical USB token — the
+  cloud-hosted key still satisfies the CA/Browser Forum's hardware-key rule, you just approve each
+  signing session from your phone (a TOTP-style prompt, ~2hr authorized window) rather than plugging
+  in a dongle.
+  - ⚠️ Certum also sells a much cheaper **"Open Source Code Signing"** tier (~$50/yr), but that requires
+    the signed software to ship under an OSI-approved open-source license. ProjectExplorer ships under a
+    commercial EULA (`LICENSE-EULA.txt`) with paid license keys, so it does **not** qualify — use the
+    standard OV tier above, not the open-source one.
+  - Reseller-priced Sectigo/Comodo OV certs are a fine alternative (~$219/yr) if you'd rather have a more
+    globally-recognized CA name; Certum's SimplySign mainly wins on not requiring a separate token purchase.
+  - EV (e.g. [Certum EV Cloud](https://www.sslmentor.com/certum/certumcodecloudev) ~$226/yr, or
+    Sectigo/DigiCert EV ~$280–350+/yr with heavier business vetting) clears SmartScreen instantly instead
+    of building reputation over time — worth revisiting post-launch if OV's reputation-building window is
+    hurting early conversion, but overkill to start with for a low-volume v1.
+  - As of March 2026, CA/Browser Forum rules cap **all** code-signing certs (OV and EV) at 459 days
+    (~15 months) max validity — even a "multi-year" plan needs a free reissue partway through. Budget for
+    that regardless of vendor.
 - [ ] 💡 Sign **both** the app exe and the installer exe with `signtool`:
   ```powershell
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
@@ -243,7 +271,9 @@ conversion.
     "installer-output\ProjectNest-1.0.1-Setup.exe"
   ```
 - [ ] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
-  it's automatic.
+  it's scripted. Note: with SimplySign the *script* is automatic but each release still needs a manual
+  phone approval to open the ~2hr signing window first — it's not unattended/headless CI signing unless
+  you upgrade to a plan that supports that later.
 - [ ] 💡 If you can't sign yet: document that users will see a SmartScreen prompt and must click
   **More info → Run anyway**. Add this to the Gumroad post-purchase notes so it's not a surprise.
 
@@ -254,7 +284,7 @@ conversion.
 These are tracked here so nothing slips. (The trivial-and-safe ones are handled in the companion PR;
 the judgment calls are left for you.)
 
-- [ ] ⛔ Replace `PublicKeyPem` placeholder (Section 2.2).
+- [x] ⛔ Replace `PublicKeyPem` placeholder (Section 2.2). *(Done — commit `5a95f73`.)*
 - [x] ✅ Updater URL now uses `/master/` (repo's real default branch; no `main` exists). *(handled in companion PR)*
 - [x] ✅ Support email + landing URL reconciled to `blaznaccess.com` across `RegistrationDialog.cs` and the installer. *(handled in companion PR)*
 - [x] 🔧 Fixed the stray "Inno Setup 7" comments in `build-installer.ps1` **and** `ProjectExplorer.iss` — all now correctly say **Inno Setup 6**. *(handled in companion PR)*
@@ -269,8 +299,9 @@ the judgment calls are left for you.)
   `bin/`, `obj/`. *(handled in companion PR)*
 - [ ] 🔧 Do **not** commit `private_key.pem`, `public_key.pem` is fine to keep locally but is embedded
   in code anyway.
-- [ ] 💡 Add a short top-level `README.md` for the public repo: what the product is, a screenshot, the
+- [x] 💡 Add a short top-level `README.md` for the public repo: what the product is, a screenshot, the
   Gumroad buy link, and a "Releases" pointer. (Buyers and the curious will land here once it's public.)
+  *(Added — swap in a real screenshot once the UI is final.)*
 - [ ] 💡 Add an `Issues` template so users can report bugs.
 
 ---
@@ -281,17 +312,21 @@ the judgment calls are left for you.)
 - [ ] 🔁 Track sales in Gumroad; reconcile against keys issued.
 - [ ] 💡 Collect feature requests against the roadmap already in `CLAUDE.md`
   (Open CMD here, drag-drop reparenting, Reveal in Explorer, search/filter, etc.).
-- [ ] 💡 Keep a `CHANGELOG.md` so release notes are quick to assemble each time.
+- [x] 💡 Keep a `CHANGELOG.md` so release notes are quick to assemble each time. Add a new
+  `[X.Y.Z]` section on every release (see `docs/RELEASE.md` step 2).
 
 ---
 
-## Quick reference — "Release a new version" in 8 steps
+## Quick reference — "Release a new version" in 5 steps
+
+> Also written up standalone at [`docs/RELEASE.md`](RELEASE.md) for faster linking once you're
+> past first-launch setup — including the manual/offline fallback if you need clean-VM testing or
+> code-signing before the release goes public, which this tag-triggered path skips.
 
 1. Bump version in `ProjectExplorer.WinForms.csproj`.
-2. Update `CHANGELOG.md` / write release notes.
-3. `.\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml`
-4. Test the installer on a clean VM.
-5. (Recommended) Sign the exe + installer.
-6. Commit & push `updates/updates.xml` (and version bump).
-7. `gh release create vX.Y.Z installer-output\ProjectNest-X.Y.Z-Setup.exe --title "..." --notes-file ...`
-8. Verify an older install auto-updates to the new version.
+2. Add a `## [X.Y.Z] — YYYY-MM-DD` section to `CHANGELOG.md`.
+3. Commit and push both to `master`.
+4. `.\installer\cut-release.ps1 -Version X.Y.Z` — tags, pushes, and watches
+   `.github/workflows/release.yml` build the installer, publish the GitHub Release, and commit
+   `updates/updates.xml` for you.
+5. Verify an older install auto-updates to the new version.

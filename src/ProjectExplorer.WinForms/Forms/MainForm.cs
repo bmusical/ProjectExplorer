@@ -4,6 +4,7 @@ using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
 using ProjectExplorer.Shell;
+using ProjectExplorer.Shell.Services;
 using ProjectExplorer.WinForms.Helpers;
 using LicenseState = ProjectExplorer.Core.Models.LicenseState;
 
@@ -14,6 +15,7 @@ public partial class MainForm : Form
     private readonly ProjectManager _projectManager;
     private readonly IShellIconProvider _shellIconProvider;
     private readonly IShellThumbnailProvider _shellThumbnailProvider;
+    private readonly IShellPropertiesProvider _shellPropertiesProvider;
 
     // Tracks, per image ListViewItem, the icon key (shown in Small/Details/List
     // views) and the thumbnail key (shown in Large/Extra Large views), so we can
@@ -25,6 +27,7 @@ public partial class MainForm : Form
     private AppView _currentView = AppView.Details;
     private readonly LicenseManager _licenseManager;
     private LicenseInfo _license;
+    private readonly AppSettingsManager _appSettingsManager;
 
     // Navigation history
     private readonly Stack<string> _backStack = new();
@@ -34,8 +37,28 @@ public partial class MainForm : Form
     private Project? _currentProject;
     private string _currentPath = string.Empty;
 
+    // The FileReference currently shown in filePreviewPanel, if any (null when listView is showing).
+    private FileReference? _currentPreviewFileRef;
+
+    // The WebResource currently shown in webResourcePreviewPanel, if any (null when listView is showing).
+    private WebResource? _currentPreviewWebResource;
+
     // Drag-drop state
     private TreeNode? _dragHighlightNode;
+
+    // ── Resource availability (unreachable folders/files/web resources) ──
+    // Cache survives tree rebuilds (RefreshTreeView() recreates TreeNodes/ListViewItems, but not
+    // this dictionary), keyed by ProjectChild.Id. Only FolderReference/FileReference/WebResource
+    // entries are ever present.
+    private readonly Dictionary<Guid, AvailabilityCheckResult> _availabilityCache = new();
+    private readonly HashSet<Guid> _availabilityChecksInFlight = new();
+    private readonly System.Windows.Forms.Timer _availabilityRetryTimer = new() { Interval = 20_000 };
+    private static readonly HttpClient _availabilityHttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+    // Cached rather than newed up per node/item: Font wraps a GDI handle, and
+    // ApplyAvailabilityStyle runs on every tree rebuild and every retry-timer tick.
+    private Font? _unavailableTreeFont;
+    private Font? _unavailableListFont;
 
     // Tree UI state persistence
     private static readonly string _uiSettingsPath = Path.Combine(
@@ -68,15 +91,25 @@ public partial class MainForm : Form
 
     public MainForm(ProjectManager projectManager, IShellIconProvider shellIconProvider,
                     IShellThumbnailProvider shellThumbnailProvider,
-                    LicenseManager licenseManager, LicenseInfo license)
+                    IShellPropertiesProvider shellPropertiesProvider,
+                    LicenseManager licenseManager, LicenseInfo license,
+                    AppSettingsManager appSettingsManager)
     {
         _projectManager         = projectManager;
         _shellIconProvider      = shellIconProvider;
         _shellThumbnailProvider = shellThumbnailProvider;
+        _shellPropertiesProvider = shellPropertiesProvider;
         _licenseManager         = licenseManager;
         _license                = license;
+        _appSettingsManager     = appSettingsManager;
 
         InitializeComponent();
+        ApplyPersistedWindowBounds();
+
+        // Adopt Windows 11 Explorer's visual style for the tree/list controls
+        // (alternating hover/selection colors, no dotted focus rectangle).
+        ModernWindowStyler.ApplyExplorerListStyle(treeView.Handle);
+        ModernWindowStyler.ApplyExplorerListStyle(listView.Handle);
 
         SetWindowTitle();
 
@@ -93,6 +126,85 @@ public partial class MainForm : Form
         RestoreTreeState(treeView.Nodes, new HashSet<string>(persistedState.ExpandedTags), persistedState.SelectedTag);
         treeView.EndUpdate();
         treeView.SelectedNode?.EnsureVisible();
+        // Only network/removable resources that are currently unavailable get auto-retried; local-disk
+        // resources that vanish were likely moved or deleted, not just disconnected, and web resources
+        // are checked on-demand (shown, or "Refresh") rather than polled, so retrying either of those
+        // in the background would just be noise (see AddAvailabilityMenuItems).
+        _availabilityRetryTimer.Tick += async (s, e) => await RecheckUnavailableResourcesAsync();
+        _availabilityRetryTimer.Start();
+        EnsureVisibleOnScreen();
+    }
+
+    /// <summary>
+    /// Applies the persisted window position/size from the last session, if any. Called
+    /// right after InitializeComponent (which sets the design-time CenterScreen default)
+    /// so a saved position wins when one exists.
+    /// </summary>
+    private void ApplyPersistedWindowBounds()
+    {
+        var settings = _appSettingsManager.Load();
+        if (settings.WindowWidth is int w && settings.WindowHeight is int h && w > 100 && h > 100)
+        {
+            this.StartPosition = FormStartPosition.Manual;
+            this.Size = new Size(w, h);
+            if (settings.WindowLeft is int l && settings.WindowTop is int t)
+                this.Location = new Point(l, t);
+            if (settings.WindowMaximized)
+                this.WindowState = FormWindowState.Maximized;
+        }
+    }
+
+    private void SaveWindowBounds()
+    {
+        try
+        {
+            var settings = _appSettingsManager.Load();
+            var bounds = WindowState == FormWindowState.Normal ? this.Bounds : this.RestoreBounds;
+            settings.WindowLeft = bounds.Left;
+            settings.WindowTop = bounds.Top;
+            settings.WindowWidth = bounds.Width;
+            settings.WindowHeight = bounds.Height;
+            settings.WindowMaximized = WindowState == FormWindowState.Maximized;
+            _appSettingsManager.Save(settings);
+        }
+        catch { /* non-critical */ }
+    }
+
+    /// <summary>
+    /// Resets the window to a centered position on the primary screen if its current bounds
+    /// don't fall on any currently connected screen (e.g. it was last positioned on a second
+    /// monitor that's since been unplugged). Applies regardless of the Focus on Run setting —
+    /// both a freshly launched instance and an existing instance being refocused go through
+    /// this before becoming visible.
+    /// </summary>
+    private void EnsureVisibleOnScreen()
+    {
+        if (WindowState != FormWindowState.Normal) return;
+
+        var bounds = this.Bounds;
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        if (Screen.AllScreens.Any(s => s.WorkingArea.IntersectsWith(bounds))) return;
+
+        var target = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1200, 750);
+        this.Left = target.Left + Math.Max(0, (target.Width - bounds.Width) / 2);
+        this.Top = target.Top + Math.Max(0, (target.Height - bounds.Height) / 2);
+    }
+
+    /// <summary>
+    /// Called when another launch of the app signals us (Focus on Run = Prevent multiple
+    /// copies) instead of opening its own window. Brings this window to the foreground,
+    /// restoring it first if minimized and repositioning it if it's drifted off-screen.
+    /// </summary>
+    public void RestoreAndActivate()
+    {
+        if (WindowState == FormWindowState.Minimized)
+            WindowState = FormWindowState.Normal;
+
+        EnsureVisibleOnScreen();
+
+        Show();
+        Activate();
+        WindowActivator.ForceToForeground(this.Handle);
     }
 
     /// <summary>
@@ -104,6 +216,12 @@ public partial class MainForm : Form
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
                 ?? new Version(1, 0, 0);
         this.Text = $"Project Nest Explorer {v.Major}.{v.Minor}.{v.Build}";
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ModernWindowStyler.ApplyRoundedCorners(this.Handle);
     }
 
     protected override void OnLoad(EventArgs e)
@@ -450,11 +568,13 @@ public partial class MainForm : Form
             var refNode = new TreeNode(folderRef.EffectiveName)
             {
                 Tag = TagFolderRef + $"{project.Id}:{folderRef.Id}",
-                ToolTipText = folderRef.Description ?? folderRef.RealPath,
+                ToolTipText = BuildAvailabilityTooltip(folderRef),
                 ImageIndex = GetImageIndex("Folder"),
                 SelectedImageIndex = GetImageIndex("FolderOpen")
             };
             parent.Nodes.Add(refNode);
+            ApplyAvailabilityStyle(refNode, folderRef.Id);
+            EnsureAvailabilityChecked(folderRef);
 
             // Add a dummy node so the + expander shows, then we lazy-load real subfolders
             if (Directory.Exists(folderRef.RealPath))
@@ -467,22 +587,26 @@ public partial class MainForm : Form
             var webNode = new TreeNode(webResource.EffectiveName)
             {
                 Tag = TagWebResource + $"{project.Id}:{webResource.Id}",
-                ToolTipText = webResource.Description ?? webResource.Url,
+                ToolTipText = BuildAvailabilityTooltip(webResource),
                 ImageIndex = GetImageIndex("WebResource"),
                 SelectedImageIndex = GetImageIndex("WebResource")
             };
             parent.Nodes.Add(webNode);
+            ApplyAvailabilityStyle(webNode, webResource.Id);
+            EnsureAvailabilityChecked(webResource);
         }
         else if (child is FileReference fileRef)
         {
             var fileNode = new TreeNode(fileRef.EffectiveName)
             {
                 Tag = TagFileRef + $"{project.Id}:{fileRef.Id}",
-                ToolTipText = fileRef.Description ?? fileRef.FilePath,
+                ToolTipText = BuildAvailabilityTooltip(fileRef),
                 ImageIndex = GetFileRefImageIndex(fileRef),
                 SelectedImageIndex = GetFileRefImageIndex(fileRef)
             };
             parent.Nodes.Add(fileNode);
+            ApplyAvailabilityStyle(fileNode, fileRef.Id);
+            EnsureAvailabilityChecked(fileRef);
         }
     }
 
@@ -517,6 +641,182 @@ public partial class MainForm : Form
         return imageListSmall.Images.IndexOfKey(key);
     }
 
+    // ── Resource Availability ──
+
+    /// <summary>
+    /// Kicks off a background availability check the first time a FolderReference/FileReference/
+    /// WebResource is rendered this session. No-ops for anything already checked or in flight, and
+    /// for non-leaf types (Project/Collection have no availability concept).
+    /// </summary>
+    private void EnsureAvailabilityChecked(ProjectChild child)
+    {
+        if (child is not (FolderReference or FileReference or WebResource)) return;
+        if (_availabilityCache.ContainsKey(child.Id)) return;
+        _ = CheckAvailabilityAsync(child);
+    }
+
+    /// <summary>Forces a fresh check regardless of what's cached, e.g. from "Check Availability Now".</summary>
+    private Task ForceCheckAvailabilityAsync(ProjectChild child)
+    {
+        _availabilityCache.Remove(child.Id);
+        return CheckAvailabilityAsync(child);
+    }
+
+    private async Task CheckAvailabilityAsync(ProjectChild child)
+    {
+        if (!_availabilityChecksInFlight.Add(child.Id)) return;
+        try
+        {
+            AvailabilityCheckResult? result = child switch
+            {
+                FolderReference fr => await ResourceAvailabilityChecker.CheckFolderAsync(fr.RealPath),
+                FileReference file => await ResourceAvailabilityChecker.CheckFileAsync(file.FilePath),
+                WebResource wr => await ResourceAvailabilityChecker.CheckWebResourceAsync(wr.Url, _availabilityHttpClient),
+                _ => null
+            };
+            if (result == null) return;
+
+            _availabilityCache[child.Id] = result.Value;
+            UpdateAvailabilityVisuals(child);
+        }
+        catch
+        {
+            // Best-effort background check — leave the resource's availability as whatever it was
+            // (or unknown) rather than letting an unexpected failure surface to the user.
+        }
+        finally
+        {
+            _availabilityChecksInFlight.Remove(child.Id);
+        }
+    }
+
+    /// <summary>
+    /// Re-checks every currently-unavailable network/removable resource (the kind that might just be
+    /// temporarily disconnected), skipping ones the user asked to stop auto-retrying via the "Stop
+    /// Auto-Retry" context menu action. Local-disk resources are never retried here — a missing local
+    /// file was moved or deleted, not disconnected, so polling it is pointless. Web resources aren't
+    /// retried here either — polling a URL repeatedly in the background is unwanted network chatter
+    /// for something the user can just click "Refresh" on; a WebResource only ever gets (re-)checked
+    /// when it's shown or explicitly refreshed (see <see cref="EnsureAvailabilityChecked"/> /
+    /// <see cref="ForceCheckAvailabilityAsync"/>).
+    /// </summary>
+    private async Task RecheckUnavailableResourcesAsync()
+    {
+        var candidateIds = _availabilityCache
+            .Where(kv => kv.Value.LocationKind == ResourceLocationKind.NetworkOrRemovable &&
+                         (kv.Value.Status == AvailabilityStatus.Unavailable || kv.Value.Status == AvailabilityStatus.Unknown))
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var id in candidateIds)
+        {
+            var child = FindChildAnywhere(id);
+            if (child == null)
+            {
+                _availabilityCache.Remove(id);
+                continue;
+            }
+            if (child.Metadata.TryGetValue(ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, out var suppressed) && suppressed == "true")
+                continue;
+
+            await CheckAvailabilityAsync(child);
+        }
+    }
+
+    /// <summary>Finds a child by Id across every loaded project, not just the currently displayed one.</summary>
+    private ProjectChild? FindChildAnywhere(Guid childId)
+    {
+        foreach (var project in _projectManager.Projects)
+        {
+            var parentList = project.FindParentList(childId);
+            var child = parentList?.FirstOrDefault(c => c.Id == childId);
+            if (child != null) return child;
+        }
+        return null;
+    }
+
+    /// <summary>Updates an already-rendered TreeNode/ListViewItem's style in place, without rebuilding the tree.</summary>
+    private void UpdateAvailabilityVisuals(ProjectChild child)
+    {
+        var node = FindTreeNodeByChildId(treeView.Nodes, child.Id);
+        if (node != null)
+        {
+            node.ToolTipText = BuildAvailabilityTooltip(child);
+            ApplyAvailabilityStyle(node, child.Id);
+        }
+
+        foreach (ListViewItem item in listView.Items)
+        {
+            if (item.Tag is string tag && GetChildIdFromTag(tag) == child.Id)
+            {
+                ApplyAvailabilityStyle(item, child.Id);
+                break;
+            }
+        }
+    }
+
+    private static TreeNode? FindTreeNodeByChildId(TreeNodeCollection nodes, Guid childId)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (node.Tag is string tag && GetChildIdFromTag(tag) == childId)
+                return node;
+            var found = FindTreeNodeByChildId(node.Nodes, childId);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void ApplyAvailabilityStyle(TreeNode node, Guid childId)
+    {
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        node.ForeColor = unavailable ? Color.Gray : Color.Empty;
+        node.NodeFont = unavailable ? (_unavailableTreeFont ??= new Font(treeView.Font, FontStyle.Strikeout)) : null;
+    }
+
+    private void ApplyAvailabilityStyle(ListViewItem item, Guid childId)
+    {
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        item.ForeColor = unavailable ? Color.Gray : listView.ForeColor;
+        item.Font = unavailable ? (_unavailableListFont ??= new Font(listView.Font, FontStyle.Strikeout)) : listView.Font;
+    }
+
+    /// <summary>Builds a tree node tooltip: the item's normal description/path, plus an availability note when unavailable.</summary>
+    private string BuildAvailabilityTooltip(ProjectChild child)
+    {
+        var baseText = child switch
+        {
+            FolderReference fr => fr.Description ?? fr.RealPath,
+            FileReference file => file.Description ?? file.FilePath,
+            WebResource wr => wr.Description ?? wr.Url,
+            _ => ""
+        };
+
+        if (!_availabilityCache.TryGetValue(child.Id, out var result) || result.Status != AvailabilityStatus.Unavailable)
+            return baseText;
+
+        return baseText + Environment.NewLine + Environment.NewLine + DescribeUnavailable(result.LocationKind);
+    }
+
+    private static string DescribeUnavailable(ResourceLocationKind kind) => kind switch
+    {
+        ResourceLocationKind.LocalDisk =>
+            "⚠ Not found. It may have been moved, renamed, or deleted — use \"Locate...\" to relink it.",
+        ResourceLocationKind.NetworkOrRemovable =>
+            "⚠ Not reachable right now. This may be a temporarily disconnected network or removable drive — Project Nest Explorer will keep checking automatically.",
+        ResourceLocationKind.Web =>
+            "⚠ The site returned an error (e.g. a 404) the last time it was checked — use \"Refresh\" to check again; this clears as soon as it loads.",
+        _ => "⚠ Could not be verified."
+    };
+
+    private static string DescribeUnavailableShort(ResourceLocationKind kind) => kind switch
+    {
+        ResourceLocationKind.LocalDisk => "moved or deleted?",
+        ResourceLocationKind.NetworkOrRemovable => "network/removable drive unreachable",
+        ResourceLocationKind.Web => "site returned an error",
+        _ => "could not verify"
+    };
+
     // ── Tree View Events ──
 
     private void TreeView_AfterSelect(object? sender, TreeViewEventArgs e)
@@ -524,6 +824,54 @@ public partial class MainForm : Form
         if (e.Node == null) return;
 
         var tag = e.Node.Tag?.ToString() ?? "";
+
+        if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            _currentProject = _projectManager.GetProject(projectId);
+            var fileRefId = Guid.Parse(parts[1]);
+            var fileRef = FindFileRef(_currentProject, fileRefId);
+            if (fileRef != null)
+            {
+                var dir = Path.GetDirectoryName(fileRef.FilePath);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    _currentPath = dir;
+                else
+                    _currentPath = string.Empty;
+                HideWebResourcePreview();
+                ShowFileReferencePreview(fileRef);
+            }
+
+            UpdateAddressBar();
+            UpdateStatusBar();
+            UpdateToolbarButtons();
+            return;
+        }
+
+        if (tag.StartsWith(TagWebResource))
+        {
+            var parts = tag.Substring(TagWebResource.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            _currentProject = _projectManager.GetProject(projectId);
+            var resourceId = Guid.Parse(parts[1]);
+            var webResource = FindWebResource(_currentProject, resourceId);
+            if (webResource != null)
+            {
+                _currentPath = string.Empty;
+                HideFileReferencePreview();
+                ShowWebResourcePreview(webResource);
+            }
+
+            UpdateAddressBar();
+            UpdateStatusBar();
+            UpdateToolbarButtons();
+            return;
+        }
+
+        HideFileReferencePreview();
+        HideWebResourcePreview();
+
         listView.BeginUpdate();
         listView.Items.Clear();
 
@@ -558,23 +906,6 @@ public partial class MainForm : Form
                 PopulateFileList(folderRef.RealPath);
             }
         }
-        else if (tag.StartsWith(TagFileRef))
-        {
-            var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            _currentProject = _projectManager.GetProject(projectId);
-            var fileRefId = Guid.Parse(parts[1]);
-            var fileRef = FindFileRef(_currentProject, fileRefId);
-            if (fileRef != null)
-            {
-                var dir = Path.GetDirectoryName(fileRef.FilePath);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                {
-                    _currentPath = dir;
-                    PopulateFileList(dir);
-                }
-            }
-        }
         else if (tag.StartsWith(TagRealFolder))
         {
             var path = tag.Substring(TagRealFolder.Length);
@@ -586,6 +917,69 @@ public partial class MainForm : Form
         UpdateAddressBar();
         UpdateStatusBar();
         UpdateToolbarButtons();
+    }
+
+    /// <summary>
+    /// Shows the given FileReference's inline preview in place of the ListView:
+    /// renders the file's content when we can (image/text), and always leaves
+    /// Open/Properties available regardless of whether the format is supported.
+    /// </summary>
+    private void ShowFileReferencePreview(FileReference fileRef)
+    {
+        _currentPreviewFileRef = fileRef;
+        listView.Visible = false;
+        filePreviewPanel.Visible = true;
+
+        var icon = string.IsNullOrEmpty(fileRef.Extension)
+            ? _shellIconProvider.GetFileIcon(fileRef.FilePath, IconSize.Jumbo)
+            : _shellIconProvider.GetIconByExtension(fileRef.Extension, IconSize.Jumbo);
+        filePreviewPanel.ShowFile(fileRef.FilePath, fileRef.Description, icon);
+    }
+
+    private void HideFileReferencePreview()
+    {
+        if (_currentPreviewFileRef == null) return;
+        _currentPreviewFileRef = null;
+        filePreviewPanel.Visible = false;
+        listView.Visible = true;
+    }
+
+    private void FilePreviewPanel_OpenRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewFileRef != null) OpenFileReference(_currentPreviewFileRef);
+    }
+
+    private void FilePreviewPanel_PropertiesRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewFileRef != null && File.Exists(_currentPreviewFileRef.FilePath))
+            _shellPropertiesProvider.ShowPropertiesDialog(_currentPreviewFileRef.FilePath, this.Handle);
+    }
+
+    /// <summary>
+    /// Shows the given WebResource's inline preview in place of the ListView:
+    /// navigates the embedded browser (WebResourcePreviewPanel) to its URL.
+    /// "Open in External Browser" is always available via the event below.
+    /// </summary>
+    private void ShowWebResourcePreview(WebResource webResource)
+    {
+        _currentPreviewWebResource = webResource;
+        listView.Visible = false;
+        webResourcePreviewPanel.Visible = true;
+
+        webResourcePreviewPanel.ShowWebResource(webResource.Url, webResource.EffectiveName, imageListExtraLarge.Images["WebResource"]);
+    }
+
+    private void HideWebResourcePreview()
+    {
+        if (_currentPreviewWebResource == null) return;
+        _currentPreviewWebResource = null;
+        webResourcePreviewPanel.Visible = false;
+        listView.Visible = true;
+    }
+
+    private void WebResourcePreviewPanel_OpenExternalRequested(object? sender, EventArgs e)
+    {
+        if (_currentPreviewWebResource != null) LaunchWebResource(_currentPreviewWebResource);
     }
 
     private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
@@ -663,6 +1057,24 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// F2 rename from the ListView. Unlike the TreeView (<see cref="TreeView_KeyDown"/>), the
+    /// ListView has no inline label editing, so this routes through the same dialog-based rename
+    /// the right-click "Rename" menu item already uses (<see cref="RenameViaDialog"/>) — e.g. when
+    /// renaming a top-level Project while its row is selected in the ListView rather than the tree.
+    /// </summary>
+    private void ListView_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.F2 || listView.SelectedItems.Count != 1) return;
+
+        var tag = listView.SelectedItems[0].Tag?.ToString() ?? "";
+        if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection))
+        {
+            RenameViaDialog(tag);
+            e.Handled = true;
+        }
+    }
+
     private void TreeView_AfterLabelEdit(object? sender, NodeLabelEditEventArgs e)
     {
         // Always cancel the built-in label update; we manage node text manually after the async save.
@@ -712,6 +1124,7 @@ public partial class MainForm : Form
             item.SubItems.Add("");
             item.SubItems.Add("Project");
             item.SubItems.Add(project.Modified.ToString("g"));
+            item.SubItems.Add(project.Description ?? "");
             listView.Items.Add(item);
         }
     }
@@ -746,6 +1159,8 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fr.Id);
+                EnsureAvailabilityChecked(fr);
             }
             else if (child is WebResource wr)
             {
@@ -758,6 +1173,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(wr.Url);
                 item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, wr.Id);
+                EnsureAvailabilityChecked(wr);
             }
             else if (child is FileReference fileRef)
             {
@@ -770,6 +1187,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileRef.FilePath);
                 item.SubItems.Add(fileRef.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fileRef.Id);
+                EnsureAvailabilityChecked(fileRef);
             }
         }
     }
@@ -806,6 +1225,8 @@ public partial class MainForm : Form
                 item.SubItems.Add("");
                 item.SubItems.Add(fr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fr.Id);
+                EnsureAvailabilityChecked(fr);
             }
             else if (child is WebResource wr)
             {
@@ -818,6 +1239,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(wr.Url);
                 item.SubItems.Add(wr.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, wr.Id);
+                EnsureAvailabilityChecked(wr);
             }
             else if (child is FileReference fileRef)
             {
@@ -830,6 +1253,8 @@ public partial class MainForm : Form
                 item.SubItems.Add(fileRef.FilePath);
                 item.SubItems.Add(fileRef.Description ?? "");
                 listView.Items.Add(item);
+                ApplyAvailabilityStyle(item, fileRef.Id);
+                EnsureAvailabilityChecked(fileRef);
             }
         }
     }
@@ -1099,6 +1524,8 @@ public partial class MainForm : Form
 
     private void NavigateToPath(string path)
     {
+        HideFileReferencePreview();
+        HideWebResourcePreview();
         _currentPath = path;
         listView.BeginUpdate();
         listView.Items.Clear();
@@ -1112,11 +1539,23 @@ public partial class MainForm : Form
 
     private void UpdateAddressBar()
     {
-        txtAddress.Text = _currentPath;
+        txtAddress.Text = _currentPreviewWebResource != null ? _currentPreviewWebResource.Url : _currentPath;
     }
 
     private void UpdateStatusBar()
     {
+        if (_currentPreviewFileRef != null)
+        {
+            lblStatus.Text = $"{_currentPreviewFileRef.EffectiveName}  |  {_currentPreviewFileRef.FilePath}";
+            return;
+        }
+
+        if (_currentPreviewWebResource != null)
+        {
+            lblStatus.Text = $"{_currentPreviewWebResource.EffectiveName}  |  {_currentPreviewWebResource.Url}";
+            return;
+        }
+
         var count = listView.Items.Count;
         lblStatus.Text = count == 1 ? "1 item" : $"{count} items";
         if (!string.IsNullOrEmpty(_currentPath))
@@ -1153,8 +1592,10 @@ public partial class MainForm : Form
         }
         else if (tag.StartsWith(TagWebResource))
         {
-            // Launch web resource in default browser
-            LaunchWebResource(tag);
+            // Select the corresponding tree node so it shows in the browser preview,
+            // same as Project/Collection/FolderRef above; use the panel's
+            // "Open in External Browser" action to launch it in the default browser.
+            SelectTreeNodeByTag(tag);
         }
         else if (tag.StartsWith(TagFileRef))
         {
@@ -1267,143 +1708,43 @@ public partial class MainForm : Form
             // Empty-area click: offer view options / new-item shortcuts if a project is open.
             if (_currentProject != null)
             {
-                menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
-                menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
-                menu.Items.Add("Add Web Resource...", null, async (s, e) => await ShowAddWebResourceDialog(_currentProject.Id, null));
-                menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(_currentProject.Id, null));
+                AddNewChildMenuItems(menu, _currentProject.Id, null);
                 menu.Items.Add(new ToolStripSeparator());
             }
             AddViewSubmenu(menu);
         }
-        else if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection) || tag.StartsWith(TagFolderRef))
+        else if (tag.StartsWith(TagProject))
         {
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
             menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
-
-            if (tag.StartsWith(TagFolderRef))
-            {
-                var parts = tag.Substring(TagFolderRef.Length).Split(':');
-                var projectId = Guid.Parse(parts[0]);
-                var folderRefId = Guid.Parse(parts[1]);
-                menu.Items.Add("Open in Explorer", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null && Directory.Exists(fr.RealPath))
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
-                });
-                menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
-                });
-                menu.Items.Add("Open PowerShell Here", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
-                });
-                menu.Items.Add("Copy Path", null, (s, e) =>
-                {
-                    var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                    if (fr != null && !string.IsNullOrEmpty(fr.RealPath)) Clipboard.SetText(fr.RealPath);
-                });
-                menu.Items.Add(new ToolStripSeparator());
-                menu.Items.Add("Remove from Project", null, async (s, e) =>
-                {
-                    if (MessageBox.Show("Remove this folder reference from the project?", "Confirm Remove",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                    {
-                        await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                        RefreshTreeView();
-                    }
-                });
-            }
+            menu.Items.Add(new ToolStripSeparator());
+            AddProjectMenuItems(menu, projectId, () => RenameViaDialog(tag));
+        }
+        else if (tag.StartsWith(TagCollection))
+        {
+            var parts = tag.Substring(TagCollection.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var collectionId = Guid.Parse(parts[1]);
+            menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
+            menu.Items.Add(new ToolStripSeparator());
+            AddCollectionMenuItems(menu, projectId, collectionId, () => RenameViaDialog(tag));
+        }
+        else if (tag.StartsWith(TagFolderRef))
+        {
+            var parts = tag.Substring(TagFolderRef.Length).Split(':');
+            menu.Items.Add("Open", null, (s, e) => SelectTreeNodeByTag(tag));
+            menu.Items.Add(new ToolStripSeparator());
+            AddFolderReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
         else if (tag.StartsWith(TagWebResource))
         {
             var parts = tag.Substring(TagWebResource.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var resourceId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open (Launch)", null, (s, e) => LaunchWebResource(tag));
-            menu.Items.Add("Copy URL", null, (s, e) =>
-            {
-                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
-                if (wr != null && !string.IsNullOrEmpty(wr.Url)) Clipboard.SetText(wr.Url);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
-                if (wr != null)
-                {
-                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateWebResourceAsync(projectId, resourceId,
-                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            dlg.ResourceUrl.Trim(),
-                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                if (MessageBox.Show("Remove this web resource from the project?", "Confirm Remove",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                    RefreshTreeView();
-                }
-            });
+            AddWebResourceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]), tag);
         }
         else if (tag.StartsWith(TagFileRef))
         {
             var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var fileRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null) OpenFileReference(fr);
-            });
-            menu.Items.Add("Open Containing Folder", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && File.Exists(fr.FilePath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
-            });
-            menu.Items.Add("Copy Path", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null)
-                {
-                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateFileReferenceAsync(projectId, fileRefId,
-                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            newPath: dlg.ResourceFilePath.Trim(),
-                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                if (MessageBox.Show("Remove this file reference from the project?", "Confirm Remove",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
-                    RefreshTreeView();
-                }
-            });
+            AddFileReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
         else if (tag.StartsWith(TagRealFolder))
         {
@@ -1414,14 +1755,7 @@ public partial class MainForm : Form
                 _forwardStack.Clear();
                 NavigateToPath(path);
             });
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                if (Directory.Exists(path))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
-            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
-            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+            AddRealFolderMenuItems(menu, path);
         }
         else if (tag.StartsWith("File:"))
         {
@@ -1437,6 +1771,10 @@ public partial class MainForm : Form
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = true });
             });
             menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(filePath));
+            menu.Items.Add("Properties", null, (s, e) =>
+            {
+                if (File.Exists(filePath)) _shellPropertiesProvider.ShowPropertiesDialog(filePath, this.Handle);
+            });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Add as File Resource...", null, async (s, e) =>
             {
@@ -1451,6 +1789,51 @@ public partial class MainForm : Form
 
         if (menu.Items.Count > 0)
             menu.Show(listView, location);
+    }
+
+    /// <summary>
+    /// The ListView has no inline label editing (unlike the TreeView), so
+    /// Project/Collection renames triggered from a ListView context menu go
+    /// through this dialog instead of TreeNode.BeginEdit().
+    /// </summary>
+    private async void RenameViaDialog(string tag)
+    {
+        if (tag.StartsWith(TagProject))
+        {
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+            var project = _projectManager.GetProject(projectId);
+            if (project == null) return;
+
+            using var dlg = new InputDialog("Rename Project", "Project name:", project.Name);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.RenameProjectAsync(projectId, name);
+                    RefreshTreeView();
+                }
+            }
+        }
+        else if (tag.StartsWith(TagCollection))
+        {
+            var parts = tag.Substring(TagCollection.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var collectionId = Guid.Parse(parts[1]);
+            var collection = _projectManager.GetProject(projectId)?.FindCollection(collectionId);
+            if (collection == null) return;
+
+            using var dlg = new InputDialog("Rename Collection", "Collection name:", collection.Name);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.RenameCollectionAsync(projectId, collectionId, name);
+                    RefreshTreeView();
+                }
+            }
+        }
     }
 
     private void AddViewSubmenu(ContextMenuStrip menu)
@@ -1620,6 +2003,406 @@ public partial class MainForm : Form
     }
 
     // ── Context Menu ──
+    //
+    // Item-type menus are built by the shared Add*MenuItems helpers below so the
+    // TreeView and ListView context menus can never drift out of parity with
+    // each other — each helper is called from both ShowTreeViewContextMenu and
+    // ShowListViewContextMenu.
+
+    private void AddNewChildMenuItems(ContextMenuStrip menu, Guid projectId, Guid? parentCollectionId)
+    {
+        menu.Items.Add(parentCollectionId == null ? "New Collection..." : "New Sub-Collection...", null, async (s, e) =>
+        {
+            using var dlg = new InputDialog(
+                parentCollectionId == null ? "Create New Collection" : "Create Sub-Collection",
+                "Collection name:", "New Collection");
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                var name = dlg.InputText.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    await _projectManager.CreateCollectionAsync(projectId, name, parentCollectionId);
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add("Add Folder...", null, async (s, e) =>
+        {
+            if (!CheckLeafLimit("Add Folder")) return;
+            using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, parentCollectionId);
+                RefreshLicense();
+                UpdateLicenseUi();
+                RefreshTreeView();
+            }
+        });
+        menu.Items.Add("Add Web Resource...", null, async (s, e) => await ShowAddWebResourceDialog(projectId, parentCollectionId));
+        menu.Items.Add("Add File...", null, async (s, e) => await ShowAddFileResourceDialog(projectId, parentCollectionId));
+    }
+
+    /// <summary>
+    /// Move Up/Move Down for a top-level Project — a precision-free alternative to dragging
+    /// for repositioning siblings, since Projects/Collections/etc. only get a few pixels of
+    /// "insertion line" hit zone during drag-and-drop.
+    /// </summary>
+    private void AddProjectMoveMenuItems(ContextMenuStrip menu, Guid projectId)
+    {
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Move Up", null, async (s, e) =>
+        {
+            await _projectManager.MoveProjectUpAsync(projectId);
+            RefreshTreeView();
+        });
+        menu.Items.Add("Move Down", null, async (s, e) =>
+        {
+            await _projectManager.MoveProjectDownAsync(projectId);
+            RefreshTreeView();
+        });
+    }
+
+    /// <summary>Move Up/Move Down for any ProjectChild (Collection/FolderReference/WebResource/FileReference).</summary>
+    private void AddChildMoveMenuItems(ContextMenuStrip menu, Guid projectId, Guid childId)
+    {
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Move Up", null, async (s, e) =>
+        {
+            await _projectManager.MoveChildUpAsync(projectId, childId);
+            RefreshTreeView();
+        });
+        menu.Items.Add("Move Down", null, async (s, e) =>
+        {
+            await _projectManager.MoveChildDownAsync(projectId, childId);
+            RefreshTreeView();
+        });
+    }
+
+    private void AddProjectMenuItems(ContextMenuStrip menu, Guid projectId, Action rename)
+    {
+        AddNewChildMenuItems(menu, projectId, null);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            if (project != null)
+            {
+                using var dlg = new InputDialog("Edit Project Description", "Description:", project.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateProjectAsync(
+                        projectId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
+        AddProjectMoveMenuItems(menu, projectId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Delete Project", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            if (project == null) return;
+            var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.DeleteProjectAsync(projectId);
+                _currentProject = null;
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddCollectionMenuItems(ContextMenuStrip menu, Guid projectId, Guid collectionId, Action rename)
+    {
+        AddNewChildMenuItems(menu, projectId, collectionId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Rename", null, (s, e) => rename());
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var collection = _projectManager.GetProject(projectId)?.FindCollection(collectionId);
+            if (collection != null)
+            {
+                using var dlg = new InputDialog("Edit Collection Description", "Description:", collection.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateCollectionAsync(
+                        projectId, collectionId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
+        AddChildMoveMenuItems(menu, projectId, collectionId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Delete Collection", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
+                "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.DeleteCollectionAsync(projectId, collectionId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Prepends the "unavailable" warning header plus Check Now / Locate / Stop-Resume-Retry
+    /// actions to a resource's context menu, when it's currently unavailable. No-ops otherwise,
+    /// unless <paramref name="alwaysOfferCheckNow"/> is set — WebResource passes true, since a
+    /// site can keep failing the same automated check (e.g. one that blocks non-browser requests)
+    /// even though it loads fine for the user, and they need a way to force a recheck without
+    /// waiting for the status to already say Unavailable.
+    /// </summary>
+    private void AddAvailabilityMenuItems(ContextMenuStrip menu, Guid projectId, ProjectChild child, string relinkLabel, Func<Task>? relinkAction, bool alwaysOfferCheckNow = false, string checkNowLabel = "Check Availability Now")
+    {
+        _availabilityCache.TryGetValue(child.Id, out var result);
+        if (result.Status != AvailabilityStatus.Unavailable)
+        {
+            if (alwaysOfferCheckNow)
+            {
+                menu.Items.Add(checkNowLabel, null, async (s, e) => await ForceCheckAvailabilityAsync(child));
+                menu.Items.Add(new ToolStripSeparator());
+            }
+            return;
+        }
+
+        menu.Items.Add(new ToolStripMenuItem($"⚠ Unavailable — {DescribeUnavailableShort(result.LocationKind)}") { Enabled = false });
+        menu.Items.Add(checkNowLabel, null, async (s, e) => await ForceCheckAvailabilityAsync(child));
+
+        if (relinkAction != null)
+            menu.Items.Add(relinkLabel, null, async (s, e) => await relinkAction());
+
+        // Only NetworkOrRemovable is ever auto-retried in the background (see
+        // RecheckUnavailableResourcesAsync) — Web resources have nothing to stop/resume.
+        if (result.LocationKind == ResourceLocationKind.NetworkOrRemovable)
+        {
+            var suppressed = child.Metadata.TryGetValue(ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, out var v) && v == "true";
+            menu.Items.Add(suppressed ? "Resume Auto-Retry" : "Stop Auto-Retry", null, async (s, e) =>
+            {
+                await _projectManager.SetChildMetadataAsync(
+                    projectId, child.Id, ResourceAvailabilityChecker.SuppressAutoRetryMetadataKey, suppressed ? null : "true");
+            });
+        }
+
+        menu.Items.Add(new ToolStripSeparator());
+    }
+
+    private async Task LocateFolderReferenceAsync(Guid projectId, FolderReference folderRef)
+    {
+        using var dlg = new FolderBrowserDialog { Description = $"Select the new location for \"{folderRef.EffectiveName}\"" };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        await _projectManager.UpdateFolderReferenceAsync(projectId, folderRef.Id, newPath: dlg.SelectedPath);
+        await ForceCheckAvailabilityAsync(folderRef);
+        RefreshTreeView();
+    }
+
+    private async Task LocateFileReferenceAsync(Guid projectId, FileReference fileRef)
+    {
+        using var dlg = new OpenFileDialog { Title = $"Select the new location for \"{fileRef.EffectiveName}\"", CheckFileExists = true };
+        if (!string.IsNullOrEmpty(fileRef.Extension))
+        {
+            var ext = fileRef.Extension.TrimStart('.').ToUpperInvariant();
+            dlg.Filter = $"{ext} files (*{fileRef.Extension})|*{fileRef.Extension}|All files (*.*)|*.*";
+        }
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        await _projectManager.UpdateFileReferenceAsync(projectId, fileRef.Id, newPath: dlg.FileName);
+        await ForceCheckAvailabilityAsync(fileRef);
+        RefreshTreeView();
+    }
+
+    private void AddFolderReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid folderRefId)
+    {
+        var existingFr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+        if (existingFr != null)
+        {
+            AddAvailabilityMenuItems(menu, projectId, existingFr, "Locate Folder...",
+                async () => await LocateFolderReferenceAsync(projectId, existingFr));
+        }
+
+        menu.Items.Add("Edit Description...", null, async (s, e) =>
+        {
+            var project = _projectManager.GetProject(projectId);
+            var fr = FindFolderRef(project, folderRefId);
+            if (fr != null)
+            {
+                using var dlg = new InputDialog("Edit Folder Description", "Description:", fr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var description = dlg.InputText.Trim();
+                    await _projectManager.UpdateFolderReferenceAsync(
+                        projectId, folderRefId, newDescription: string.IsNullOrEmpty(description) ? null : description);
+                    RefreshTreeView();
+                }
+            }
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Open in Explorer", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && Directory.Exists(fr.RealPath))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
+        });
+        menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
+        });
+        menu.Items.Add("Open PowerShell Here", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
+        });
+        menu.Items.Add("Copy Path", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && !string.IsNullOrEmpty(fr.RealPath)) Clipboard.SetText(fr.RealPath);
+        });
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
+            if (fr != null && Directory.Exists(fr.RealPath)) _shellPropertiesProvider.ShowPropertiesDialog(fr.RealPath, this.Handle);
+        });
+        AddChildMoveMenuItems(menu, projectId, folderRefId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this folder reference from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddWebResourceMenuItems(ContextMenuStrip menu, Guid projectId, Guid resourceId, string tag)
+    {
+        var existingWr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+        if (existingWr != null)
+            AddAvailabilityMenuItems(menu, projectId, existingWr, relinkLabel: "", relinkAction: null, alwaysOfferCheckNow: true, checkNowLabel: "Refresh");
+
+        menu.Items.Add("Open in External Browser", null, (s, e) => LaunchWebResource(tag));
+        menu.Items.Add("Copy URL", null, (s, e) =>
+        {
+            var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+            if (wr != null && !string.IsNullOrEmpty(wr.Url)) Clipboard.SetText(wr.Url);
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Edit...", null, async (s, e) =>
+        {
+            var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
+            if (wr != null)
+            {
+                using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    await _projectManager.UpdateWebResourceAsync(
+                        projectId, resourceId,
+                        string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                        dlg.ResourceUrl.Trim(),
+                        string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                    RefreshTreeView();
+                }
+            }
+        });
+        AddChildMoveMenuItems(menu, projectId, resourceId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this web resource from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddFileReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid fileRefId)
+    {
+        var existingFile = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+        if (existingFile != null)
+        {
+            AddAvailabilityMenuItems(menu, projectId, existingFile, "Locate File...",
+                async () => await LocateFileReferenceAsync(projectId, existingFile));
+        }
+
+        menu.Items.Add("Open", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null) OpenFileReference(fr);
+        });
+        menu.Items.Add("Open Containing Folder", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && File.Exists(fr.FilePath))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
+        });
+        menu.Items.Add("Copy Path", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
+        });
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null && File.Exists(fr.FilePath)) _shellPropertiesProvider.ShowPropertiesDialog(fr.FilePath, this.Handle);
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Edit...", null, async (s, e) =>
+        {
+            var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
+            if (fr != null)
+            {
+                using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    await _projectManager.UpdateFileReferenceAsync(
+                        projectId, fileRefId,
+                        newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
+                        newPath: dlg.ResourceFilePath.Trim(),
+                        newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                    RefreshTreeView();
+                }
+            }
+        });
+        AddChildMoveMenuItems(menu, projectId, fileRefId);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Remove from Project", null, async (s, e) =>
+        {
+            var result = MessageBox.Show("Remove this file reference from the project?",
+                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+            {
+                await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
+                RefreshTreeView();
+            }
+        });
+    }
+
+    private void AddRealFolderMenuItems(ContextMenuStrip menu, string path)
+    {
+        menu.Items.Add("Open in Explorer", null, (s, e) =>
+        {
+            if (Directory.Exists(path))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        });
+        menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
+        menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
+        menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+        menu.Items.Add("Properties", null, (s, e) =>
+        {
+            if (Directory.Exists(path)) _shellPropertiesProvider.ShowPropertiesDialog(path, this.Handle);
+        });
+    }
 
     private void ShowTreeViewContextMenu(TreeNode node, Point location)
     {
@@ -1633,35 +2416,8 @@ public partial class MainForm : Form
 
         if (tag.StartsWith(TagProject))
         {
-            menu.Items.Add("New Collection...", null, MenuProjectNewCollection_Click);
-            menu.Items.Add("Add Folder...", null, MenuProjectAddFolder_Click);
-            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                await ShowAddWebResourceDialog(projectId, null);
-            });
-            menu.Items.Add("Add File...", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                await ShowAddFileResourceDialog(projectId, null);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Delete Project", null, async (s, e) =>
-            {
-                var projectId = Guid.Parse(tag.Substring(TagProject.Length));
-                var project = _projectManager.GetProject(projectId);
-                if (project == null) return;
-                var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.DeleteProjectAsync(projectId);
-                    _currentProject = null;
-                    RefreshTreeView();
-                }
-            });
+            var projectId = Guid.Parse(tag.Substring(TagProject.Length));
+            AddProjectMenuItems(menu, projectId, () => node.BeginEdit());
         }
 
         if (tag.StartsWith(TagCollection))
@@ -1669,220 +2425,30 @@ public partial class MainForm : Form
             var parts = tag.Substring(TagCollection.Length).Split(':');
             var projectId = Guid.Parse(parts[0]);
             var collectionId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("New Sub-Collection...", null, async (s, e) =>
-            {
-                using var dlg = new InputDialog("Create Sub-Collection", "Name:", "New Collection");
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    var name = dlg.InputText.Trim();
-                    if (!string.IsNullOrEmpty(name))
-                    {
-                        await _projectManager.CreateCollectionAsync(projectId, name, collectionId);
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Add Folder...", null, async (s, e) =>
-            {
-                if (!CheckLeafLimit("Add Folder")) return;
-                using var dlg = new FolderBrowserDialog { Description = "Select folder to add" };
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    await _projectManager.AddFolderReferenceAsync(projectId, dlg.SelectedPath, collectionId);
-                    RefreshLicense();
-                    UpdateLicenseUi();
-                    RefreshTreeView();
-                }
-            });
-            menu.Items.Add("Add Web Resource...", null, async (s, e) =>
-            {
-                await ShowAddWebResourceDialog(projectId, collectionId);
-            });
-            menu.Items.Add("Add File...", null, async (s, e) =>
-            {
-                await ShowAddFileResourceDialog(projectId, collectionId);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Rename", null, (s, e) => node.BeginEdit());
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Delete Collection", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
-                    "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.DeleteCollectionAsync(projectId, collectionId);
-                    RefreshTreeView();
-                }
-            });
+            AddCollectionMenuItems(menu, projectId, collectionId, () => node.BeginEdit());
         }
 
         if (tag.StartsWith(TagFolderRef))
         {
             var parts = tag.Substring(TagFolderRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var folderRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Edit Description...", null, async (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var fr = FindFolderRef(project, folderRefId);
-                if (fr != null)
-                {
-                    using var dlg = new InputDialog("Edit Folder Description", "Description:", fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        var description = dlg.InputText.Trim();
-                        await _projectManager.UpdateFolderReferenceAsync(
-                            projectId,
-                            folderRefId,
-                            newDescription: string.IsNullOrEmpty(description) ? null : description
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this folder reference from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                    RefreshTreeView();
-                }
-            });
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var fr = FindFolderRef(project, folderRefId);
-                if (fr != null && Directory.Exists(fr.RealPath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fr.RealPath) { UseShellExecute = true });
-                }
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) =>
-            {
-                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: false);
-            });
-            menu.Items.Add("Open PowerShell Here", null, (s, e) =>
-            {
-                var fr = FindFolderRef(_projectManager.GetProject(projectId), folderRefId);
-                if (fr != null) LaunchTerminal(fr.RealPath, usePowerShell: true);
-            });
+            AddFolderReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
 
         if (tag.StartsWith(TagWebResource))
         {
             var parts = tag.Substring(TagWebResource.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var resourceId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var project = _projectManager.GetProject(projectId);
-                var wr = FindWebResource(project, resourceId);
-                if (wr != null)
-                {
-                    using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateWebResourceAsync(
-                            projectId,
-                            resourceId,
-                            string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            dlg.ResourceUrl.Trim(),
-                            string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add("Launch", null, (s, e) => LaunchWebResource(tag));
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this web resource from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                    RefreshTreeView();
-                }
-            });
+            AddWebResourceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]), tag);
         }
 
         if (tag.StartsWith(TagFileRef))
         {
             var parts = tag.Substring(TagFileRef.Length).Split(':');
-            var projectId = Guid.Parse(parts[0]);
-            var fileRefId = Guid.Parse(parts[1]);
-
-            menu.Items.Add("Open", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null) OpenFileReference(fr);
-            });
-            menu.Items.Add("Open Containing Folder", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && File.Exists(fr.FilePath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{fr.FilePath}\"") { UseShellExecute = true });
-            });
-            menu.Items.Add("Copy Path", null, (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null && !string.IsNullOrEmpty(fr.FilePath)) Clipboard.SetText(fr.FilePath);
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Edit...", null, async (s, e) =>
-            {
-                var fr = FindFileRef(_projectManager.GetProject(projectId), fileRefId);
-                if (fr != null)
-                {
-                    using var dlg = new FileResourceDialog("Edit File", fr.DisplayName ?? "", fr.FilePath, fr.Description ?? "");
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        await _projectManager.UpdateFileReferenceAsync(
-                            projectId,
-                            fileRefId,
-                            newDisplayName: string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
-                            newPath: dlg.ResourceFilePath.Trim(),
-                            newDescription: string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim()
-                        );
-                        RefreshTreeView();
-                    }
-                }
-            });
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Remove from Project", null, async (s, e) =>
-            {
-                var result = MessageBox.Show("Remove this file reference from the project?",
-                    "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
-                    RefreshTreeView();
-                }
-            });
+            AddFileReferenceMenuItems(menu, Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
 
         if (tag.StartsWith(TagRealFolder))
         {
-            var path = tag.Substring(TagRealFolder.Length);
-            menu.Items.Add("Open in Explorer", null, (s, e) =>
-            {
-                if (Directory.Exists(path))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-                }
-            });
-            menu.Items.Add("Open Command Prompt Here", null, (s, e) => LaunchTerminal(path, usePowerShell: false));
-            menu.Items.Add("Open PowerShell Here", null, (s, e) => LaunchTerminal(path, usePowerShell: true));
-            menu.Items.Add("Copy Path", null, (s, e) => Clipboard.SetText(path));
+            AddRealFolderMenuItems(menu, tag.Substring(TagRealFolder.Length));
         }
 
         if (menu.Items.Count > 0)
@@ -1966,17 +2532,87 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        _availabilityRetryTimer.Stop();
+        // Deliberately NOT disposing _unavailableTreeFont/_unavailableListFont here: they're still
+        // assigned to TreeNode.NodeFont/ListViewItem.Font on every unavailable row, and the TreeView
+        // can still receive a WM_NOTIFY/NM_CUSTOMDRAW repaint between OnFormClosing and the window
+        // actually being destroyed. Disposing them here left those controls pointing at a Font whose
+        // GDI handle was already gone, and TreeView.CustomDraw's Font.ToHfont() call would throw
+        // ArgumentException on that last repaint. The process exit reclaims these either way.
         SaveTreeState();
+        SaveWindowBounds();
         base.OnFormClosing(e);
     }
 
+    /// <summary>
+    /// A GDPR-style "give me all my data" export: zips up whatever this app has actually written
+    /// to %APPDATA%\ProjectExplorer\ (projects.json, license.json, uisettings.json,
+    /// appsettings.json) so the user can hand it off or archive it. Not a backup/restore feature —
+    /// there is deliberately no matching "Import".
+    /// </summary>
+    private void MenuFileExportMyData_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Export All My Data",
+            Filter = "Zip archive (*.zip)|*.zip|All files (*.*)|*.*",
+            FileName = $"ProjectNestExplorer-MyData-{DateTime.Now:yyyy-MM-dd}.zip"
+        };
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var included = new UserDataExportService().ExportAll(dlg.FileName);
+
+            var message = included.Count > 0
+                ? $"Exported {included.Count} file(s) to:\n{dlg.FileName}\n\nIncluded: {string.Join(", ", included)}"
+                : $"Nothing has been saved yet, so an empty archive was created at:\n{dlg.FileName}";
+
+            MessageBox.Show(this, message, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Failed to export data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     // ── Drag and Drop ──
+
+    // Where the cursor sits over a row, driving whether we show an insertion line
+    // (reorder as a sibling) or highlight the whole row (drop into it as a container).
+    private enum DropZone { None, Before, Into, After }
+
+    private enum DropKind { ReparentOrReorder, ReorderProjects, ConvertProjectToCollection, ConvertCollectionToProject }
+
+    private sealed class DropPlan
+    {
+        public required DropKind Kind { get; init; }
+        public required TreeNode HighlightNode { get; init; }
+        public required DropZone Zone { get; init; }
+
+        // ReparentOrReorder + ConvertCollectionToProject: the dragged item's current project/child.
+        public Guid ProjectId { get; init; }
+        public Guid ChildId { get; init; }
+
+        // ConvertProjectToCollection: the project being dragged, and the project hosting the target collection.
+        public Guid TargetProjectId { get; init; }
+
+        // ReparentOrReorder only.
+        public Guid? DestParentCollectionId { get; init; }
+        public Guid? BeforeSiblingId { get; init; }
+    }
+
+    // Screen-coordinate insertion line, drawn with ControlPaint.DrawReversibleLine (XOR-painted
+    // directly onto the screen DC) so it can be erased just by drawing it again — no Invalidate/
+    // repaint bookkeeping needed for a control as heavy to redraw as a TreeView.
+    private (Point Start, Point End)? _insertionLine;
 
     private void TreeView_ItemDrag(object? sender, ItemDragEventArgs e)
     {
         if (e.Item is not TreeNode node) return;
         var tag = node.Tag?.ToString() ?? "";
-        if (!tag.StartsWith(TagCollection) && !tag.StartsWith(TagFolderRef) && !tag.StartsWith(TagWebResource))
+        if (!tag.StartsWith(TagCollection) && !tag.StartsWith(TagFolderRef) && !tag.StartsWith(TagWebResource) && !tag.StartsWith(TagProject))
             return;
         treeView.DoDragDrop(node, DragDropEffects.Move);
     }
@@ -1993,54 +2629,91 @@ public partial class MainForm : Form
         if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode)
         {
             e.Effect = DragDropEffects.None;
+            ClearDragHighlight();
+            ClearInsertionLine();
             return;
         }
 
         var pt = treeView.PointToClient(new Point(e.X, e.Y));
-        var targetNode = treeView.GetNodeAt(pt);
+        var (targetNode, zone) = GetDropZone(draggedNode, pt);
+        var plan = targetNode != null ? ComputeDropPlan(draggedNode, targetNode, zone) : null;
 
-        if (targetNode == null || !IsValidDropTarget(draggedNode, targetNode))
+        if (plan == null)
         {
             e.Effect = DragDropEffects.None;
             ClearDragHighlight();
+            ClearInsertionLine();
             return;
         }
 
         e.Effect = DragDropEffects.Move;
 
-        if (!ReferenceEquals(targetNode, _dragHighlightNode))
+        if (plan.Zone == DropZone.Into)
+        {
+            ClearInsertionLine();
+            if (!ReferenceEquals(plan.HighlightNode, _dragHighlightNode))
+            {
+                ClearDragHighlight();
+                _dragHighlightNode = plan.HighlightNode;
+                plan.HighlightNode.BackColor = SystemColors.Highlight;
+                plan.HighlightNode.ForeColor = SystemColors.HighlightText;
+            }
+        }
+        else
         {
             ClearDragHighlight();
-            _dragHighlightNode = targetNode;
-            targetNode.BackColor = SystemColors.Highlight;
-            targetNode.ForeColor = SystemColors.HighlightText;
+            DrawInsertionLine(targetNode!, plan.Zone);
         }
     }
 
-    private void TreeView_DragLeave(object? sender, EventArgs e) => ClearDragHighlight();
+    private void TreeView_DragLeave(object? sender, EventArgs e)
+    {
+        ClearDragHighlight();
+        ClearInsertionLine();
+    }
 
     private async void TreeView_DragDrop(object? sender, DragEventArgs e)
     {
         ClearDragHighlight();
+        ClearInsertionLine();
 
         if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode draggedNode) return;
 
         var pt = treeView.PointToClient(new Point(e.X, e.Y));
-        var targetNode = treeView.GetNodeAt(pt);
-        if (targetNode == null || !IsValidDropTarget(draggedNode, targetNode)) return;
+        var (targetNode, zone) = GetDropZone(draggedNode, pt);
+        var plan = targetNode != null ? ComputeDropPlan(draggedNode, targetNode, zone) : null;
+        if (plan == null) return;
 
         var dragTag = draggedNode.Tag?.ToString() ?? "";
-        var targetTag = targetNode.Tag?.ToString() ?? "";
-
-        var projectId = GetProjectIdFromTag(dragTag);
-        var childId = GetChildIdFromTag(dragTag);
-        var newParentId = GetCollectionIdFromTag(targetTag);
 
         try
         {
-            await _projectManager.MoveChildAsync(projectId, childId, newParentId);
-            RefreshTreeView();
-            SelectTreeNodeByTag(dragTag);
+            switch (plan.Kind)
+            {
+                case DropKind.ReparentOrReorder:
+                    await _projectManager.MoveChildAsync(plan.ProjectId, plan.ChildId, plan.DestParentCollectionId, plan.BeforeSiblingId);
+                    RefreshTreeView();
+                    SelectTreeNodeByTag(dragTag);
+                    break;
+
+                case DropKind.ReorderProjects:
+                    await _projectManager.MoveProjectAsync(plan.ProjectId, plan.BeforeSiblingId);
+                    RefreshTreeView();
+                    SelectTreeNodeByTag(dragTag);
+                    break;
+
+                case DropKind.ConvertProjectToCollection:
+                    await _projectManager.ConvertProjectToCollectionAsync(plan.ProjectId, plan.TargetProjectId, plan.DestParentCollectionId);
+                    RefreshTreeView();
+                    SelectTreeNodeByTag(TagCollection + $"{plan.TargetProjectId}:{plan.ProjectId}");
+                    break;
+
+                case DropKind.ConvertCollectionToProject:
+                    await _projectManager.ConvertCollectionToProjectAsync(plan.ProjectId, plan.ChildId);
+                    RefreshTreeView();
+                    SelectTreeNodeByTag(TagProject + plan.ChildId);
+                    break;
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -2058,30 +2731,208 @@ public partial class MainForm : Form
         }
     }
 
-    private bool IsValidDropTarget(TreeNode draggedNode, TreeNode targetNode)
+    private void DrawInsertionLine(TreeNode targetNode, DropZone zone)
     {
-        if (ReferenceEquals(draggedNode, targetNode)) return false;
+        var bounds = targetNode.Bounds;
+        var y = zone == DropZone.Before ? bounds.Top : bounds.Bottom;
+        var start = treeView.PointToScreen(new Point(bounds.Left, y));
+        var end = treeView.PointToScreen(new Point(treeView.ClientSize.Width, y));
+
+        if (_insertionLine is { } current && current.Start == start && current.End == end)
+            return;
+
+        ClearInsertionLine();
+        ControlPaint.DrawReversibleLine(start, end, SystemColors.Highlight);
+        _insertionLine = (start, end);
+    }
+
+    private void ClearInsertionLine()
+    {
+        if (_insertionLine is { } line)
+        {
+            ControlPaint.DrawReversibleLine(line.Start, line.End, SystemColors.Highlight);
+            _insertionLine = null;
+        }
+    }
+
+    /// <summary>
+    /// Determines which row the cursor is over and which zone of its height it's in.
+    /// Project rows are Into-only for anything except another Project (Projects have no
+    /// "into" of their own — they never nest under each other, only under the Projects
+    /// root); dragging one Project onto another gets Before/After only, to reorder them.
+    /// Collections get Before/Into/After. Leaf rows (FolderReference/WebResource/
+    /// FileReference) get Before/After only, since they can't contain children.
+    /// </summary>
+    private (TreeNode? Node, DropZone Zone) GetDropZone(TreeNode draggedNode, Point clientPt)
+    {
+        // Hit-test at a fixed near-left X rather than the cursor's actual X: TreeNode.Bounds
+        // (and the row highlight it drives) only spans the icon+label, so a cursor sitting to
+        // the right of a short or deeply-indented label — a very normal place for it to be
+        // mid-drag — would otherwise miss the row entirely and read as "no valid target here".
+        var targetNode = treeView.GetNodeAt(new Point(2, clientPt.Y));
+        if (targetNode == null) return (null, DropZone.None);
+
+        var dragTag = draggedNode.Tag?.ToString() ?? "";
+        var tag = targetNode.Tag?.ToString() ?? "";
+
+        if (tag == TagProjectsRoot)
+            return (targetNode, DropZone.Into);
+
+        if (tag.StartsWith(TagProject))
+        {
+            if (!dragTag.StartsWith(TagProject))
+                return (targetNode, DropZone.Into);
+
+            var pBounds = targetNode.Bounds;
+            var pFrac = pBounds.Height == 0 ? 0.5 : (double)(clientPt.Y - pBounds.Top) / pBounds.Height;
+            return (targetNode, pFrac < 0.5 ? DropZone.Before : DropZone.After);
+        }
+
+        var bounds = targetNode.Bounds;
+        var frac = bounds.Height == 0 ? 0.5 : (double)(clientPt.Y - bounds.Top) / bounds.Height;
+
+        if (tag.StartsWith(TagCollection))
+        {
+            if (frac < 0.2) return (targetNode, DropZone.Before);
+            if (frac > 0.8) return (targetNode, DropZone.After);
+            return (targetNode, DropZone.Into);
+        }
+
+        return (targetNode, frac < 0.5 ? DropZone.Before : DropZone.After);
+    }
+
+    private DropPlan? ComputeDropPlan(TreeNode draggedNode, TreeNode targetNode, DropZone zone)
+    {
+        if (ReferenceEquals(draggedNode, targetNode)) return null;
+        if (IsAncestorOf(draggedNode, targetNode)) return null;
 
         var dragTag = draggedNode.Tag?.ToString() ?? "";
         var targetTag = targetNode.Tag?.ToString() ?? "";
 
-        if (!targetTag.StartsWith(TagCollection) && !targetTag.StartsWith(TagProject)) return false;
-        if (!dragTag.StartsWith(TagCollection) && !dragTag.StartsWith(TagFolderRef) && !dragTag.StartsWith(TagWebResource)) return false;
-
-        if (GetProjectIdFromTag(dragTag) != GetProjectIdFromTag(targetTag)) return false;
-
-        // Prevent dropping onto the current parent (already there — no move would happen)
-        if (ReferenceEquals(targetNode, draggedNode.Parent)) return false;
-
-        // Prevent dropping onto a descendant of the dragged node
-        var ancestor = targetNode.Parent;
-        while (ancestor != null)
+        if (dragTag.StartsWith(TagProject))
         {
-            if (ReferenceEquals(ancestor, draggedNode)) return false;
-            ancestor = ancestor.Parent;
+            var draggedProjectId = GetProjectIdFromTag(dragTag);
+
+            // Drag a Project onto another Project: reorder them (Projects never nest under
+            // each other, so this is never an "into" — see GetDropZone).
+            if (targetTag.StartsWith(TagProject) && zone != DropZone.Into)
+            {
+                var beforeProjectId = zone == DropZone.Before
+                    ? GetProjectIdFromTag(targetTag)
+                    : NextSiblingIdSkipping(targetNode, draggedNode, GetProjectIdFromTag);
+                return new DropPlan
+                {
+                    Kind = DropKind.ReorderProjects,
+                    HighlightNode = targetNode,
+                    Zone = zone,
+                    ProjectId = draggedProjectId,
+                    BeforeSiblingId = beforeProjectId
+                };
+            }
+
+            // Drag a Project onto a Collection's middle zone: convert the project into a
+            // collection nested there.
+            if (zone == DropZone.Into && targetTag.StartsWith(TagCollection))
+            {
+                var hostProjectId = GetProjectIdFromTag(targetTag);
+                if (hostProjectId == draggedProjectId) return null; // can't nest a project inside its own collection
+                return new DropPlan
+                {
+                    Kind = DropKind.ConvertProjectToCollection,
+                    HighlightNode = targetNode,
+                    Zone = DropZone.Into,
+                    ProjectId = draggedProjectId,
+                    TargetProjectId = hostProjectId,
+                    DestParentCollectionId = GetCollectionIdFromTag(targetTag)
+                };
+            }
+
+            return null;
         }
 
-        return true;
+        // Drag a Collection onto the Projects root: convert it into a new top-level project.
+        if (targetTag == TagProjectsRoot)
+        {
+            if (zone != DropZone.Into || !dragTag.StartsWith(TagCollection)) return null;
+            return new DropPlan
+            {
+                Kind = DropKind.ConvertCollectionToProject,
+                HighlightNode = targetNode,
+                Zone = DropZone.Into,
+                ProjectId = GetProjectIdFromTag(dragTag),
+                ChildId = GetChildIdFromTag(dragTag)
+            };
+        }
+
+        // Reparent / reorder: Collection, FolderReference, or WebResource within the same project.
+        if (!dragTag.StartsWith(TagCollection) && !dragTag.StartsWith(TagFolderRef) && !dragTag.StartsWith(TagWebResource))
+            return null;
+
+        var projectId = GetProjectIdFromTag(dragTag);
+        if (projectId != GetProjectIdFromTag(targetTag)) return null;
+
+        TreeNode highlightNode;
+        Guid? destParentId;
+        Guid? beforeSiblingId;
+
+        if (zone == DropZone.Into)
+        {
+            if (!targetTag.StartsWith(TagCollection) && !targetTag.StartsWith(TagProject)) return null;
+            highlightNode = targetNode;
+            destParentId = GetCollectionIdFromTag(targetTag);
+            beforeSiblingId = null; // append at end
+        }
+        else
+        {
+            var parentNode = targetNode.Parent;
+            var parentTag = parentNode?.Tag?.ToString() ?? "";
+            if (parentNode == null || (!parentTag.StartsWith(TagCollection) && !parentTag.StartsWith(TagProject)))
+                return null;
+            if (ReferenceEquals(parentNode, draggedNode)) return null;
+
+            highlightNode = parentNode;
+            destParentId = GetCollectionIdFromTag(parentTag);
+
+            beforeSiblingId = zone == DropZone.Before
+                ? GetChildIdFromTag(targetTag)
+                : NextSiblingIdSkipping(targetNode, draggedNode, GetChildIdFromTag);
+        }
+
+        return new DropPlan
+        {
+            Kind = DropKind.ReparentOrReorder,
+            HighlightNode = highlightNode,
+            Zone = zone,
+            ProjectId = projectId,
+            ChildId = GetChildIdFromTag(dragTag),
+            DestParentCollectionId = destParentId,
+            BeforeSiblingId = beforeSiblingId
+        };
+    }
+
+    /// <summary>
+    /// For an "After" zone drop: the Id of whichever sibling currently follows targetNode,
+    /// skipping over draggedNode itself if it happens to be that very next sibling (dragging
+    /// an item to sit "after" its own immediately-preceding sibling is a same-position no-op,
+    /// not "move to the end"). Null means "append at the end" (targetNode is last).
+    /// </summary>
+    private static Guid? NextSiblingIdSkipping(TreeNode targetNode, TreeNode draggedNode, Func<string, Guid> parseId)
+    {
+        var next = targetNode.NextNode;
+        while (next != null && ReferenceEquals(next, draggedNode))
+            next = next.NextNode;
+        return next?.Tag is string nextTag ? parseId(nextTag) : null;
+    }
+
+    private static bool IsAncestorOf(TreeNode possibleAncestor, TreeNode node)
+    {
+        var cur = node.Parent;
+        while (cur != null)
+        {
+            if (ReferenceEquals(cur, possibleAncestor)) return true;
+            cur = cur.Parent;
+        }
+        return false;
     }
 
     private static Guid GetProjectIdFromTag(string tag)
@@ -2090,6 +2941,7 @@ public partial class MainForm : Form
         if (tag.StartsWith(TagCollection)) return Guid.Parse(tag[TagCollection.Length..].Split(':')[0]);
         if (tag.StartsWith(TagFolderRef)) return Guid.Parse(tag[TagFolderRef.Length..].Split(':')[0]);
         if (tag.StartsWith(TagWebResource)) return Guid.Parse(tag[TagWebResource.Length..].Split(':')[0]);
+        if (tag.StartsWith(TagFileRef)) return Guid.Parse(tag[TagFileRef.Length..].Split(':')[0]);
         return Guid.Empty;
     }
 
@@ -2098,6 +2950,7 @@ public partial class MainForm : Form
         if (tag.StartsWith(TagCollection)) return Guid.Parse(tag[TagCollection.Length..].Split(':')[1]);
         if (tag.StartsWith(TagFolderRef)) return Guid.Parse(tag[TagFolderRef.Length..].Split(':')[1]);
         if (tag.StartsWith(TagWebResource)) return Guid.Parse(tag[TagWebResource.Length..].Split(':')[1]);
+        if (tag.StartsWith(TagFileRef)) return Guid.Parse(tag[TagFileRef.Length..].Split(':')[1]);
         return Guid.Empty;
     }
 
@@ -2120,17 +2973,26 @@ public partial class MainForm : Form
 
         var project = _projectManager.GetProject(projectId);
         var webResource = FindWebResource(project, resourceId);
+        if (webResource != null) LaunchWebResource(webResource);
+    }
 
-        if (webResource != null && !string.IsNullOrWhiteSpace(webResource.Url))
+    private void LaunchWebResource(WebResource webResource)
+    {
+        // Must resolve to an http(s) URI before handing it to ShellExecute -- a scheme-less string
+        // like "example.com" is otherwise treated as a local file path rather than a URL to browse to.
+        if (!WebResource.TryGetNavigableUri(webResource.Url, out var uri))
         {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(webResource.Url) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to launch URL: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            MessageBox.Show($"\"{webResource.Url}\" is not a valid URL.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.ToString()) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to launch URL: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

@@ -5,7 +5,15 @@
 ; Output lands in publish\ at the repo root, then run this script.
 
 #define AppName      "Project Nest Explorer"
-#define AppVersion   "1.0.2"
+; Command-line callers (release.yml, build-installer.ps1) always pass
+; /DAppVersion=X.Y.Z. Without this guard, this line's own #define runs after
+; the command-line one and silently wins, so the compiled installer keeps
+; whatever version was last hardcoded here regardless of what was requested
+; (this is exactly how the 1.0.4 release shipped an installer still named
+; ProjectNest-1.0.3-Setup.exe, which then failed to attach to the release).
+#ifndef AppVersion
+  #define AppVersion "0.0.0"
+#endif
 #define AppPublisher "HxM Blazor Software LLC"
 #define AppExeName   "ProjectNest.exe"
 #define AppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
@@ -23,6 +31,7 @@ DefaultGroupName={#AppName}
 OutputDir=..\installer-output
 OutputBaseFilename=ProjectNest-{#AppVersion}-Setup
 SetupIconFile=..\src\ProjectExplorer.WinForms\Assets\app.ico
+LicenseFile=..\LICENSE-EULA.txt
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

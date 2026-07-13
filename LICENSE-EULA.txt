@@ -1,0 +1,65 @@
+PROJECT NEST EXPLORER — END-USER LICENSE AGREEMENT
+Publisher: HxM Blazor Software LLC ("we", "us")
+
+This End-User License Agreement ("Agreement") governs your use of Project Nest
+Explorer (the "Software"), a Windows desktop application. By installing,
+activating, or using the Software, you agree to the terms below. If you do not
+agree, do not install or use the Software.
+
+1. LICENSE GRANT
+Subject to this Agreement, we grant you a non-exclusive, non-transferable
+license to install and use the Software:
+  - Free tier: up to 5 projects and 50 folder/file/web references, at no cost.
+  - Licensed tier: unlimited use, once activated with a valid license key
+    issued to you.
+You may use the Software for personal use or internally within your business
+— including to run your own commercial work — on as many of your own devices
+as you need. This license does not permit using the Software as a component
+of, or basis for, another product that you distribute, sell, or sublicense.
+
+2. LICENSE KEY
+Your license key is issued to you personally and may not be shared,
+published, sold, or transferred to another person or organization. Activating
+the Software with a key you did not purchase, or distributing your key, is a
+violation of this Agreement.
+
+3. RESTRICTIONS
+You may not:
+  - Reverse engineer, decompile, or disassemble the Software, except to the
+    extent such restriction is prohibited by applicable law.
+  - Resell, sublicense, rent, or lease the Software or your license key.
+  - Use the Software to build or support a competing product.
+  - Remove or alter any copyright, trademark, or proprietary notices in the
+    Software.
+
+4. OWNERSHIP
+The Software is licensed, not sold. HxM Blazor Software LLC retains all
+right, title, and interest in the Software, including all copyright and
+other intellectual property rights. Where the Software's source code is
+publicly viewable, that visibility does not grant any license to copy,
+modify, or redistribute it — all rights are reserved.
+
+5. NO WARRANTY
+The Software is provided "AS IS," without warranty of any kind, express or
+implied, including but not limited to warranties of merchantability, fitness
+for a particular purpose, and non-infringement.
+
+6. LIMITATION OF LIABILITY
+To the maximum extent permitted by law, HxM Blazor Software LLC shall not be
+liable for any indirect, incidental, special, or consequential damages, or
+for any loss of data, arising out of or related to your use of the Software.
+
+7. SUPPORT & REFUNDS
+Support requests: support@blaznaccess.com. Purchases made through Gumroad are
+subject to Gumroad's refund policy.
+
+8. TERMINATION
+We may terminate your license if you violate this Agreement. Upon
+termination, you must stop using the Software. Sections 3-6 survive
+termination.
+
+9. CHANGES
+We may update this Agreement for future versions of the Software. Continued
+use after an update constitutes acceptance of the revised terms.
+
+Questions? Contact support@blaznaccess.com.
