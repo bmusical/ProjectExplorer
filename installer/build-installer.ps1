@@ -4,14 +4,40 @@
 # Usage:
 #   .\build-installer.ps1 -Version 1.2.0
 #   .\build-installer.ps1 -Version 1.2.0 -UpdateXml   # also updates updates\updates.xml
+#   .\build-installer.ps1 -Version 1.2.0 -Sign        # also code-signs the exe + installer
+#
+# -Sign requires Certum SimplySign Desktop installed and a signing session approved from the
+# SimplySign mobile app (~2hr window) before running — see docs/LAUNCH_CHECKLIST.md Section 6.
 
 param(
     [string]$Version   = "1.0.0",
-    [switch]$UpdateXml          # pass to bump updates\updates.xml after a successful build
+    [switch]$UpdateXml,        # pass to bump updates\updates.xml after a successful build
+    [switch]$Sign              # pass to code-sign the published exe + installer via signtool
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path $PSScriptRoot -Parent
+
+function Invoke-CodeSign {
+    param([string]$FilePath)
+
+    $signtoolCmd = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    $signtool = if ($signtoolCmd) { $signtoolCmd.Source } else {
+        Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    }
+    if (-not $signtool) {
+        Write-Error "signtool.exe not found (ships with the Windows SDK). Install it, or omit -Sign."
+        exit 1
+    }
+
+    Write-Host "==> Signing $FilePath ..." -ForegroundColor Cyan
+    & $signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a "$FilePath"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "signtool failed for $FilePath. Make sure Certum SimplySign Desktop is installed and a signing session is open (approve via the SimplySign mobile app)."
+        exit 1
+    }
+}
 
 # ── 1. Publish ────────────────────────────────────────────────────────────────
 
@@ -28,6 +54,10 @@ dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.
     /p:PublishDir="$repoRoot\publish\\"
 
 if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish failed"; exit 1 }
+
+if ($Sign) {
+    Invoke-CodeSign "$repoRoot\publish\ProjectNest.exe"
+}
 
 # ── 2. Inno Setup ─────────────────────────────────────────────────────────────
 
@@ -49,6 +79,10 @@ $setupExe = "$PSScriptRoot\installer-output\ProjectNest-$Version-Setup.exe"
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
 
 Write-Host "==> Installer: $setupExe" -ForegroundColor Green
+
+if ($Sign) {
+    Invoke-CodeSign $setupExe
+}
 
 # ── 3. Update updates.xml (optional) ─────────────────────────────────────────
 
@@ -75,6 +109,12 @@ if ($UpdateXml)
 
 Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green
+Write-Host ""
+if ($Sign) {
+    Write-Host "==> Signed: publish\ProjectNest.exe and $setupExe" -ForegroundColor Green
+} else {
+    Write-Host "==> Not signed — re-run with -Sign to code-sign the exe + installer (avoids SmartScreen warnings)." -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "Next steps for a release:"
 Write-Host "  1. Commit and push updates\updates.xml"

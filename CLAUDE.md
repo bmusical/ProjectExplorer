@@ -44,7 +44,8 @@ dotnet test --filter "FullyQualifiedName~TestMethodName"
 dotnet publish src/ProjectExplorer.WinForms -r win-x64 --self-contained true -p:PublishSingleFile=true
 
 # Build the Inno Setup installer end-to-end (Windows only, requires Inno Setup 6)
-./installer/build-installer.ps1 -Version X.Y.Z -UpdateXml
+# -Sign code-signs the exe + installer via signtool (requires Certum SimplySign Desktop + an open signing session)
+./installer/build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
 ```
 
 ## Architecture
@@ -113,6 +114,7 @@ The app is freemium: **Free = 3 projects, 25 leaf references** (Collections don'
 - **Dev-mode placeholder — already replaced**: `LicenseManager.PublicKeyPem` used to ship as `"DEVELOPMENT_KEY_PLACEHOLDER"` (which makes the app accept *any* correctly-formatted string as a valid license), but the real ECDSA public key was embedded in commit `5a95f73` (2026-07-02). Verification is live, not dev mode. `docs/LAUNCH_CHECKLIST.md`'s pre-flight checkbox for this is already checked off, in sync with the code.
 - **Packaging**: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true` → self-contained single-file `publish/ProjectNest.exe`.
 - **Installer**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) wraps the exe into `ProjectNest-<version>-Setup.exe`. Script at `installer/ProjectExplorer.iss`; fully scripted via `installer/build-installer.ps1`.
+- **Code signing**: Certum "Code Signing in the Cloud" (OV) certificate issued 2026-07-13 (valid to 2027-07-13) to HXM Blazor Software LLC via SimplySign — the private key lives in Certum's cloud HSM, never exported locally. Pass `-Sign` to `installer/build-installer.ps1` to sign both `publish/ProjectNest.exe` and the Inno Setup output via `signtool`; requires Certum SimplySign Desktop installed and a signing session approved from the SimplySign mobile app first. See `docs/LAUNCH_CHECKLIST.md` Section 6.
 - **Auto-update**: Wired up via `Autoupdater.NET.Official`, reading `updates/updates.xml` from the repo's `master` branch on GitHub (requires the repo to be public).
 - **Sales channel**: Gumroad (handles checkout/tax); recommended model is signed keys generated per-sale via `tools/KeyGen`, not Gumroad's own random license keys (incompatible with the ECDSA verifier).
 - **No store dependency**: direct download, no Microsoft Store submission.

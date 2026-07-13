@@ -13,17 +13,19 @@ each step below.
    release notes (can reuse the changelog entry).
 3. **Build the installer:**
    ```powershell
-   .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml
+   .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
    ```
    This publishes a self-contained `win-x64` single-file exe to `publish\ProjectNest.exe`, runs
    Inno Setup to produce `installer-output\ProjectNest-X.Y.Z-Setup.exe`, and (because of
-   `-UpdateXml`) rewrites `updates\updates.xml` with the new version and download URL.
+   `-UpdateXml`) rewrites `updates\updates.xml` with the new version and download URL. `-Sign`
+   code-signs both the exe and the installer via `signtool` — see step 5.
 4. **Test the installer** on a clean Windows VM with no .NET installed, to confirm the
    self-contained build actually runs standalone. Verify the app icon shows correctly on the
    taskbar, Start menu shortcut, and Add/Remove Programs.
-5. **(Recommended) Code-sign** the exe and installer with `signtool` if you have a code-signing
-   certificate — see `docs/LAUNCH_CHECKLIST.md` Section 6. Unsigned exes trigger SmartScreen
-   warnings that hurt conversion.
+5. **Code-sign** the exe and installer by passing `-Sign` to `build-installer.ps1` (already covered
+   in step 3) — see `docs/LAUNCH_CHECKLIST.md` Section 6. Requires Certum SimplySign Desktop
+   installed and a signing session approved from the SimplySign mobile app before the build runs.
+   Unsigned exes trigger SmartScreen warnings that hurt conversion.
 6. **Commit and push** the version bump and updated `updates/updates.xml`.
 7. **Create the GitHub Release**, tagged `X.Y.Z` (no `v` prefix — this repo standardized on bare
    version tags):

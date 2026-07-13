@@ -237,7 +237,10 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 Unsigned exes trigger **SmartScreen "Unknown publisher"** warnings that scare buyers and tank
 conversion.
 
-- [ ] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+- [x] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+  *(Done — certificate issued 2026-07-13, valid to 2027-07-13, subject "HXM Blazor Software LLC",
+  Safety Harbor, FL, US. Public cert downloaded as `.pem`/DER; the private key stays in Certum's
+  cloud HSM and is never exported, per SimplySign's design.)*
   (e.g. [SSLmentor lists it from $116/yr](https://www.sslmentor.com/certum/certumcodecloud); reseller
   pricing shifts, so shop around at purchase time). It's signed via Certum's free
   [SimplySign](https://www.certum.eu/en/simplysign/) mobile app instead of a physical USB token — the
@@ -257,15 +260,17 @@ conversion.
   - As of March 2026, CA/Browser Forum rules cap **all** code-signing certs (OV and EV) at 459 days
     (~15 months) max validity — even a "multi-year" plan needs a free reissue partway through. Budget for
     that regardless of vendor.
-- [ ] 💡 Sign **both** the app exe and the installer exe with `signtool`:
+- [x] 💡 Sign **both** the app exe and the installer exe with `signtool`:
   ```powershell
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
     "publish\ProjectNest.exe"
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
     "installer-output\ProjectNest-1.0.1-Setup.exe"
   ```
-- [ ] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
-  it's scripted. Note: with SimplySign the *script* is automatic but each release still needs a manual
+- [x] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
+  it's scripted. *(Done — pass `-Sign` to `build-installer.ps1`; it signs `publish\ProjectNest.exe`
+  right after publish and the Inno Setup output right after compilation, both via `signtool sign /a`.)*
+  Note: with SimplySign the *script* is automatic but each release still needs a manual
   phone approval to open the ~2hr signing window first — it's not unattended/headless CI signing unless
   you upgrade to a plan that supports that later.
 - [ ] 💡 If you can't sign yet: document that users will see a SmartScreen prompt and must click
