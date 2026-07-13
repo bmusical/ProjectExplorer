@@ -18,22 +18,22 @@ internal static class Program
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
         var appSettingsManager = new AppSettingsManager();
-        var appSettings = appSettingsManager.Load();
 
-        // ── Focus on Run: Prevent multiple copies ──────────────────────────
-        // Only "Prevent" launches register/check the single-instance guard, so an "Allow"
-        // launch never blocks and never gets signaled by a later "Prevent" launch either —
-        // each launch simply acts on its own current setting.
-        SingleInstanceGuard? instanceGuard = null;
-        if (appSettings.FocusOnRun == FocusOnRunMode.PreventMultipleCopies)
+        // ── Single instance, always enforced ───────────────────────────────
+        // Two windows against the same projects.json can silently destroy each other's
+        // changes: ProjectManager loads the whole file into memory once at startup and
+        // never refreshes it, so a save from one window can be clobbered by a later save
+        // from another window still holding a stale in-memory copy of the same project (or,
+        // for project reordering, of the *entire* project list). This used to be a user
+        // choice ("Allow multiple copies"); it isn't safe to offer until the app can actually
+        // support concurrent windows without corrupting data, so a second launch always just
+        // switches to the running window instead of opening a new one.
+        var instanceGuard = new SingleInstanceGuard();
+        if (!instanceGuard.IsFirstInstance)
         {
-            instanceGuard = new SingleInstanceGuard();
-            if (!instanceGuard.IsFirstInstance)
-            {
-                instanceGuard.SignalExistingInstance();
-                instanceGuard.Dispose();
-                return;
-            }
+            instanceGuard.SignalExistingInstance();
+            instanceGuard.Dispose();
+            return;
         }
 
         try
@@ -42,11 +42,11 @@ internal static class Program
         }
         finally
         {
-            instanceGuard?.Dispose();
+            instanceGuard.Dispose();
         }
     }
 
-    private static void RunApplication(AppSettingsManager appSettingsManager, SingleInstanceGuard? instanceGuard)
+    private static void RunApplication(AppSettingsManager appSettingsManager, SingleInstanceGuard instanceGuard)
     {
         // ── Set up services ────────────────────────────────────────────────
         var repository     = new JsonProjectRepository();
@@ -73,7 +73,7 @@ internal static class Program
             licenseManager, license, appSettingsManager);
         mainForm.ListViewItemSorter = new ListViewColumnSorter();
 
-        instanceGuard?.ListenForActivation(() =>
+        instanceGuard.ListenForActivation(() =>
         {
             if (mainForm.IsHandleCreated)
                 mainForm.BeginInvoke(mainForm.RestoreAndActivate);

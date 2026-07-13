@@ -74,7 +74,17 @@ All children inherit from `ProjectChild` (Id, ParentId, SortOrder, Metadata dict
 
 ### Data Flow
 
-User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepository.SaveAllAsync()` → `%APPDATA%\ProjectExplorer\projects.json` (with `.bak` backup on each save). License state is stored separately at `%APPDATA%\ProjectExplorer\license.json` via `LicenseManager`; tree expand/select state at `uisettings.json`; app preferences (Focus on Run) and window bounds at `appsettings.json` via `AppSettingsManager`.
+User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepository.SaveAllAsync()` → `%APPDATA%\ProjectExplorer\projects.json` (with `.bak` backup on each save). License state is stored separately at `%APPDATA%\ProjectExplorer\license.json` via `LicenseManager`; tree expand/select state at `uisettings.json`; window bounds at `appsettings.json` via `AppSettingsManager`.
+
+`ProjectManager` loads the entire project list into memory once, in `InitializeAsync()` at
+startup, and never refreshes it from disk afterward — there's no file watcher or polling.
+`JsonProjectRepository.SaveProjectAsync` reloads *other* projects fresh from disk before writing
+(so edits to unrelated projects aren't clobbered), but the project actually being saved is always
+written from whatever's in that process's memory, stale or not; `SaveAllAsync` (used directly by
+project reordering) skips even that and overwrites the whole file with the in-memory snapshot. A
+second running copy of the app, with its own independent in-memory copy of the same file, could
+silently discard the first copy's edits this way — which is why single-instance enforcement
+(below) is mandatory rather than a user choice.
 
 ### Key Files
 
@@ -82,10 +92,9 @@ User action in `MainForm` → `ProjectManager` (async CRUD) → `JsonProjectRepo
 - `src/ProjectExplorer.Core/Services/JsonProjectRepository.cs` — persistence; manual JSON node traversal for polymorphic deserialization
 - `src/ProjectExplorer.Core/Services/LicenseManager.cs` — free-tier limit checks + ECDSA license key verification; see Licensing section
 - `src/ProjectExplorer.Core/Models/Project.cs` — root model with tree helpers (`FindCollection`, `FindParentList`, circular reference detection)
-- `src/ProjectExplorer.Core/Services/AppSettingsManager.cs` / `Models/AppSettings.cs` — app-wide preferences (Focus on Run, window bounds), persisted at `appsettings.json`
+- `src/ProjectExplorer.Core/Services/AppSettingsManager.cs` / `Models/AppSettings.cs` — app-wide preferences (currently just window bounds), persisted at `appsettings.json`
 - `src/ProjectExplorer.WinForms/Forms/MainForm.cs` — 3100+ line main window; TreeView (left) drives ListView (right) with navigation history stacks, drag-and-drop reparenting/reordering/conversion, and unified context menus
-- `src/ProjectExplorer.WinForms/Forms/SettingsForm.cs` — File ▸ Settings… dialog (currently just Focus on Run)
-- `src/ProjectExplorer.WinForms/Helpers/SingleInstanceGuard.cs` — named Mutex + EventWaitHandle pair backing "Prevent multiple copies"
+- `src/ProjectExplorer.WinForms/Helpers/SingleInstanceGuard.cs` — named Mutex + EventWaitHandle pair enforcing single-instance (always on, not a setting — see Recently Shipped)
 - `src/ProjectExplorer.Shell/Services/WindowActivator.cs` — `AttachThreadInput`/`SetForegroundWindow` P/Invoke wrapper used to reliably steal foreground focus across processes (`Interop/WindowActivationNativeMethods.cs`)
 - `src/ProjectExplorer.WinForms/Forms/RegistrationDialog.cs` — license key activation UI (Help ▸ Register / License…)
 - `src/ProjectExplorer.WinForms/Forms/HelpForm.cs` — in-app Help ▸ Help Contents… dialog (`F1`); content mirrors `docs/HELP.md`, keep both in sync when either changes
@@ -178,7 +187,7 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 - **Reveal in Explorer** — `Process.Start("explorer.exe", "/select,\"<path>\"")`, on both FolderReference and FileReference context menus.
 - **Copy path to clipboard** — `Clipboard.SetText(path)` on FolderReference/FileReference/WebResource context menus.
 - **Drag-and-drop node moving, reordering, and conversion** — `ProjectManager.MoveChildAsync(Guid projectId, Guid childId, Guid? newParentCollectionId, Guid? beforeSiblingId = null)` (`ProjectManager.cs`) handles reparenting *and* same/cross-container reordering for Collection/FolderReference/WebResource/FileReference (position given by sibling Id rather than index, so it can't drift when the source removal shifts indices) plus the circular-reference guard; `MoveProjectAsync`/`MoveChildUpAsync`/`MoveChildDownAsync`/`MoveProjectUpAsync`/`MoveProjectDownAsync` build on it for the top-level Projects list (which has no `SortOrder` — it's just `_projects` list order, persisted as-is via `SaveAllAsync`) and for one-click reposition. `MainForm.cs`'s `ComputeDropPlan`/`GetDropZone` decide, per zone the cursor is over, whether to reparent-into (middle zone of a Collection — 60/20/20 split — or the single zone of a Project/Projects-root), reorder-before/after (edge zones, or the top/bottom half of a Project or leaf row, shown with `ControlPaint.DrawReversibleLine` as an insertion line), or trigger one of two type conversions: dragging a Project onto a Collection calls `ConvertProjectToCollectionAsync` (project becomes a collection nested there, Id preserved so children stay valid); dragging a Collection onto the "Projects" root node calls `ConvertCollectionToProjectAsync` (collection becomes a new top-level project, Id preserved); dragging a Project onto another Project reorders them via `MoveProjectAsync` (Projects never nest under each other). `GetDropZone` hit-tests at a fixed near-left X rather than the cursor's actual X, since `TreeNode.Bounds` only spans the icon+label — testing at the real cursor X missed rows entirely once the cursor drifted right of a short or deeply-indented label. Every item type's context menu also gets "Move Up"/"Move Down" (`AddChildMoveMenuItems`/`AddProjectMoveMenuItems`) as a precision-free alternative to dragging, including FileReference which still isn't itself a drag source.
-- **Focus on Run (single instance)** — File ▸ Settings… (`SettingsForm.cs`) sets `AppSettings.FocusOnRun` (`AppSettingsManager`, `appsettings.json`). "Prevent multiple copies" makes `Program.cs` take a named Mutex via `SingleInstanceGuard`; a later "Prevent"-mode launch that finds it already held signals the running instance (`EventWaitHandle`) and exits instead of opening a window. The running instance's `SingleInstanceGuard.ListenForActivation` callback marshals onto the UI thread and calls `MainForm.RestoreAndActivate()`, which uses `ProjectExplorer.Shell.Services.WindowActivator` (P/Invoke `AttachThreadInput` + `SetForegroundWindow`) since plain `Form.Activate()` is often ignored across processes. "Allow multiple copies" launches never touch the mutex at all, so they're invisible to it either way. Window position/size is persisted on close (`MainForm.SaveWindowBounds`) and restored on launch; `MainForm.EnsureVisibleOnScreen` resets it to a centered position on the primary screen if it no longer falls on any connected screen — this runs on every startup and on every "Prevent"-mode refocus, regardless of which Focus on Run mode is active.
+- **Single instance (always enforced)** — `Program.cs` always takes a named Mutex via `SingleInstanceGuard`; a later launch that finds it already held signals the running instance (`EventWaitHandle`) and exits instead of opening a window. The running instance's `SingleInstanceGuard.ListenForActivation` callback marshals onto the UI thread and calls `MainForm.RestoreAndActivate()`, which uses `ProjectExplorer.Shell.Services.WindowActivator` (P/Invoke `AttachThreadInput` + `SetForegroundWindow`) since plain `Form.Activate()` is often ignored across processes. This used to be a user setting ("Focus on Run", File ▸ Settings…) with an "Allow multiple copies" option; that's been removed (along with the now-empty Settings dialog) because two windows against the same `projects.json` can silently overwrite each other's changes — see the **Data Flow** note above. Window position/size is persisted on close (`MainForm.SaveWindowBounds`) and restored on launch; `MainForm.EnsureVisibleOnScreen` resets it to a centered position on the primary screen if it no longer falls on any connected screen — this runs on every startup and on every refocus.
 - **Unified context menus + Properties verb** — TreeView and ListView right-click menus were consolidated; a Properties dialog was added for inspecting/editing node metadata.
 - **Windows 11 Fluent styling** — `ModernWindowStyler` applies DWM/UxTheme attributes (rounded corners, Mica/dark titlebar) at startup.
 - **F2 rename** — `MainForm.TreeView_KeyDown` handles `Keys.F2` on the selected TreeView node (Project/Collection only — leaf types don't rename here) via inline `TreeNode.BeginEdit()`. `MainForm.ListView_KeyDown` handles the same `Keys.F2` on the selected ListView row (e.g. renaming a top-level Project while its row is selected in the ListView instead of the tree) — the ListView has no inline label editing, so it routes through `RenameViaDialog`, the same dialog the right-click "Rename" menu item already used. (Del-to-delete and Enter-to-open in the TreeView are **not** wired up yet — only the address bar handles Enter today; still open items, see Roadmap.)
@@ -207,13 +216,22 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 | **Search / filter** | Filter the TreeView or ListView by name across all projects. Critical once collections grow large. |
 | **Recently opened** | Track last-accessed folders/URLs per project session; surface in a "Recent" panel. |
 | **Export / share a project** | Export a single project definition as a `.peproj` JSON file to hand off to a colleague. Distinct from the already-shipped `File ▸ Export All My Data...` (see Recently Shipped), which dumps everything for one user rather than one project for sharing. |
-| **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously. |
 
 ### Far-term (needs user validation first)
 
 | Feature | Notes |
 |---|---|
+| **Multiple windows / tabs** | Power users with dual monitors or many projects open simultaneously — see the note in the Roadmap intro below the table for why this needs real customer signal before scoping. |
 | **File preview pane** | Show thumbnails or text preview for the selected folder's contents inline. High complexity, benefit depends on persona. |
 | **Cloud sync** | Sync `projects.json` via OneDrive / Dropbox path. Simple if users manage it themselves; complex if we build sync. |
 | **Plugin / extension model** | Allow third-party child types (e.g. "Git repo" with branch info). Premature until core is stable. |
 | **macOS / Linux port** | Requires replacing WinForms + Shell P/Invoke. Revisit if demand emerges from non-Windows users. |
+
+**On "Multiple windows / tabs":** this was demoted from Medium-term after the single-instance
+enforcement fix above (2026-07-13) — it can't be built as "just let the user run a second OS
+process," since that's exactly the data-corruption bug that fix closed off (see **Data Flow**).
+Doing this safely means multiple windows sharing one in-process `ProjectManager`/in-memory
+project list within a single running instance, not multiple independent processes each with their
+own stale copy of `projects.json`. That's a real architectural lift (MainForm isn't currently
+built to run more than one instance against shared state), so it's parked here pending actual
+customer demand rather than scheduled speculatively.

@@ -2544,17 +2544,6 @@ public partial class MainForm : Form
         base.OnFormClosing(e);
     }
 
-    private void MenuFileSettings_Click(object? sender, EventArgs e)
-    {
-        var settings = _appSettingsManager.Load();
-        using var dlg = new SettingsForm(settings);
-        if (dlg.ShowDialog(this) == DialogResult.OK)
-        {
-            settings.FocusOnRun = dlg.SelectedFocusOnRun;
-            _appSettingsManager.Save(settings);
-        }
-    }
-
     /// <summary>
     /// A GDPR-style "give me all my data" export: zips up whatever this app has actually written
     /// to %APPDATA%\ProjectExplorer\ (projects.json, license.json, uisettings.json,
