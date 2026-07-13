@@ -14,8 +14,8 @@ own or manage the things themselves.
   `projects.json` (plus a `.bak` backup copy made automatically on every save) records the tree of
   references you've built; `license.json` stores your license state if you've registered;
   `uisettings.json` remembers which tree items were expanded/selected; `appsettings.json` stores
-  app preferences (like Focus on Run) and the main window's last position/size. Nothing else — no
-  other files, no registry changes, nothing on your real folders — is ever touched by normal use.
+  the main window's last position/size. Nothing else — no other files, no registry changes,
+  nothing on your real folders — is ever touched by normal use.
 
 If you ever want to reset everything, back up your setup, or move to another computer: that one
 JSON file (and its `.bak`) is the entire footprint. Deleting it gives you a clean slate; nothing
@@ -121,16 +121,16 @@ the two conversion gestures above.)
 | `Ctrl+N` | New Project… |
 | `F2` | Rename the selected Project or Collection (works from either the tree or the list) |
 
-## Settings
+## Window behavior
 
-**File ▸ Settings…** currently has one option, **Focus on Run**:
+Launching Project Nest Explorer while it's already running switches to the existing window
+instead of opening a second one — this is fixed behavior, not a setting. Each window reads
+`projects.json` once at startup and doesn't notice changes made elsewhere, so two windows open
+at the same time could silently overwrite each other's edits to that file; switching to the
+existing window instead of opening a second one avoids that entirely.
 
-- **Prevent multiple copies** (default) — launching the app while it's already running switches
-  to the existing window instead of opening a second one.
-- **Allow multiple copies** — every launch opens its own independent window.
-
-Either way, if the main window's last saved position has drifted off every screen you currently
-have connected (for example, it was on a second monitor that's since been unplugged), it's
+If the main window's last saved position has drifted off every screen you currently have
+connected (for example, it was on a second monitor that's since been unplugged), it's
 automatically moved back onto your primary screen the next time it becomes visible.
 
 ## Exporting your data

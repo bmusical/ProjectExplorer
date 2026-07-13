@@ -6,6 +6,12 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Remove the "Allow multiple copies" option from Settings — single-instance enforcement (a
+  second launch switches to the already-running window) is now always on. Two windows against
+  the same `projects.json` could silently overwrite each other's changes, since each window only
+  reads the file once at startup and never notices edits made by another window; this wasn't
+  safe to leave as a user choice. File ▸ Settings… has been removed along with it, since it had
+  no other options.
 - Raise the free-tier limits from 3 projects / 25 leaf references to **5 projects / 50 leaf
   references** (`LicenseManager.FreeProjectLimit` / `FreeLeafNodeLimit`).
 - Add **File ▸ Export All My Data...**: bundles everything Project Nest Explorer has written to

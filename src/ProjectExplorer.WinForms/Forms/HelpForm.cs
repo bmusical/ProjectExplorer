@@ -251,13 +251,14 @@ public class HelpForm : Form
         AppendBullet("Ctrl+N — New Project…");
         AppendBullet("F2 — Rename the selected Project or Collection (works from either the tree or the list).");
 
-        AppendHeading("Settings");
+        AppendHeading("Window behavior");
         AppendParagraph(
-            "File ▸ Settings… currently has one option, Focus on Run: \"Prevent multiple copies\" " +
-            "(default) switches to the already-running window instead of opening a second one; " +
-            "\"Allow multiple copies\" always opens a new window. Either way, if the main window's " +
-            "saved position has drifted off every screen you currently have connected, it's moved " +
-            "back onto your primary screen the next time it becomes visible.");
+            "Launching Project Nest Explorer while it's already running switches to the existing " +
+            "window instead of opening a second one — this is fixed behavior, not a setting. Each " +
+            "window reads projects.json once at startup and doesn't notice changes made elsewhere, " +
+            "so two windows open at once could silently overwrite each other's edits to that file. " +
+            "If the main window's saved position has drifted off every screen you currently have " +
+            "connected, it's moved back onto your primary screen the next time it becomes visible.");
 
         AppendHeading("Exporting your data");
         AppendParagraph(
