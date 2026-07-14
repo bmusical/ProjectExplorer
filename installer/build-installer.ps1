@@ -1,4 +1,4 @@
-# build-installer.ps1 — run from the repo root or the installer\ folder
+# build-installer.ps1 - run from the repo root or the installer\ folder
 # Requires: .NET 10 SDK, Inno Setup 6 (iscc.exe on PATH or at default install path)
 #
 # Usage:
@@ -16,6 +16,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# PowerShell (all versions, not just 7.3+) converts every line a native command writes to STDERR
+# into an error record, and with $ErrorActionPreference = "Stop" that gets promoted into a
+# terminating exception at the moment it's written -- before this ever reaches the explicit
+# $LASTEXITCODE checks below. dotnet and iscc.exe can both write ordinary warnings/progress info to
+# stderr on an otherwise successful run. Invoke-NativeQuiet temporarily relaxes
+# $ErrorActionPreference to "Continue" around just the native call itself so that can't happen;
+# $LASTEXITCODE is unaffected either way and stays the source of truth this script already checks.
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
 function Invoke-CodeSign {
@@ -43,15 +51,17 @@ function Invoke-CodeSign {
 
 Write-Host "==> Publishing Project Nest Explorer $Version (win-x64, self-contained)..." -ForegroundColor Cyan
 
-dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj" `
-    -c Release `
-    -r win-x64 `
-    --self-contained true `
-    /p:PublishSingleFile=true `
-    /p:PublishReadyToRun=true `
-    /p:IncludeNativeLibrariesForSelfExtract=true `
-    /p:Version=$Version `
-    /p:PublishDir="$repoRoot\publish\\"
+Invoke-NativeQuiet {
+    dotnet publish "$repoRoot\src\ProjectExplorer.WinForms\ProjectExplorer.WinForms.csproj" `
+        -c Release `
+        -r win-x64 `
+        --self-contained true `
+        /p:PublishSingleFile=true `
+        /p:PublishReadyToRun=true `
+        /p:IncludeNativeLibrariesForSelfExtract=true `
+        /p:Version=$Version `
+        /p:PublishDir="$repoRoot\publish\\"
+}
 
 if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish failed"; exit 1 }
 
@@ -75,7 +85,7 @@ Write-Host "==> Running Inno Setup 6 compiler..." -ForegroundColor Cyan
 $issFile  = "$PSScriptRoot\ProjectExplorer.iss"
 $setupExe = "$PSScriptRoot\installer-output\ProjectNest-$Version-Setup.exe"
 
-& $iscc "/DAppVersion=$Version" $issFile
+Invoke-NativeQuiet { & $iscc "/DAppVersion=$Version" $issFile }
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
 
 Write-Host "==> Installer: $setupExe" -ForegroundColor Green
@@ -105,7 +115,7 @@ if ($UpdateXml)
     Write-Host "    changelog : $changelogUrl"
 }
 
-# ── 4. Summary ────────────────────────────────────────────────────────────────
+# --- 4. Summary ---
 
 Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green

@@ -110,7 +110,7 @@ public key — no license server needed. The `tools/KeyGen` console app is your 
 
 - [ ] ⛔ Build the app with the real public key, generate a key with the real private key, paste it
   into **Help ▸ Register / License…**, and confirm it activates and persists across restarts.
-- [ ] 💡 Note the current limits so your store copy matches: **Free = 3 projects, 25 references.**
+- [ ] 💡 Note the current limits so your store copy matches: **Free = 5 projects, 50 references.**
   Licensed = unlimited. (Defined in `LicenseManager.cs`.)
 
 > **Known limitation (fine to ship, good to know):** keys are per-email but not hardware-locked and
@@ -209,20 +209,26 @@ compares `<version>` to the running assembly version. If newer, it prompts the u
 
 ### 5.2 Cut a release (🔁 every release)
 
-- [ ] 🔁 Commit & push the updated `updates/updates.xml`.
-- [ ] 🔁 Create a git tag and GitHub Release named **`<version>`** (no `v` prefix, e.g. `1.0.1`):
-  ```bash
-  gh release create 1.0.1 \
-    "installer-output/ProjectNest-1.0.1-Setup.exe" \
-    --title "Project Nest Explorer 1.0.1" \
-    --notes-file docs/release-notes/1.0.1.md
+**`updates/updates.xml` is owned by `.github/workflows/release.yml`, not you — never commit it as
+part of a version bump.** The repo is public, so committing it before the GitHub Release and
+installer asset exist would advertise a version that 404s for anyone who checks for updates in
+that window.
+
+- [ ] 🔁 Bump `<Version>` / `AssemblyVersion` / `FileVersion` in `ProjectExplorer.WinForms.csproj`
+  and add a new `## [X.Y.Z] — YYYY-MM-DD` section to `CHANGELOG.md`. Commit and push both to `master`.
+- [ ] 🔁 Tag and push (no `v` prefix — a `v`-prefixed tag won't match the workflow's trigger
+  pattern and simply won't run):
+  ```powershell
+  .\installer\cut-release.ps1 -Version 1.0.1
   ```
+  This double-checks the csproj/`CHANGELOG.md` bump made it to `master`, pushes the tag, and streams
+  the GitHub Actions run live via `gh run watch`. (Or by hand: `git tag 1.0.1 && git push origin
+  1.0.1`.) The workflow builds the installer, creates the GitHub Release with
+  `ProjectNest-1.0.1-Setup.exe` attached, and only then commits `updates/updates.xml` pointing at
+  this version — see `docs/RELEASE.md` for the full step-by-step and the manual/offline fallback
+  (clean-VM testing, code-signing before the release goes public) if you need either first.
 - [ ] 🔁 **The uploaded asset filename MUST exactly match** the `<url>` in `updates.xml`
   (`ProjectNest-<version>-Setup.exe`). A mismatch = broken auto-update download.
-- [ ] 🔁 Write release notes (what changed). These are linked from the update dialog via `<changelog>`.
-- [ ] 🔁 Bump `<Version>` / `AssemblyVersion` / `FileVersion` in
-  `ProjectExplorer.WinForms.csproj` for the next cycle (the build script passes `-Version`, but keep
-  the csproj in sync so debug builds report the right version too).
 
 ### 5.3 Verify the update path (🔁 first few releases)
 
@@ -316,16 +322,16 @@ the judgment calls are left for you.)
 
 ---
 
-## Quick reference — "Release a new version" in 8 steps
+## Quick reference — "Release a new version" in 5 steps
 
 > Also written up standalone at [`docs/RELEASE.md`](RELEASE.md) for faster linking once you're
-> past first-launch setup.
+> past first-launch setup — including the manual/offline fallback if you need clean-VM testing or
+> code-signing before the release goes public, which this tag-triggered path skips.
 
 1. Bump version in `ProjectExplorer.WinForms.csproj`.
-2. Update `CHANGELOG.md` / write release notes.
-3. `.\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml`
-4. Test the installer on a clean VM.
-5. (Recommended) Sign the exe + installer.
-6. Commit & push `updates/updates.xml` (and version bump).
-7. `gh release create X.Y.Z installer-output\ProjectNest-X.Y.Z-Setup.exe --title "..." --notes-file ...`
-8. Verify an older install auto-updates to the new version.
+2. Add a `## [X.Y.Z] — YYYY-MM-DD` section to `CHANGELOG.md`.
+3. Commit and push both to `master`.
+4. `.\installer\cut-release.ps1 -Version X.Y.Z` — tags, pushes, and watches
+   `.github/workflows/release.yml` build the installer, publish the GitHub Release, and commit
+   `updates/updates.xml` for you.
+5. Verify an older install auto-updates to the new version.

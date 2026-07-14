@@ -7,11 +7,19 @@ name: Release
 #   1. dotnet publish a self-contained, single-file win-x64 build.
 #   2. Compile the Inno Setup installer around it.
 #   3. Attach the installer to the GitHub Release for this tag.
+#   4. Only *then* point updates/updates.xml at this version and commit it.
+#
+# Step 4 is deliberately last and deliberately gated on step 3 succeeding:
+# updates.xml is what the in-app auto-updater reads (publicly, since the repo
+# is public), so if it pointed at this version before the release/asset
+# existed, any installed copy checking for updates in that window would find
+# a version "available" and 404 trying to download it.
 #
 # The tag itself must already exist as a real Git tag pointing at a commit on
-# master where CHANGELOG.md / updates.xml / the csproj <Version> have already
-# been bumped to match — this workflow builds and publishes, it doesn't bump
-# versions.
+# master where CHANGELOG.md / the csproj <Version> have already been bumped
+# to match — this workflow builds and publishes, it doesn't bump versions.
+# updates/updates.xml should NOT be hand-bumped as part of that commit
+# anymore; this workflow owns it exclusively (see step 4 above).
 on:
   push:
     tags:
@@ -72,3 +80,33 @@ jobs:
           name: Project Nest Explorer ${{ steps.version.outputs.version }}
           body_path: release-notes.md
           files: installer-output/ProjectNest-${{ steps.version.outputs.version }}-Setup.exe
+
+      # Only reached if "Create GitHub Release" above succeeded — a failed release
+      # step stops the job here by default, so updates.xml never points at a
+      # version that isn't actually downloadable yet.
+      - name: Point updates.xml at the now-published release
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+
+          # Edit on top of master's current tip rather than this tag's (possibly
+          # shallow, detached) checkout, so we can't accidentally clobber any
+          # commit that landed on master after the tag was cut.
+          git fetch origin master --depth=1
+          git checkout -B master origin/master
+
+          $xmlPath = "updates\updates.xml"
+          $xml = [xml](Get-Content $xmlPath -Encoding UTF8)
+          $xml.item.version   = $version
+          $xml.item.url       = "https://github.com/${{ github.repository }}/releases/download/$version/ProjectNest-$version-Setup.exe"
+          $xml.item.changelog = "https://github.com/${{ github.repository }}/releases/tag/$version"
+          $xml.Save((Resolve-Path $xmlPath))
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add $xmlPath
+          if (git diff --cached --quiet) {
+            Write-Host "updates.xml already matches $version; nothing to commit."
+          } else {
+            git commit -m "Point updates.xml at $version [skip ci]"
+            git push origin master
+          }

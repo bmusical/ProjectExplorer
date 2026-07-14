@@ -10,12 +10,12 @@ own or manage the things themselves.
 - Removing something from a project (or deleting a whole Project/Collection) never deletes the
   real folder or file, and never affects any website. It only removes the reference — the pointer
   you organized here — from this app.
-- The **only** thing Project Nest Explorer ever writes to your computer is one data file:
-  `%APPDATA%\ProjectExplorer\projects.json` (plus a `.bak` backup copy made automatically on every
-  save), which records the tree of references you've built. A separate small file,
-  `%APPDATA%\ProjectExplorer\license.json`, stores your license state if you've registered.
-  Nothing else — no other files, no registry changes, nothing on your real folders — is ever
-  touched by normal use.
+- Everything Project Nest Explorer writes to your computer lives in `%APPDATA%\ProjectExplorer\`:
+  `projects.json` (plus a `.bak` backup copy made automatically on every save) records the tree of
+  references you've built; `license.json` stores your license state if you've registered;
+  `uisettings.json` remembers which tree items were expanded/selected; `appsettings.json` stores
+  the main window's last position/size. Nothing else — no other files, no registry changes,
+  nothing on your real folders — is ever touched by normal use.
 
 If you ever want to reset everything, back up your setup, or move to another computer: that one
 JSON file (and its `.bak`) is the entire footprint. Deleting it gives you a clean slate; nothing
@@ -57,32 +57,94 @@ place where files actually live.
 - **View ▸ Details / Extra Large Icons / Large Icons / Small Icons / List / Tile** switches how the
   ListView displays folder contents.
 
+## Unavailable folders, files, and web resources
+
+A Folder Reference or File Reference can point at something that's gone missing — a network or
+removable drive got disconnected, or a local file was moved or deleted. A Web Resource shows this
+only when the site itself actively returns an error (a 404, a 500, etc.) — never just because a
+check couldn't connect, since that's just as likely a passing network blip as a dead link, and
+flagging it either way would make perfectly working links flash broken. When one of these happens,
+the item shows **greyed out with a strikethrough** in both the tree and list, and its tooltip
+explains why:
+
+- **Local disk** — not found; it was likely moved, renamed, or deleted. Use **Locate Folder…**/
+  **Locate File…** on its right-click menu to point it at the new location, or remove it.
+- **Network/removable drive** — not reachable right now, which may just be temporary. Project
+  Nest Explorer automatically re-checks these every 20 seconds and the item reverts to normal as
+  soon as it's reachable again — no action needed.
+- **Web resource** — the site returned an error the last time it was checked. Web resources
+  aren't polled in the background — click **Refresh** on its right-click menu to check again, and
+  it reverts to normal as soon as the page loads successfully.
+
+If you know a network/removable drive is gone for good and don't want it checked anymore, use
+**Stop Auto-Retry** on its right-click menu (**Resume Auto-Retry** turns it back on). Web
+resources have no auto-retry to stop — they're only ever checked when shown or refreshed.
+
+Right-click an unavailable Folder/File Reference any time for **Check Availability Now** to
+re-check immediately instead of waiting for the next automatic retry. A Web Resource's equivalent
+is labeled **Refresh**, and it's always on its right-click menu — not just when the item is
+flagged unavailable. That's partly for the case where a site keeps failing the automated check
+(e.g. one that blocks non-browser requests) even though it loads fine for you, but it's really
+just a normal, everyday action: click **Refresh** on any Web Resource any time you want to
+double-check its status, for any reason.
+
 ## Everyday actions (right-click menu)
 
 | On this item | You can |
 |---|---|
-| **Project** | New Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Delete Project |
-| **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Delete Collection |
-| **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Remove from Project |
-| **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Remove from Project |
-| **Web Resource** | Open in External Browser, Copy URL, Edit…, Remove from Project |
+| **Project** | New Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Project |
+| **Collection** | New Sub-Collection…, Add Folder…/File…/Web Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection |
+| **Folder Reference** | Open in Explorer, Open Command Prompt Here, Open PowerShell Here, Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate Folder… / Stop-Resume Auto-Retry when unavailable)* |
+| **File Reference** | Open, Open Containing Folder, Copy Path, Properties, Edit…, Move Up/Down, Remove from Project *(+ Check Availability Now / Locate File… / Stop-Resume Auto-Retry when unavailable)* |
+| **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project, Refresh |
 
 "Remove from Project" and "Delete Project/Collection" only remove entries from your
 `projects.json` tree — see the note at the top of this document.
 
-You can also drag and drop items in the tree to reorganize them into different Collections;
-this only changes their place in `projects.json`, same as any other edit here.
+You can also drag and drop items in the tree to reorganize them: drop onto a Collection or
+Project to move something inside it, or drop just above/below a row (watch for the insertion
+line) to reorder it relative to its siblings without changing its parent — this includes
+Projects themselves, dragged onto one another. Two special gestures convert between the two
+container types instead of just moving something: drag a Project onto a Collection to turn
+that project into a collection nested there, or drag a Collection onto the "Projects" root to
+turn it into its own top-level project (its contents come along either way). If the exact drop
+position is fiddly to hit, every item's right-click menu also has **Move Up**/**Move Down**,
+which does the same repositioning without needing to drag at all. All of this only changes
+placement in `projects.json`, same as any other edit here. (Reparenting via drag stays within
+the same Project — moving something into a *different* project isn't supported yet except via
+the two conversion gestures above.)
 
 ## Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl+N` | New Project… |
-| `F2` | Rename the selected tree item |
+| `F2` | Rename the selected Project or Collection (works from either the tree or the list) |
+
+## Window behavior
+
+Launching Project Nest Explorer while it's already running switches to the existing window
+instead of opening a second one — this is fixed behavior, not a setting. Each window reads
+`projects.json` once at startup and doesn't notice changes made elsewhere, so two windows open
+at the same time could silently overwrite each other's edits to that file; switching to the
+existing window instead of opening a second one avoids that entirely.
+
+If the main window's last saved position has drifted off every screen you currently have
+connected (for example, it was on a second monitor that's since been unplugged), it's
+automatically moved back onto your primary screen the next time it becomes visible.
+
+## Exporting your data
+
+**File ▸ Export All My Data...** bundles everything Project Nest Explorer has written to
+`%APPDATA%\ProjectExplorer\` — whichever of `projects.json`, `license.json`, `uisettings.json`,
+and `appsettings.json` already exist — into a single zip file you choose where to save. This is a
+"give me all my data" export for backing up your setup or handing it to yourself on another
+computer; it's one-way, so there's no matching "Import" — see the note at the top of this document
+for how to move that same folder to a new machine by hand if you want it live there again.
 
 ## Free tier & licensing
 
-Project Nest Explorer is free for up to **3 projects** and **25 folder/file/web references**
+Project Nest Explorer is free for up to **5 projects** and **50 folder/file/web references**
 total (Collections themselves don't count against the limit). A one-time license key removes that
 limit entirely.
 
@@ -95,9 +157,10 @@ limit entirely.
 
 ## Checking for updates
 
-**Help ▸ Check for Updates…** checks for a newer version and offers to download it. This is the
-only feature in the app that reaches the internet on its own (besides loading Web Resource
-previews you've added); everything else works fully offline.
+**Help ▸ Check for Updates…** checks for a newer version and offers to download it. Besides that
+and loading Web Resource previews you've added, the only other automatic network activity is
+checking whether a Web Resource is currently reachable (see **Unavailable folders, files, and web
+resources** above) — everything else works fully offline.
 
 ## Getting help
 

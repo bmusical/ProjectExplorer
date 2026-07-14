@@ -33,7 +33,7 @@ every session.
 Grab the latest installer from [GitHub Releases](https://github.com/bmusical/ProjectExplorer/releases).
 Project Nest Explorer is Windows-only (10 1809+ / 11).
 
-Free to use for up to 3 projects and 25 folder/file/web references. A one-time license removes
+Free to use for up to 5 projects and 50 folder/file/web references. A one-time license removes
 that limit — see [blaznaccess.com/landing/project-nest](https://blaznaccess.com/landing/project-nest).
 
 ## Building from source

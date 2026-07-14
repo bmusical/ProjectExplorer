@@ -5,13 +5,21 @@ Quick reference for shipping a new version of Project Nest Explorer. This assume
 is already done — see `docs/LAUNCH_CHECKLIST.md` for that setup and for the full context behind
 each step below.
 
-## Steps
+**`updates/updates.xml` is owned by the release workflow, not by you.** Don't hand-edit it as part
+of the version bump. It's the file the in-app auto-updater reads, and the repo is public, so
+committing it early would advertise a version before its installer exists — anyone whose app
+checks for updates in that window gets a 404. `.github/workflows/release.yml` updates and commits
+it itself, as its last step, gated on the GitHub Release (with the installer attached) already
+existing.
+
+## Steps (recommended: tag-triggered, via `.github/workflows/release.yml`)
 
 1. **Bump the version** in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj`
    (`<Version>`, `<AssemblyVersion>`, `<FileVersion>`).
-2. **Update `CHANGELOG.md`** with a new `## [X.Y.Z] — YYYY-MM-DD` section, and write the GitHub
-   release notes (can reuse the changelog entry).
-3. **Build the installer:**
+2. **Update `CHANGELOG.md`** with a new `## [X.Y.Z] — YYYY-MM-DD` section.
+3. **Commit and push** those two changes to `master`.
+4. **Run the release script**, which tags, pushes, and watches the build for you in one go —
+   no other git or GitHub UI steps needed:
    ```powershell
    .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
    ```
@@ -33,14 +41,17 @@ each step below.
    gh release create X.Y.Z \
      "installer-output/ProjectNest-X.Y.Z-Setup.exe" \
      --title "Project Nest Explorer X.Y.Z" \
-     --notes-file docs/release-notes/X.Y.Z.md
+     --notes-file release-notes.md
    ```
-   The uploaded asset filename **must exactly match** the `<url>` in `updates/updates.xml`
-   (`ProjectNest-X.Y.Z-Setup.exe`) or auto-update downloads will break.
-8. **Verify the update path**: install an older version, launch it, and confirm it detects the new
-   release, downloads, and upgrades cleanly. User data in
-   `%APPDATA%\ProjectExplorer\projects.json` must survive the upgrade (the installer's
-   `[UninstallDelete]` intentionally leaves user data alone).
+   `release-notes.md` is a scratch file (gitignored) — delete it after, or just leave it for next
+   time. The uploaded asset filename **must exactly match** the `<url>` this produces in
+   `updates/updates.xml` (`ProjectNest-X.Y.Z-Setup.exe`) or auto-update downloads will break.
+7. **Only now**, re-run the build script with `-UpdateXml` (or hand-edit `updates/updates.xml`) to
+   point at the release you just published, and commit/push that on its own:
+   ```powershell
+   .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml
+   ```
+8. **Verify the update path** as in step 6 of the recommended path above.
 
 ## Notes
 

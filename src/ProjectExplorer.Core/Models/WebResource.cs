@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace ProjectExplorer.Core.Models;
 
 /// <summary>
@@ -42,5 +44,35 @@ public class WebResource : ProjectChild
 
             return "(unknown web resource)";
         }
+    }
+
+    /// <summary>
+    /// Resolves a stored URL to a navigable absolute http(s) <see cref="Uri"/>, treating a URL typed
+    /// without a scheme (e.g. "example.com") as "https://example.com" rather than failing to parse.
+    /// Used both to launch a resource in the external browser and to check its availability, so a
+    /// scheme-less URL neither opens as a local file path nor gets flagged broken for that reason alone.
+    /// </summary>
+    public static bool TryGetNavigableUri(string? url, [NotNullWhen(true)] out Uri? uri)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            uri = null;
+            return false;
+        }
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out uri))
+        {
+            // Already has an explicit scheme. Only http(s) is navigable in a browser -- anything
+            // else (ftp://, mailto:, etc.) is left unresolved rather than guessing at intent by
+            // prepending "https://" onto an already-schemed string.
+            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                return true;
+
+            uri = null;
+            return false;
+        }
+
+        // No scheme at all (e.g. "example.com") -- assume https, the common case for a bare domain.
+        return Uri.TryCreate("https://" + url, UriKind.Absolute, out uri);
     }
 }

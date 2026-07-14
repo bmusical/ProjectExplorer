@@ -183,32 +183,95 @@ public class HelpForm : Form
             "View ▸ Details / Extra Large Icons / Large Icons / Small Icons / List / Tile " +
             "switches how folder contents are displayed.");
 
+        AppendHeading("Unavailable folders, files, and web resources");
+        AppendParagraph(
+            "A Folder Reference or File Reference can point at something that's gone missing — a " +
+            "network/removable drive got disconnected, or a local file was moved or deleted. A Web " +
+            "Resource shows this only when the site itself actively returns an error (a 404, a " +
+            "500, etc.) — never just because a check couldn't connect, since that's just as likely " +
+            "a passing network blip as a dead link. When one of these happens, the item shows " +
+            "greyed out with a strikethrough in both the tree and list, and its tooltip explains why.");
+        AppendBullet(
+            "Local disk — not found; likely moved, renamed, or deleted. Use \"Locate Folder…\"/" +
+            "\"Locate File…\" on its right-click menu to point it at the new location, or remove it.");
+        AppendBullet(
+            "Network/removable drive — not reachable right now, which may just be temporary. It's " +
+            "automatically re-checked every 20 seconds and reverts to normal as soon as it's " +
+            "reachable again — no action needed.");
+        AppendBullet(
+            "Web resource — the site returned an error the last time it was checked. Web resources " +
+            "aren't polled in the background — click \"Refresh\" on its right-click menu to check " +
+            "again, and it reverts to normal as soon as the page loads successfully.");
+        AppendBullet(
+            "\"Stop Auto-Retry\" on a network/removable resource's right-click menu turns off the " +
+            "automatic re-check for one you know is gone for good (\"Resume Auto-Retry\" turns it " +
+            "back on) — web resources have no auto-retry to stop. \"Check Availability Now\" on an " +
+            "unavailable Folder/File Reference re-checks it immediately instead of waiting for the " +
+            "next automatic retry.");
+        AppendBullet(
+            "A Web Resource's \"Refresh\" (its equivalent of \"Check Availability Now\") is always " +
+            "on its right-click menu, not just when it's flagged unavailable. That's partly for " +
+            "sites that keep failing the automated check (e.g. one that blocks non-browser " +
+            "requests) even though they load fine for you, but it's really just a normal, " +
+            "everyday action you can use on any Web Resource any time, for any reason.");
+
         AppendHeading("Everyday actions (right-click menu)");
         AppendBullet(
             "Project — New Collection…, Add Folder…/File…/Web Resource…, " +
-            "Rename, Edit Description…, Delete Project.");
+            "Rename, Edit Description…, Move Up/Down, Delete Project.");
         AppendBullet(
             "Collection — New Sub-Collection…, Add Folder…/File…/Web " +
-            "Resource…, Rename, Edit Description…, Delete Collection.");
+            "Resource…, Rename, Edit Description…, Move Up/Down, Delete Collection.");
         AppendBullet(
             "Folder Reference — Open in Explorer, Open Command Prompt Here, Open PowerShell Here, " +
-            "Copy Path, Properties, Edit Description…, Remove from Project.");
+            "Copy Path, Properties, Edit Description…, Move Up/Down, Remove from Project.");
         AppendBullet(
             "File Reference — Open, Open Containing Folder, Copy Path, Properties, Edit…, " +
-            "Remove from Project.");
-        AppendBullet("Web Resource — Open in External Browser, Copy URL, Edit…, Remove from Project.");
+            "Move Up/Down, Remove from Project.");
+        AppendBullet(
+            "Web Resource — Open in External Browser, Copy URL, Edit…, Move Up/Down, " +
+            "Remove from Project, Refresh.");
+        AppendBullet(
+            "When a Folder Reference or File Reference is unavailable, its menu also adds Check " +
+            "Availability Now and Locate Folder…/Locate File… to retarget the moved item. A " +
+            "network/removable one also adds Stop-Resume Auto-Retry when unavailable.");
         AppendParagraph(
             "\"Remove from Project\" and \"Delete Project/Collection\" only remove entries from " +
-            "projects.json — see the note at the top of this page. Drag-and-drop reordering in the " +
-            "tree is the same: it only changes placement inside that one file.");
+            "projects.json — see the note at the top of this page. Drag-and-drop in the tree is " +
+            "the same: it only changes placement inside that one file. Drop onto a Collection or " +
+            "Project to move something inside it, or drop just above/below a row (watch for the " +
+            "insertion line) to reorder it among its siblings — including Projects, dragged onto " +
+            "one another. Two gestures convert between container types: drag a Project onto a " +
+            "Collection to turn it into a collection nested there, or drag a Collection onto the " +
+            "\"Projects\" root to turn it into its own top-level project. If a drop position is " +
+            "fiddly to hit exactly, every item's Move Up/Move Down menu items do the same " +
+            "repositioning without dragging.");
 
         AppendHeading("Keyboard shortcuts");
         AppendBullet("Ctrl+N — New Project…");
-        AppendBullet("F2 — Rename the selected tree item.");
+        AppendBullet("F2 — Rename the selected Project or Collection (works from either the tree or the list).");
+
+        AppendHeading("Window behavior");
+        AppendParagraph(
+            "Launching Project Nest Explorer while it's already running switches to the existing " +
+            "window instead of opening a second one — this is fixed behavior, not a setting. Each " +
+            "window reads projects.json once at startup and doesn't notice changes made elsewhere, " +
+            "so two windows open at once could silently overwrite each other's edits to that file. " +
+            "If the main window's saved position has drifted off every screen you currently have " +
+            "connected, it's moved back onto your primary screen the next time it becomes visible.");
+
+        AppendHeading("Exporting your data");
+        AppendParagraph(
+            "File ▸ Export All My Data… bundles everything Project Nest Explorer has written to " +
+            "%APPDATA%\\ProjectExplorer\\ — whichever of projects.json, license.json, " +
+            "uisettings.json, and appsettings.json already exist — into a single zip file you " +
+            "choose where to save. This is a \"give me all my data\" export for backing up your " +
+            "setup or handing it to yourself on another computer; it's one-way, so there's no " +
+            "matching \"Import\".");
 
         AppendHeading("Free tier & licensing");
         AppendParagraph(
-            "Free for up to 3 projects and 25 folder/file/web references total (Collections don't " +
+            "Free for up to 5 projects and 50 folder/file/web references total (Collections don't " +
             "count against the limit). A one-time license key removes that limit.");
         AppendBullet(
             "Help ▸ Register / License… to enter a key or see your current free-tier usage.");
@@ -217,9 +280,10 @@ public class HelpForm : Form
 
         AppendHeading("Checking for updates");
         AppendParagraph(
-            "Help ▸ Check for Updates… checks for a newer version. This — along with " +
-            "loading Web Resource previews you've added — is the only thing in the app that reaches " +
-            "the internet on its own; everything else works fully offline.");
+            "Help ▸ Check for Updates… checks for a newer version. Besides that, loading Web " +
+            "Resource previews you've added, and checking whether a Web Resource is currently " +
+            "reachable (see \"Unavailable folders, files, and web resources\" above), everything " +
+            "else works fully offline.");
 
         AppendHeading("Getting help");
         AppendParagraph("Questions, bugs, or anything not covered here: support@blaznaccess.com");

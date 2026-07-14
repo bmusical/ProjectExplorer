@@ -50,6 +50,7 @@ partial class MainForm
     private MenuStrip menuStrip;
     private ToolStripMenuItem menuFile;
     private ToolStripMenuItem menuFileNewProject;
+    private ToolStripMenuItem menuFileExportMyData;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
@@ -194,8 +195,12 @@ partial class MainForm
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
         this.menuFileNewProject = new ToolStripMenuItem { Text = "New &Project...", ShortcutKeys = Keys.Control | Keys.N };
+        this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
-        this.menuFile.DropDownItems.AddRange(new ToolStripItem[] { menuFileNewProject, new ToolStripSeparator(), menuFileExit });
+        this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
+            menuFileNewProject, new ToolStripSeparator(),
+            menuFileExportMyData, new ToolStripSeparator(), menuFileExit
+        });
 
         this.menuView = new ToolStripMenuItem { Text = "&View" };
         this.menuViewDetails = new ToolStripMenuItem { Text = "&Details", Checked = true };
@@ -235,6 +240,7 @@ partial class MainForm
         };
 
         this.menuFileNewProject.Click += MenuFileNewProject_Click;
+        this.menuFileExportMyData.Click += MenuFileExportMyData_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;
@@ -370,6 +376,7 @@ partial class MainForm
         this.listView.DoubleClick += ListView_DoubleClick;
         this.listView.ColumnClick += ListView_ColumnClick;
         this.listView.MouseClick += ListView_MouseClick;
+        this.listView.KeyDown += ListView_KeyDown;
         this.Width = 1200;
 
         // ── File Preview Panel (shown instead of listView for a selected FileReference) ──
