@@ -767,16 +767,25 @@ public partial class MainForm : Form
         return null;
     }
 
+    // Web resources are excluded from the grey/strikethrough treatment: many sites return
+    // 4xx/5xx to the automated background check (bot-blocking, WAFs, etc.) while loading fine
+    // for the user in a real browser, which made the styling fire on links that weren't actually
+    // broken. The underlying Unavailable status is still tracked (tooltip, "Refresh" menu item)
+    // — only the visual grey-out/strikethrough is suppressed for ResourceLocationKind.Web.
     private void ApplyAvailabilityStyle(TreeNode node, Guid childId)
     {
-        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result)
+            && result.Status == AvailabilityStatus.Unavailable
+            && result.LocationKind != ResourceLocationKind.Web;
         node.ForeColor = unavailable ? Color.Gray : Color.Empty;
         node.NodeFont = unavailable ? (_unavailableTreeFont ??= new Font(treeView.Font, FontStyle.Strikeout)) : null;
     }
 
     private void ApplyAvailabilityStyle(ListViewItem item, Guid childId)
     {
-        var unavailable = _availabilityCache.TryGetValue(childId, out var result) && result.Status == AvailabilityStatus.Unavailable;
+        var unavailable = _availabilityCache.TryGetValue(childId, out var result)
+            && result.Status == AvailabilityStatus.Unavailable
+            && result.LocationKind != ResourceLocationKind.Web;
         item.ForeColor = unavailable ? Color.Gray : listView.ForeColor;
         item.Font = unavailable ? (_unavailableListFont ??= new Font(listView.Font, FontStyle.Strikeout)) : listView.Font;
     }

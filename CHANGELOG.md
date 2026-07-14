@@ -6,6 +6,12 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Fix Web Resources rendering grey + strikethrough far too often. Many sites return an HTTP
+  error (4xx/5xx) to the app's automated background availability check — bot-blocking, WAFs, rate
+  limiting — while loading fine for the user in a real browser, so a working link would flash
+  "unavailable" incorrectly. Web Resources no longer show the grey/strikethrough "unavailable"
+  styling at all; FolderReference/FileReference are unaffected.
+
 ## [1.0.6] — 2026-07-13
 
 - Remove the "Allow multiple copies" option from Settings — single-instance enforcement (a
