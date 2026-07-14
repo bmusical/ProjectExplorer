@@ -1,3 +1,4 @@
+using System.Net;
 using ProjectExplorer.Core.Models;
 
 namespace ProjectExplorer.Core.Services;
@@ -20,6 +21,13 @@ public static class ResourceAvailabilityChecker
 
     private static readonly TimeSpan DefaultPathTimeout = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan DefaultWebTimeout = TimeSpan.FromSeconds(6);
+
+    // .NET's HttpClient sends no User-Agent by default. Plenty of WAFs/anti-bot layers (Cloudflare,
+    // Akamai, etc.) treat that as a bot signature and reply 403 to an otherwise-fine page, so the
+    // background check was flagging working links as broken purely for not looking like a browser.
+    // Spoofing a common desktop Chrome UA avoids that whole class of false positive.
+    private const string BrowserUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
     /// <summary>
     /// Classifies a filesystem path without touching the disk beyond a drive-type lookup.
@@ -98,13 +106,13 @@ public static class ResourceAvailabilityChecker
     }
 
     /// <summary>
-    /// Checks whether a WebResource's URL is currently reachable. Only an explicit HTTP error
-    /// response (status &gt;= 400 — a 404, a 500, etc.) marks it <see cref="AvailabilityStatus.Unavailable"/>;
-    /// a successful response (any status &lt; 400) marks it <see cref="AvailabilityStatus.Available"/>.
-    /// A connection failure, DNS failure, or timeout proves nothing either way — it's just as
-    /// likely a transient network blip, VPN hiccup, or a site that's slow/unusual about answering
-    /// bots — so those are reported as <see cref="AvailabilityStatus.Unknown"/> rather than
-    /// confidently flagging the link as broken.
+    /// Checks whether a WebResource's URL is currently reachable. Only a confidently-broken HTTP
+    /// error response (see <see cref="ClassifyResponse"/> — a 404, a 500, etc.) marks it
+    /// <see cref="AvailabilityStatus.Unavailable"/>; a successful response (any status &lt; 400)
+    /// marks it <see cref="AvailabilityStatus.Available"/>. A connection failure, DNS failure, or
+    /// timeout proves nothing either way — it's just as likely a transient network blip, VPN
+    /// hiccup, or a site that's slow/unusual about answering bots — so those are reported as
+    /// <see cref="AvailabilityStatus.Unknown"/> rather than confidently flagging the link as broken.
     /// </summary>
     public static async Task<AvailabilityCheckResult> CheckWebResourceAsync(
         string? url, HttpClient httpClient, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
@@ -123,13 +131,31 @@ public static class ResourceAvailabilityChecker
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd(BrowserUserAgent);
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            var status = (int)response.StatusCode >= 400 ? AvailabilityStatus.Unavailable : AvailabilityStatus.Available;
-            return new AvailabilityCheckResult(status, ResourceLocationKind.Web, DateTime.UtcNow);
+            return new AvailabilityCheckResult(ClassifyResponse(response.StatusCode), ResourceLocationKind.Web, DateTime.UtcNow);
         }
         catch
         {
             return new AvailabilityCheckResult(AvailabilityStatus.Unknown, ResourceLocationKind.Web, DateTime.UtcNow);
         }
+    }
+
+    /// <summary>
+    /// 401/403/429 are deliberately excluded from "confirmed broken": they far more often mean the
+    /// automated check itself got blocked (bot/WAF detection, rate limiting) or hit an auth wall
+    /// the user's own logged-in browser would sail straight through, than that the resource is
+    /// actually gone. Those report <see cref="AvailabilityStatus.Unknown"/> instead, same as a
+    /// connection failure — only a clearer error (404, 410, 5xx, etc.) counts as confirmed.
+    /// </summary>
+    private static AvailabilityStatus ClassifyResponse(HttpStatusCode statusCode)
+    {
+        if ((int)statusCode < 400) return AvailabilityStatus.Available;
+
+        return statusCode switch
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests => AvailabilityStatus.Unknown,
+            _ => AvailabilityStatus.Unavailable
+        };
     }
 }
