@@ -51,7 +51,7 @@ Use this instead of the above if you need to test the installer on a clean VM or
 therefore makes the installer downloadable) as soon as it's built.
 
 1. **Bump the version** and **update `CHANGELOG.md`** as in steps 1–2 above.
-2. **Build the installer:**
+2. **Build the installer** (add `-Sign` if you have a code-signing certificate set up — see step 4):
    ```powershell
    .\installer\build-installer.ps1 -Version X.Y.Z
    ```
@@ -61,9 +61,12 @@ therefore makes the installer downloadable) as soon as it's built.
 3. **Test the installer** on a clean Windows VM with no .NET installed, to confirm the
    self-contained build actually runs standalone. Verify the app icon shows correctly on the
    taskbar, Start menu shortcut, and Add/Remove Programs.
-4. **(Recommended) Code-sign** the exe and installer with `signtool` if you have a code-signing
-   certificate — see `docs/LAUNCH_CHECKLIST.md` Section 6. Unsigned exes trigger SmartScreen
-   warnings that hurt conversion.
+4. **(Recommended) Code-sign** the exe and installer if you have a code-signing certificate — see
+   `docs/LAUNCH_CHECKLIST.md` Section 6. Unsigned exes trigger SmartScreen warnings that hurt
+   conversion. Pass `-Sign` to step 2 above and `build-installer.ps1` signs both
+   `publish\ProjectNest.exe` and the installer exe with `signtool` automatically (auto-selecting
+   the best available cert via `/a`) — no separate manual `signtool` calls needed. If you're on
+   Certum SimplySign, open the ~2hr phone-approval signing session *before* running the script.
 5. **Commit and push** the version bump (`updates/updates.xml` is *not* part of this commit).
 6. **Create the GitHub Release**, tagged `X.Y.Z`. There's no checked-in release-notes file to point
    `--notes-file` at — pull the notes straight from the `CHANGELOG.md` section you just added in

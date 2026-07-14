@@ -263,17 +263,21 @@ conversion.
   - As of March 2026, CA/Browser Forum rules cap **all** code-signing certs (OV and EV) at 459 days
     (~15 months) max validity — even a "multi-year" plan needs a free reissue partway through. Budget for
     that regardless of vendor.
-- [ ] 💡 Sign **both** the app exe and the installer exe with `signtool`:
+- [x] 💡 Sign **both** the app exe and the installer exe with `signtool` — scripted, not manual:
+  `installer/build-installer.ps1` takes a `-Sign` switch that runs, right after each exe is
+  produced (after publish, and after Inno Setup):
   ```powershell
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
     "publish\ProjectNest.exe"
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
-    "installer-output\ProjectNest-1.0.1-Setup.exe"
+    "installer-output\ProjectNest-<version>-Setup.exe"
   ```
-- [ ] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
-  it's scripted. Note: with SimplySign the *script* is automatic but each release still needs a manual
-  phone approval to open the ~2hr signing window first — it's not unattended/headless CI signing unless
-  you upgrade to a plan that supports that later.
+  It locates `signtool.exe` itself (PATH, falling back to the Windows SDK's default install
+  location) and fails fast with a clear message if it can't find it. Usage:
+  `.\installer\build-installer.ps1 -Version X.Y.Z -Sign`. Note: with SimplySign the *script* is
+  automatic but each release still needs a manual phone approval to open the ~2hr signing window
+  **before** running it — it's not unattended/headless CI signing unless you upgrade to a plan
+  that supports that later.
 - [ ] 💡 If you can't sign yet: document that users will see a SmartScreen prompt and must click
   **More info → Run anyway**. Add this to the Gumroad post-purchase notes so it's not a surprise.
 
