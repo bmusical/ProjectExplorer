@@ -243,7 +243,10 @@ that window.
 Unsigned exes trigger **SmartScreen "Unknown publisher"** warnings that scare buyers and tank
 conversion.
 
-- [ ] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+- [x] 💡 **Recommended: Certum "Code Signing in the Cloud" (OV)**, ~$108–120/yr through resellers
+  *(Done — certificate issued 2026-07-13, valid to 2027-07-13, subject "HXM Blazor Software LLC",
+  Safety Harbor, FL, US. Public cert downloaded as `.pem`/DER; the private key stays in Certum's
+  cloud HSM and is never exported, per SimplySign's design.)*
   (e.g. [SSLmentor lists it from $116/yr](https://www.sslmentor.com/certum/certumcodecloud); reseller
   pricing shifts, so shop around at purchase time). It's signed via Certum's free
   [SimplySign](https://www.certum.eu/en/simplysign/) mobile app instead of a physical USB token — the
