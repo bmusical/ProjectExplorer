@@ -37,24 +37,15 @@ $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
-function Invoke-CodeSign {
-    param([string]$FilePath)
-
-    $signtoolCmd = Get-Command signtool.exe -ErrorAction SilentlyContinue
-    $signtool = if ($signtoolCmd) { $signtoolCmd.Source } else {
-        Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+function Invoke-NativeQuiet {
+    param([Parameter(Mandatory = $true)][scriptblock]$ScriptBlock)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $ScriptBlock
     }
-    if (-not $signtool) {
-        Write-Error "signtool.exe not found (ships with the Windows SDK). Install it, or omit -Sign."
-        exit 1
-    }
-
-    Write-Host "==> Signing $FilePath ..." -ForegroundColor Cyan
-    & $signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a "$FilePath"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "signtool failed for $FilePath. Make sure Certum SimplySign Desktop is installed and a signing session is open (approve via the SimplySign mobile app)."
-        exit 1
+    finally {
+        $ErrorActionPreference = $previous
     }
 }
 
@@ -143,11 +134,7 @@ if ($Sign) { Invoke-CodeSign -SignToolPath $signToolPath -Path $setupExe }
 
 Write-Host "==> Installer: $setupExe" -ForegroundColor Green
 
-if ($Sign) {
-    Invoke-CodeSign $setupExe
-}
-
-# ── 3. Update updates.xml (optional) ─────────────────────────────────────────
+# --- 3. Update updates.xml (optional) ---
 
 if ($UpdateXml)
 {
@@ -174,13 +161,27 @@ Write-Host ""
 Write-Host "==> Build complete!" -ForegroundColor Green
 Write-Host ""
 if ($Sign) {
-    Write-Host "==> Signed: publish\ProjectNest.exe and $setupExe" -ForegroundColor Green
+    Write-Host "Signed: $publishedExe and $setupExe" -ForegroundColor Green
 } else {
-    Write-Host "==> Not signed — re-run with -Sign to code-sign the exe + installer (avoids SmartScreen warnings)." -ForegroundColor Yellow
+    Write-Host "Not signed - re-run with -Sign to code-sign the exe + installer (avoids SmartScreen warnings)." -ForegroundColor Yellow
 }
 Write-Host ""
-Write-Host "Next steps for a release:"
-Write-Host "  1. Commit and push updates\updates.xml"
-Write-Host "  2. Create GitHub Release: $Version"
-Write-Host "  3. Upload $setupExe as the release asset"
-Write-Host "  4. Existing users will be prompted to update on next launch"
+if ($UpdateXml) {
+    Write-Host "updates\updates.xml now points at $Version - that only belongs on master once the" -ForegroundColor Yellow
+    Write-Host "release below already exists with its asset attached. If it doesn't yet, commit/push" -ForegroundColor Yellow
+    Write-Host "this file separately, after step 2." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Next steps for a release:"
+    Write-Host "  1. Create GitHub Release: $Version (if not already done)"
+    Write-Host "  2. Upload $setupExe as the release asset (if not already done)"
+    Write-Host "  3. Commit and push updates\updates.xml"
+    Write-Host "  4. Existing users will be prompted to update on next launch"
+} else {
+    $testStep = if ($Sign) { "Test $setupExe (already signed)" } else { "Test/sign $setupExe as needed" }
+    Write-Host "Next steps for a release:"
+    Write-Host "  1. $testStep"
+    Write-Host "  2. Commit and push the version bump (not updates.xml yet)"
+    Write-Host "  3. Create GitHub Release: $Version, with $setupExe as the release asset"
+    Write-Host "  4. Re-run this script with -UpdateXml, then commit/push updates\updates.xml"
+    Write-Host "  5. Existing users will be prompted to update on next launch"
+}
