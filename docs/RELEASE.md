@@ -21,7 +21,7 @@ existing.
 4. **Run the release script**, which tags, pushes, and watches the build for you in one go —
    no other git or GitHub UI steps needed:
    ```powershell
-   .\installer\cut-release.ps1 -Version X.Y.Z
+   .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
    ```
    It double-checks the csproj version and `CHANGELOG.md` section from steps 1–2 actually made it
    to `master`, pushes the tag (no `v` prefix — this repo standardized on bare version tags, and a
