@@ -39,13 +39,15 @@
 - [x] ✅ **URLs & support email are now consistent on `blaznaccess.com`:**
   | File | Value |
   |------|-------|
-  | `RegistrationDialog.cs` → `lnkBuy` | `https://blaznaccess.com/landing/project-nest` *(swap for the direct Gumroad product URL once live)* |
+  | `RegistrationDialog.cs` → `lnkBuy` | `https://bemusical.gumroad.com/l/project-nest` *(live Gumroad product page — updated 2026-07-15)* |
   | `RegistrationDialog.cs` → invalid-key message | `support@blaznaccess.com` |
   | `installer/ProjectExplorer.iss` → `AppPublisherURL` | `https://blaznaccess.com/landing/project-nest` |
   | `installer/ProjectExplorer.iss` → `AppSupportURL` | `mailto:support@blaznaccess.com` |
 
-  > Canonical support address is **support@blaznaccess.com**. The only remaining TODO here is to
-  > repoint `lnkBuy` at the *direct Gumroad checkout URL* when the product page is published.
+  > Canonical support address is **support@blaznaccess.com**. `lnkBuy` now points at the live
+  > Gumroad checkout instead of the landing-page placeholder — `AppPublisherURL` is left on the
+  > general landing page intentionally (it's just the installer's "publisher website" link, not a
+  > buy-now action).
 - [ ] 🔧 Register / confirm ownership of the domain used in those URLs.
 - [ ] 🔧 Set up the support inbox (e.g. `support@yourdomain.com`) and make sure you actually receive mail there.
 - [ ] 💡 Write a one-line tagline (already in-app: *"All your projects, one place."*) and keep it consistent across Gumroad, the landing page, and the About box.

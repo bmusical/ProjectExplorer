@@ -6,6 +6,10 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Point Help ▸ Register / License…'s "Purchase a license" link at the live Gumroad product page
+  (`https://bemusical.gumroad.com/l/project-nest`) instead of the `blaznaccess.com` landing-page
+  placeholder.
+
 ## [1.0.7] — 2026-07-15
 
 - Fix Web Resources rendering grey + strikethrough far too often — the underlying availability
