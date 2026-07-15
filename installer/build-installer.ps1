@@ -53,11 +53,22 @@ function Find-SignTool {
     $onPath = Get-Command signtool -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
 
-    # signtool.exe ships with the Windows SDK, not on PATH by default - look under the usual
-    # install root and take the newest bin\<sdk-version>\x64 copy found.
-    $sdkRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
-    if (Test-Path $sdkRoot) {
-        $found = Get-ChildItem -Path $sdkRoot -Filter "signtool.exe" -Recurse -ErrorAction SilentlyContinue |
+    # Deliberately does NOT rely on the PATH environment variable being refreshed in the
+    # current shell (Windows only broadcasts env var changes to processes that re-read them,
+    # and terminals/tabs often keep a stale copy captured at their own startup) - search known
+    # install locations directly instead, every time, so this always works regardless of PATH.
+    $searchRoots = @(
+        "$env:LOCALAPPDATA\signtool"                        # manual NuGet Microsoft.Windows.SDK.BuildTools extraction
+        "${env:ProgramFiles(x86)}\Windows Kits\10\bin"       # standard Windows SDK install location
+        "${env:ProgramFiles}\Windows Kits\10\bin"            # some installs (e.g. via Visual Studio) land here instead
+        "${env:ProgramFiles}\Microsoft Visual Studio"        # VS-bundled copy, if present
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+    )
+
+    $found = $null
+    foreach ($root in $searchRoots) {
+        if (-not (Test-Path $root)) { continue }
+        $found = Get-ChildItem -Path $root -Filter "signtool.exe" -Recurse -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -like "*\x64\*" } |
             Sort-Object FullName -Descending |
             Select-Object -First 1
