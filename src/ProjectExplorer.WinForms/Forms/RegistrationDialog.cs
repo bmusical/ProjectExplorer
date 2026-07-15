@@ -133,7 +133,7 @@ public class RegistrationDialog : Form
         lnkBuy.LinkClicked += (s, e) =>
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "https://blaznaccess.com/landing/project-nest",   // TODO: swap for direct Gumroad product URL when live
+                FileName = "https://bemusical.gumroad.com/l/project-nest",
                 UseShellExecute = true
             });
 
