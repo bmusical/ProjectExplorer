@@ -137,6 +137,40 @@ public class ResourceAvailabilityCheckerTests
         Assert.Equal(AvailabilityStatus.Unavailable, result.Status);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task CheckWebResourceAsync_BotBlockingStatusCode_IsUnknown(HttpStatusCode statusCode)
+    {
+        // 401/403/429 far more often mean the automated check itself was blocked (WAF/bot
+        // detection, rate limiting) or hit an auth wall the user's own browser session would
+        // sail through, than that the resource is actually gone -- so these must NOT flag the
+        // resource as broken, same as a connection failure.
+        using var client = new HttpClient(new StubHandler(_ => new HttpResponseMessage(statusCode)));
+        var result = await ResourceAvailabilityChecker.CheckWebResourceAsync("https://example.com", client);
+        Assert.Equal(AvailabilityStatus.Unknown, result.Status);
+    }
+
+    [Fact]
+    public async Task CheckWebResourceAsync_SendsBrowserUserAgent()
+    {
+        // .NET's HttpClient sends no User-Agent by default, which plenty of WAFs/anti-bot layers
+        // treat as a bot signature and reply 403 to an otherwise-fine page -- spoofing a real
+        // browser UA avoids that whole class of false positive.
+        HttpRequestMessage? capturedRequest = null;
+        using var client = new HttpClient(new StubHandler(req =>
+        {
+            capturedRequest = req;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }));
+
+        await ResourceAvailabilityChecker.CheckWebResourceAsync("https://example.com", client);
+
+        Assert.NotNull(capturedRequest);
+        Assert.NotEmpty(capturedRequest!.Headers.UserAgent);
+    }
+
     [Fact]
     public async Task CheckWebResourceAsync_ConnectionFailure_IsUnknown()
     {

@@ -6,8 +6,18 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
-## [1.0.6] — 2026-07-13
+## [1.0.6] — 2026-07-15
 
+- Fix Web Resources rendering grey + strikethrough far too often — the underlying availability
+  check had two sources of false positives: (1) it sent no `User-Agent` header, which plenty of
+  WAFs/anti-bot layers (Cloudflare, Akamai, etc.) treat as a bot signature and answer with a
+  blanket 403 even though the page loads fine in a real browser; it now sends a browser-like
+  `User-Agent`. (2) 401/403/429 responses were treated as a confirmed "broken" result exactly
+  like a 404/500, but those three usually mean the automated check was blocked or rate-limited —
+  or hit an auth wall the user's own logged-in browser would sail through — not that the resource
+  is actually gone; they're now treated as inconclusive instead, same as a connection failure.
+  The grey/strikethrough styling and "Locate..."-to-relink behavior are otherwise unchanged for
+  all three reference types.
 - Remove the "Allow multiple copies" option from Settings — single-instance enforcement (a
   second launch switches to the already-running window) is now always on. Two windows against
   the same `projects.json` could silently overwrite each other's changes, since each window only

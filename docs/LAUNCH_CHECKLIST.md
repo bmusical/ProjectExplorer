@@ -266,21 +266,76 @@ conversion.
   - As of March 2026, CA/Browser Forum rules cap **all** code-signing certs (OV and EV) at 459 days
     (~15 months) max validity — even a "multi-year" plan needs a free reissue partway through. Budget for
     that regardless of vendor.
-- [x] 💡 Sign **both** the app exe and the installer exe with `signtool`:
+- [x] 💡 Sign **both** the app exe and the installer exe with `signtool` — scripted, not manual:
+  `installer/build-installer.ps1` takes a `-Sign` switch that runs, right after each exe is
+  produced (after publish, and after Inno Setup):
   ```powershell
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
     "publish\ProjectNest.exe"
   signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a `
-    "installer-output\ProjectNest-1.0.1-Setup.exe"
+    "installer-output\ProjectNest-<version>-Setup.exe"
   ```
-- [x] 💡 Add the signing step into `build-installer.ps1` (after publish, before/after Inno Setup) so
-  it's scripted. *(Done — pass `-Sign` to `build-installer.ps1`; it signs `publish\ProjectNest.exe`
-  right after publish and the Inno Setup output right after compilation, both via `signtool sign /a`.)*
-  Note: with SimplySign the *script* is automatic but each release still needs a manual
-  phone approval to open the ~2hr signing window first — it's not unattended/headless CI signing unless
-  you upgrade to a plan that supports that later.
+  It locates `signtool.exe` itself (PATH, falling back to the Windows SDK's default install
+  location) and fails fast with a clear message if it can't find it. Usage:
+  `.\installer\build-installer.ps1 -Version X.Y.Z -Sign`. Note: with SimplySign the *script* is
+  automatic but each release still needs a manual phone approval to open the ~2hr signing window
+  **before** running it — it's not unattended/headless CI signing unless you upgrade to a plan
+  that supports that later.
 - [ ] 💡 If you can't sign yet: document that users will see a SmartScreen prompt and must click
   **More info → Run anyway**. Add this to the Gumroad post-purchase notes so it's not a surprise.
+
+### 6.1 Certum SimplySign activation — real-world gotchas (from actual purchase, via reseller SSL Cert Shop)
+
+Buying through a reseller (e.g. SSL Cert Shop) instead of directly from Certum adds a layer of
+confusion on top of an already-unusual (cloud HSM) issuance flow. Notes below are from working
+through it for real, so the next time through — or anyone else on the team doing this — doesn't
+have to re-derive them.
+
+- [ ] ⚠️ **You end up with three separate logins, not one — this is normal, not a mistake:**
+  1. **Reseller storefront account** (SSL Cert Shop, or whichever reseller) — where the cert was
+     purchased/invoiced. Just an order/billing account.
+  2. **Certum / SimplySign account** — a *separate* email+password created during activation,
+     distinct from #1. This is the account that actually owns the certificate.
+  3. **SimplySign Mobile/Desktop App** — generates a rotating 6-digit MFA code (like an
+     authenticator app) used to approve each signing session. This is the "token" most Certum docs
+     mean when they say *token*. It's easy to confuse with an **email-delivered activation/enrollment
+     code** sent earlier in the process, which is a completely different, one-time thing — if
+     instructions mention "enter your token" and something doesn't match, check which of these two
+     it actually means first.
+- [ ] ⚠️ **Why "Invalid CSR" happens:** SimplySign is a cloud-HSM product — the private key is
+  generated and stays inside Certum's cloud, and never touches the local machine. Per CA/Browser
+  Forum rules (since 2023), code-signing private keys must live on a hardware token or cloud HSM —
+  you can't `openssl req` a CSR locally the old-school way. But a reseller's order form is usually a
+  generic wizard reused for every cert type on the site, and it still shows a manual "paste your CSR
+  here" box with placeholder text left over from non-cloud cert types. Submitting that box empty (or
+  with the placeholder still in it) is what throws "Invalid CSR" — it's a reseller UI artifact, not
+  something wrong with your order. For SimplySign specifically, CSR/key generation happens *inside
+  Certum's own activation flow* (or the SimplySign Desktop app), not in the reseller's CSR box —
+  leave that box alone and don't try to fill it in.
+- [ ] 💡 **Sanity-check whatever files the reseller portal makes you download** before assuming
+  something's broken — they're almost always Certum's CA root/intermediate **trust chain**
+  certificates, not a personal CSR or private key. Open each in a text editor:
+  - `-----BEGIN CERTIFICATE-----` → a public chain cert. Expected, harmless, not sensitive.
+  - `-----BEGIN CERTIFICATE REQUEST-----` → an actual CSR. Not expected for SimplySign (see above).
+  - `-----BEGIN PRIVATE KEY-----` → should **never** appear for a SimplySign cert (the key never
+    leaves Certum's cloud). If a file like this shows up, treat it as sensitive/wrong and don't
+    upload or share it anywhere — stop and sort out why it exists before proceeding.
+- [ ] 💡 **If reseller support is unresponsive or can't explain the above**, stop working through
+  their wizard and follow Certum's own official activation docs directly instead — the reseller only
+  handles billing; Certum runs the actual activation flow:
+  - https://support.certum.eu/en/how-to-activate-code-signing-simplysign/
+  - https://files.certum.eu/documents/manual_en/CS-Code_Signing_in_the_Cloud_Certificate_activation.pdf
+  - https://support.certum.eu/en/
+- [ ] 💡 **Once the cert is active** (installed into the Windows cert store via SimplySign Desktop),
+  signing looks like the existing `signtool` command above, but through Certum's SimplySign CSP/KSP
+  plugin — the exact `/sha1` thumbprint and any Certum-specific timestamp URL come from the
+  SimplySign Desktop app / Certum account once the cert is live, not before:
+  ```powershell
+  signtool sign /fd SHA256 /tr http://timestamp.certum.pl /td SHA256 /sha1 <thumbprint> `
+    "publish\ProjectNest.exe"
+  ```
+  Confirm the exact thumbprint and timestamp URL Certum recommends at activation time rather than
+  assuming the DigiCert one already used above works — some CAs prefer their own TSA.
 
 ---
 

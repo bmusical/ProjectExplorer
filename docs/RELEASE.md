@@ -23,20 +23,60 @@ existing.
    ```powershell
    .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
    ```
-   This publishes a self-contained `win-x64` single-file exe to `publish\ProjectNest.exe`, runs
-   Inno Setup to produce `installer-output\ProjectNest-X.Y.Z-Setup.exe`, and (because of
-   `-UpdateXml`) rewrites `updates\updates.xml` with the new version and download URL. `-Sign`
-   code-signs both the exe and the installer via `signtool` — see step 5.
-4. **Test the installer** on a clean Windows VM with no .NET installed, to confirm the
+   It double-checks the csproj version and `CHANGELOG.md` section from steps 1–2 actually made it
+   to `master`, pushes the tag (no `v` prefix — this repo standardized on bare version tags, and a
+   `v` prefix also won't match the workflow's trigger pattern, so it simply wouldn't run), then
+   streams the GitHub Actions run live in your terminal via `gh run watch` until it finishes.
+   Requires the [GitHub CLI](https://cli.github.com/), already logged in (`gh auth login`).
+
+   Prefer to do it by hand instead? `git tag X.Y.Z && git push origin X.Y.Z`, or create the GitHub
+   Release directly through the web UI with tag `X.Y.Z` targeting `master` and no files attached
+   (publishing it creates the tag, which fires the same workflow) — title convention is
+   `Project Nest Explorer X.Y.Z`.
+5. **The workflow itself** publishes the self-contained `win-x64` build, compiles the installer,
+   creates/updates the GitHub Release with `ProjectNest-X.Y.Z-Setup.exe` attached, and only then
+   commits `updates/updates.xml` pointing at this version.
+6. **Verify the update path**: install an older version, launch it, and confirm it detects the new
+   release, downloads, and upgrades cleanly. User data in
+   `%APPDATA%\ProjectExplorer\projects.json` must survive the upgrade (the installer's
+   `[UninstallDelete]` intentionally leaves user data alone).
+
+This path skips testing on a clean VM and code-signing (see the manual path below if you need
+either before the release goes public).
+
+## Manual / fully offline path
+
+Use this instead of the above if you need to test the installer on a clean VM or code-sign it
+*before* anyone can download it — the tag-triggered workflow publishes the GitHub Release (and
+therefore makes the installer downloadable) as soon as it's built.
+
+1. **Bump the version** and **update `CHANGELOG.md`** as in steps 1–2 above.
+2. **Build the installer** (add `-Sign` if you have a code-signing certificate set up — see step 4):
+   ```powershell
+   .\installer\build-installer.ps1 -Version X.Y.Z
+   ```
+   This publishes a self-contained `win-x64` single-file exe to `publish\ProjectNest.exe` and runs
+   Inno Setup to produce `installer-output\ProjectNest-X.Y.Z-Setup.exe`. Omit `-UpdateXml` here —
+   see the callout above for why.
+3. **Test the installer** on a clean Windows VM with no .NET installed, to confirm the
    self-contained build actually runs standalone. Verify the app icon shows correctly on the
    taskbar, Start menu shortcut, and Add/Remove Programs.
-5. **Code-sign** the exe and installer by passing `-Sign` to `build-installer.ps1` (already covered
-   in step 3) — see `docs/LAUNCH_CHECKLIST.md` Section 6. Requires Certum SimplySign Desktop
-   installed and a signing session approved from the SimplySign mobile app before the build runs.
-   Unsigned exes trigger SmartScreen warnings that hurt conversion.
-6. **Commit and push** the version bump and updated `updates/updates.xml`.
-7. **Create the GitHub Release**, tagged `X.Y.Z` (no `v` prefix — this repo standardized on bare
-   version tags):
+4. **(Recommended) Code-sign** the exe and installer if you have a code-signing certificate — see
+   `docs/LAUNCH_CHECKLIST.md` Section 6. Unsigned exes trigger SmartScreen warnings that hurt
+   conversion. Pass `-Sign` to step 2 above and `build-installer.ps1` signs both
+   `publish\ProjectNest.exe` and the installer exe with `signtool` automatically (auto-selecting
+   the best available cert via `/a`) — no separate manual `signtool` calls needed. If you're on
+   Certum SimplySign, open the ~2hr phone-approval signing session *before* running the script.
+5. **Commit and push** the version bump (`updates/updates.xml` is *not* part of this commit).
+6. **Create the GitHub Release**, tagged `X.Y.Z`. There's no checked-in release-notes file to point
+   `--notes-file` at — pull the notes straight from the `CHANGELOG.md` section you just added in
+   step 1, the same way `.github/workflows/release.yml` does it for the automated path:
+   ```powershell
+   $version = "X.Y.Z"
+   $changelog = Get-Content -Raw CHANGELOG.md
+   $changelog -match "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=\n## \[|\z)" | Out-Null
+   $Matches[1].Trim() | Set-Content -Path release-notes.md -Encoding utf8
+   ```
    ```bash
    gh release create X.Y.Z \
      "installer-output/ProjectNest-X.Y.Z-Setup.exe" \
