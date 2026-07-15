@@ -136,7 +136,7 @@ if (-not $iscc) {
 Write-Host "==> Running Inno Setup 6 compiler..." -ForegroundColor Cyan
 
 $issFile  = "$PSScriptRoot\ProjectExplorer.iss"
-$setupExe = "$PSScriptRoot\installer-output\ProjectNest-$Version-Setup.exe"
+$setupExe = "$repoRoot\installer-output\ProjectNest-$Version-Setup.exe"
 
 Invoke-NativeQuiet { & $iscc "/DAppVersion=$Version" $issFile }
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
