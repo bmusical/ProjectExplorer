@@ -220,6 +220,7 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 
 | Feature | Notes |
 |---|---|
+| **Comprehensive search** | Search by name, description, path/URL, and metadata across *every* project, not just the current view or expanded branches. This is core to the app's value proposition — instantly finding something added months or years ago instead of re-navigating a forgotten tree. Since `ProjectManager` already loads the full tree into memory at startup, this is an in-memory scan rather than a new storage dependency; the main effort is match/highlight UI in the TreeView/ListView plus a results view that can jump across collapsed or unrelated projects. |
 | **Keyboard navigation (remaining)** | F2 rename and address-bar Enter already work; still need Enter-to-open and Del-to-delete on the TreeView/ListView selection. |
 | **Import from clipboard / text** | Paste a folder path or URL and have ProjectExplorer auto-create the right child type. |
 | **Localization (i18n) scaffolding** | Externalize all UI strings to `.resx` resource files before the codebase grows further. Establish `Strings.resx` (default/English) and the `.Designer.cs` accessor pattern now — every string added from day 1 goes in the right place. Actual translations added incrementally as language demand is confirmed. WinForms supports this natively; no third-party library needed. |
@@ -228,7 +229,6 @@ Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and u
 
 | Feature | Notes |
 |---|---|
-| **Search / filter** | Filter the TreeView or ListView by name across all projects. Critical once collections grow large. |
 | **Recently opened** | Track last-accessed folders/URLs per project session; surface in a "Recent" panel. |
 | **Export / share a project** | Export a single project definition as a `.peproj` JSON file to hand off to a colleague. Distinct from the already-shipped `File ▸ Export All My Data...` (see Recently Shipped), which dumps everything for one user rather than one project for sharing. |
 
