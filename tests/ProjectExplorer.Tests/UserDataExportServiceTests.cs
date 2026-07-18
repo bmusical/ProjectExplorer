@@ -84,6 +84,18 @@ public class UserDataExportServiceTests
     }
 
     [Fact]
+    public void ExportAll_IncludesSqliteAndMigratedJsonFilesWhenPresent()
+    {
+        File.WriteAllText(Path.Combine(_storageDir, "projects.db"), "sqlite-bytes");
+        File.WriteAllText(Path.Combine(_storageDir, "projects.json.migrated"), "[]");
+
+        var service = new UserDataExportService(_storageDir);
+        var included = service.ExportAll(_zipPath);
+
+        Assert.Equal(new[] { "projects.db", "projects.json.migrated" }, included);
+    }
+
+    [Fact]
     public void ExportAll_OverwritesExistingDestinationZip()
     {
         File.WriteAllText(Path.Combine(_storageDir, "projects.json"), "[]");

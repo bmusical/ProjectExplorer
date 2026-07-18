@@ -4,18 +4,21 @@ namespace ProjectExplorer.Core.Services;
 
 /// <summary>
 /// Bundles every file Project Nest Explorer has written to its own storage directory (the same
-/// list docs/HELP.md documents under "what this app does not do": projects.json + its .bak,
-/// license.json, uisettings.json, appsettings.json) into a single zip, so a user can get
-/// everything the app holds about them in one place on request — a GDPR-style "give me all my
-/// data" export. This is a one-way, one-shot copy of whatever's currently on disk; there is
-/// deliberately no matching Import — it isn't an operational backup/restore or migration feature.
+/// list docs/HELP.md documents under "what this app does not do": projects.db, plus any leftover
+/// projects.json/.bak/.migrated from before or during a SQLite migration, license.json,
+/// uisettings.json, appsettings.json) into a single zip, so a user can get everything the app
+/// holds about them in one place on request — a GDPR-style "give me all my data" export. This is
+/// a one-way, one-shot copy of whatever's currently on disk; there is deliberately no matching
+/// Import — it isn't an operational backup/restore or migration feature.
 /// </summary>
 public class UserDataExportService
 {
     private static readonly string[] KnownDataFiles =
     {
+        "projects.db",
         "projects.json",
         "projects.json.bak",
+        "projects.json.migrated",
         "license.json",
         "uisettings.json",
         "appsettings.json"

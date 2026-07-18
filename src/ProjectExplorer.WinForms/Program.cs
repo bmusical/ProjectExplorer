@@ -49,8 +49,11 @@ internal static class Program
     private static void RunApplication(AppSettingsManager appSettingsManager, SingleInstanceGuard instanceGuard)
     {
         // ── Set up services ────────────────────────────────────────────────
-        var repository     = new JsonProjectRepository();
-        var projectManager = new ProjectManager(repository);
+        // SQLite is the default store (see ProjectStoreMigrator); a legacy projects.json is
+        // migrated to it once, automatically, the first time this runs after upgrading.
+        var storageDir      = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ProjectExplorer");
+        var repository      = ProjectStoreMigrator.ResolveRepository(storageDir);
+        var projectManager  = new ProjectManager(repository);
 
         projectManager.InitializeAsync().GetAwaiter().GetResult();
 
