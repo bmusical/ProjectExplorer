@@ -34,10 +34,19 @@ public class SqliteProjectRepository : IProjectRepository
     {
     }
 
-    public SqliteProjectRepository(string storageDir)
+    public SqliteProjectRepository(string storageDir) : this(storageDir, "projects.db")
+    {
+    }
+
+    /// <summary>
+    /// Lets ProjectStoreMigrator point a repository at a temp file name instead of "projects.db"
+    /// directly, so a migration-in-progress is never visible at the real path until it's fully
+    /// written — see ProjectStoreMigrator.ResolveRepository for why that matters.
+    /// </summary>
+    internal SqliteProjectRepository(string storageDir, string databaseFileName)
     {
         Directory.CreateDirectory(storageDir);
-        _connectionString = $"Data Source={Path.Combine(storageDir, "projects.db")}";
+        _connectionString = $"Data Source={Path.Combine(storageDir, databaseFileName)}";
         EnsureSchema();
     }
 
@@ -86,6 +95,19 @@ public class SqliteProjectRepository : IProjectRepository
         connection.Open();
         connection.Execute("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
         return connection;
+    }
+
+    /// <summary>
+    /// Forces all WAL-mode data into the main database file and truncates the WAL to empty, so
+    /// the file at the connection string's Data Source is guaranteed self-contained. Used by
+    /// ProjectStoreMigrator right before it atomically moves a freshly-migrated temp database
+    /// into place — without this, the move could leave data stranded in a "-wal" side file that
+    /// never made the trip.
+    /// </summary>
+    internal void Checkpoint()
+    {
+        using var connection = OpenConnection();
+        connection.Execute("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
     public async Task<List<Project>> LoadAllAsync()
