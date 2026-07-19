@@ -4,7 +4,7 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
-## [Unreleased]
+## [1.0.8] — 2026-07-19
 
 - **SQLite is now the default storage backend**, replacing the JSON file store. The old store
   rewrote the *entire* `projects.json` — every project, not just the one being edited — on every
@@ -12,9 +12,11 @@ Releases tagged `<version>` (no `v` prefix).
   which is the fix for the slowdown a large/deep project nest could cause. Existing installs
   migrate automatically and safely the first time you launch this version: your old
   `projects.json` is copied into the new database, then renamed to `projects.json.migrated` and
-  kept as a backup (never read again). If migration ever fails for any reason, your original file
-  is left untouched and the app keeps working exactly as before — migration is simply retried on
-  the next launch.
+  kept as a backup (never read again). Migration writes to a temporary file first and only
+  becomes `projects.db` via a single atomic rename once it's fully copied and verified — so even
+  if the app is force-closed, crashes, or loses power mid-migration, nothing is ever left behind
+  at the real `projects.db` path that could be mistaken for a completed migration; your original
+  `projects.json` stays exactly where it is and migration just runs again cleanly next launch.
 - Add **comprehensive search** (`File ▸ Search...`, `Ctrl+F`, or the new toolbar magnifier button):
   search every project at once — not just the one you have open — by name, description, folder/file
   path, URL, or metadata, live as you type. Double-click or press Enter on a result to jump straight
