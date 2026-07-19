@@ -4,7 +4,7 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
-## [Unreleased]
+## [1.0.8] — 2026-07-19
 
 - **SQLite is now the default storage backend**, replacing the JSON file store. The old store
   rewrote the *entire* `projects.json` — every project, not just the one being edited — on every
