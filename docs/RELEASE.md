@@ -21,13 +21,17 @@ existing.
 4. **Run the release script**, which tags, pushes, and watches the build for you in one go —
    no other git or GitHub UI steps needed:
    ```powershell
-   .\installer\build-installer.ps1 -Version X.Y.Z -UpdateXml -Sign
+   .\installer\cut-release.ps1 -Version X.Y.Z
    ```
    It double-checks the csproj version and `CHANGELOG.md` section from steps 1–2 actually made it
    to `master`, pushes the tag (no `v` prefix — this repo standardized on bare version tags, and a
    `v` prefix also won't match the workflow's trigger pattern, so it simply wouldn't run), then
    streams the GitHub Actions run live in your terminal via `gh run watch` until it finishes.
-   Requires the [GitHub CLI](https://cli.github.com/), already logged in (`gh auth login`).
+   Requires the [GitHub CLI](https://cli.github.com/), already logged in (`gh auth login`). This is
+   a different, purpose-built script from `build-installer.ps1` below — `cut-release.ps1` only
+   tags/pushes/watches and takes no `-Sign`/`-UpdateXml` switches; the GitHub Actions build it
+   watches is unsigned (see the manual path below if you need code-signing before the release goes
+   public — that's also why this path is described as skipping it, just below).
 
    Prefer to do it by hand instead? `git tag X.Y.Z && git push origin X.Y.Z`, or create the GitHub
    Release directly through the web UI with tag `X.Y.Z` targeting `master` and no files attached
