@@ -6,6 +6,23 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- **SQLite is now the default storage backend**, replacing the JSON file store. The old store
+  rewrote the *entire* `projects.json` — every project, not just the one being edited — on every
+  single save; the new `projects.db` only touches the rows for the project actually being changed,
+  which is the fix for the slowdown a large/deep project nest could cause. Existing installs
+  migrate automatically and safely the first time you launch this version: your old
+  `projects.json` is copied into the new database, then renamed to `projects.json.migrated` and
+  kept as a backup (never read again). If migration ever fails for any reason, your original file
+  is left untouched and the app keeps working exactly as before — migration is simply retried on
+  the next launch.
+- Add **comprehensive search** (`File ▸ Search...`, `Ctrl+F`, or the new toolbar magnifier button):
+  search every project at once — not just the one you have open — by name, description, folder/file
+  path, URL, or metadata, live as you type. Double-click or press Enter on a result to jump straight
+  to it in the tree.
+- Add the remaining keyboard navigation: **Enter** now activates the selected TreeView/ListView
+  item (expands/collapses a Project or Collection, opens a File Reference, navigates into a listed
+  folder), and **Delete** removes the selected item from its project — both show the same
+  confirmation dialogs the equivalent right-click menu items already did.
 - Point Help ▸ Register / License…'s "Purchase a license" link at the live Gumroad product page
   (`https://bemusical.gumroad.com/l/project-nest`) instead of the `blaznaccess.com` landing-page
   placeholder.

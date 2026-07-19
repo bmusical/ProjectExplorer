@@ -23,10 +23,14 @@ every session.
 - Nestable **Collections** to organize a project however you think about it.
 - **Folder**, **file**, and **web resource** references, each opened with one click via the
   Windows shell.
+- **Search everything** (`Ctrl+F`) — find anything across every project by name, description,
+  path, URL, or metadata, not just the one you have open.
 - Right-click a folder to open a Command Prompt or PowerShell there, reveal it in Explorer, or
   copy its path.
-- Drag-and-drop to reparent anything in the tree.
+- Drag-and-drop to reparent anything in the tree, plus full keyboard navigation (rename, delete,
+  open/activate).
 - Thumbnail/icon views, an in-app image viewer, and Windows 11 Fluent-styled UI.
+- Fast, local SQLite storage that scales to large, deep project trees.
 
 ## Download
 
@@ -57,7 +61,7 @@ To build a distributable installer, see [`docs/RELEASE.md`](docs/RELEASE.md).
 
 | Path | What's there |
 |---|---|
-| `src/ProjectExplorer.Core` | Models, business logic (`ProjectManager`), JSON persistence, licensing |
+| `src/ProjectExplorer.Core` | Models, business logic (`ProjectManager`), SQLite persistence, licensing |
 | `src/ProjectExplorer.Shell` | Windows Shell P/Invoke (icons, Fluent window styling) |
 | `src/ProjectExplorer.WinForms` | The desktop app itself |
 | `tools/KeyGen` | Internal license key generator — see [`tools/KeyGen/README.md`](tools/KeyGen/README.md) |

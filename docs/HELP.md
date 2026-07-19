@@ -11,15 +11,17 @@ own or manage the things themselves.
   real folder or file, and never affects any website. It only removes the reference — the pointer
   you organized here — from this app.
 - Everything Project Nest Explorer writes to your computer lives in `%APPDATA%\ProjectExplorer\`:
-  `projects.json` (plus a `.bak` backup copy made automatically on every save) records the tree of
-  references you've built; `license.json` stores your license state if you've registered;
-  `uisettings.json` remembers which tree items were expanded/selected; `appsettings.json` stores
-  the main window's last position/size. Nothing else — no other files, no registry changes,
-  nothing on your real folders — is ever touched by normal use.
+  `projects.db` (a SQLite database) records the tree of references you've built; `license.json`
+  stores your license state if you've registered; `uisettings.json` remembers which tree items
+  were expanded/selected; `appsettings.json` stores the main window's last position/size. Nothing
+  else — no other files, no registry changes, nothing on your real folders — is ever touched by
+  normal use. (If you're upgrading from an older version that used `projects.json`, it's migrated
+  into `projects.db` automatically the first time you launch the new version, and the old file is
+  kept alongside it — renamed to `projects.json.migrated` — as a safety copy, never read again.)
 
-If you ever want to reset everything, back up your setup, or move to another computer: that one
-JSON file (and its `.bak`) is the entire footprint. Deleting it gives you a clean slate; nothing
-you organized inside it was ever more than a reference.
+If you ever want to reset everything, back up your setup, or move to another computer:
+`projects.db` is the entire footprint. Deleting it gives you a clean slate; nothing you organized
+inside it was ever more than a reference.
 
 ## Quick start
 
@@ -56,6 +58,14 @@ place where files actually live.
   Explorer does — they only affect what's displayed, never the folders themselves.
 - **View ▸ Details / Extra Large Icons / Large Icons / Small Icons / List / Tile** switches how the
   ListView displays folder contents.
+
+## Searching across projects
+
+**File ▸ Search...** (or `Ctrl+F`, or the magnifier button on the toolbar) opens a search window
+that looks across *every* project at once — not just the one you currently have open or the
+branches you happen to have expanded. It matches name, description, folder/file path, URL, and
+any metadata you've added, live as you type. Double-click a result (or select it and press
+`Enter`) to jump straight to it in the tree, the same way clicking it there would.
 
 ## Unavailable folders, files, and web resources
 
@@ -99,7 +109,7 @@ double-check its status, for any reason.
 | **Web Resource** | Open in External Browser, Copy URL, Edit…, Move Up/Down, Remove from Project, Refresh |
 
 "Remove from Project" and "Delete Project/Collection" only remove entries from your
-`projects.json` tree — see the note at the top of this document.
+`projects.db` tree — see the note at the top of this document.
 
 You can also drag and drop items in the tree to reorganize them: drop onto a Collection or
 Project to move something inside it, or drop just above/below a row (watch for the insertion
@@ -110,7 +120,7 @@ that project into a collection nested there, or drag a Collection onto the "Proj
 turn it into its own top-level project (its contents come along either way). If the exact drop
 position is fiddly to hit, every item's right-click menu also has **Move Up**/**Move Down**,
 which does the same repositioning without needing to drag at all. All of this only changes
-placement in `projects.json`, same as any other edit here. (Reparenting via drag stays within
+placement in `projects.db`, same as any other edit here. (Reparenting via drag stays within
 the same Project — moving something into a *different* project isn't supported yet except via
 the two conversion gestures above.)
 
@@ -119,13 +129,16 @@ the two conversion gestures above.)
 | Shortcut | Action |
 |---|---|
 | `Ctrl+N` | New Project… |
+| `Ctrl+F` | Search every project by name, description, path, URL, or metadata |
 | `F2` | Rename the selected Project or Collection (works from either the tree or the list) |
+| `Enter` | Activate the selected item — expands/collapses a Project or Collection, opens a File Reference, or navigates into a folder shown in the list |
+| `Delete` | Delete the selected Project/Collection, or remove the selected Folder/File/Web reference from the project — asks for confirmation first, same as the equivalent right-click action |
 
 ## Window behavior
 
 Launching Project Nest Explorer while it's already running switches to the existing window
 instead of opening a second one — this is fixed behavior, not a setting. Each window reads
-`projects.json` once at startup and doesn't notice changes made elsewhere, so two windows open
+`projects.db` once at startup and doesn't notice changes made elsewhere, so two windows open
 at the same time could silently overwrite each other's edits to that file; switching to the
 existing window instead of opening a second one avoids that entirely.
 
@@ -136,8 +149,9 @@ automatically moved back onto your primary screen the next time it becomes visib
 ## Exporting your data
 
 **File ▸ Export All My Data...** bundles everything Project Nest Explorer has written to
-`%APPDATA%\ProjectExplorer\` — whichever of `projects.json`, `license.json`, `uisettings.json`,
-and `appsettings.json` already exist — into a single zip file you choose where to save. This is a
+`%APPDATA%\ProjectExplorer\` — whichever of `projects.db`, `license.json`, `uisettings.json`,
+and `appsettings.json` already exist (plus any leftover `projects.json`/`.migrated` file from an
+older version) — into a single zip file you choose where to save. This is a
 "give me all my data" export for backing up your setup or handing it to yourself on another
 computer; it's one-way, so there's no matching "Import" — see the note at the top of this document
 for how to move that same folder to a new machine by hand if you want it live there again.

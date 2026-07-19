@@ -235,8 +235,13 @@ that window.
 ### 5.3 Verify the update path (🔁 first few releases)
 
 - [ ] 🔁 Install an **older** version, launch it, and confirm it detects the new release, downloads,
-  and upgrades cleanly (data in `%APPDATA%\ProjectExplorer\projects.json` must survive the upgrade —
-  the installer's `[UninstallDelete]` intentionally leaves user data alone).
+  and upgrades cleanly (data in `%APPDATA%\ProjectExplorer\` must survive the upgrade — the
+  installer's `[UninstallDelete]` intentionally leaves user data alone).
+- [ ] 🔁 For any release crossing the 1.1.0 SQLite migration specifically: install a pre-1.1.0
+  version, create some projects (so `projects.json` exists with real data), then upgrade to a
+  1.1.0+ build and confirm on first launch that `projects.db` now exists with the same data,
+  `projects.json` was renamed to `projects.json.migrated` (not deleted), and nothing looks empty
+  or lost. See `ProjectStoreMigrator` / `docs/HELP.md`'s intro note.
 
 ---
 

@@ -316,6 +316,46 @@ public partial class MainForm : Form
         UpdateLicenseUi();
     }
 
+    // ── Comprehensive Search (toolbar magnifier / Ctrl+F) ──
+
+    private SearchForm? _searchForm;
+
+    private void OpenSearchForm()
+    {
+        if (_searchForm == null || _searchForm.IsDisposed)
+        {
+            _searchForm = new SearchForm(_projectManager, OnSearchResultActivated);
+            _searchForm.Show(this);
+        }
+        else
+        {
+            _searchForm.Activate();
+        }
+    }
+
+    /// <summary>
+    /// Reconstructs the exact Tag* string a matching tree node was built with (see AddProjectNode/
+    /// AddChildNode) from a SearchResult, then reuses SelectTreeNodeByTag — the same jump
+    /// mechanism double-click and drag-drop already rely on — rather than adding a second way to
+    /// navigate the tree.
+    /// </summary>
+    private void OnSearchResultActivated(SearchResult result)
+    {
+        var tag = result.ChildType switch
+        {
+            null => TagProject + result.ProjectId,
+            ChildType.Collection => TagCollection + $"{result.ProjectId}:{result.ChildId}",
+            ChildType.FolderReference => TagFolderRef + $"{result.ProjectId}:{result.ChildId}",
+            ChildType.WebResource => TagWebResource + $"{result.ProjectId}:{result.ChildId}",
+            ChildType.FileReference => TagFileRef + $"{result.ProjectId}:{result.ChildId}",
+            _ => null
+        };
+        if (tag == null) return;
+
+        SelectTreeNodeByTag(tag);
+        Activate();
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
@@ -1055,6 +1095,31 @@ public partial class MainForm : Form
                 e.Handled = true;
             }
         }
+        else if (e.KeyCode == Keys.Enter && treeView.SelectedNode != null)
+        {
+            var node = treeView.SelectedNode;
+            var tag = node.Tag?.ToString() ?? "";
+
+            // Project/Collection/root nodes have no distinct "activate" action beyond selection
+            // (which already drives the content panel via AfterSelect) -- Enter instead toggles
+            // expand/collapse here, matching Explorer's own Enter behavior on folder nodes. Every
+            // other node type routes through the same activation dispatch double-click uses.
+            if ((tag.StartsWith(TagProject) || tag.StartsWith(TagCollection) || tag == TagProjectsRoot) && node.Nodes.Count > 0)
+            {
+                if (node.IsExpanded) node.Collapse(); else node.Expand();
+            }
+            else
+            {
+                ActivateByTag(tag);
+            }
+
+            e.Handled = true;
+        }
+        else if (e.KeyCode == Keys.Delete && treeView.SelectedNode != null)
+        {
+            _ = DeleteByTagWithConfirmAsync(treeView.SelectedNode.Tag?.ToString() ?? "");
+            e.Handled = true;
+        }
     }
 
     /// <summary>
@@ -1065,12 +1130,25 @@ public partial class MainForm : Form
     /// </summary>
     private void ListView_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.KeyCode != Keys.F2 || listView.SelectedItems.Count != 1) return;
-
+        if (listView.SelectedItems.Count != 1) return;
         var tag = listView.SelectedItems[0].Tag?.ToString() ?? "";
-        if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection))
+
+        if (e.KeyCode == Keys.F2)
         {
-            RenameViaDialog(tag);
+            if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection))
+            {
+                RenameViaDialog(tag);
+                e.Handled = true;
+            }
+        }
+        else if (e.KeyCode == Keys.Enter)
+        {
+            ActivateByTag(tag);
+            e.Handled = true;
+        }
+        else if (e.KeyCode == Keys.Delete)
+        {
+            _ = DeleteByTagWithConfirmAsync(tag);
             e.Handled = true;
         }
     }
@@ -1581,10 +1659,16 @@ public partial class MainForm : Form
     private void ListView_DoubleClick(object? sender, EventArgs e)
     {
         if (listView.SelectedItems.Count == 0) return;
+        ActivateByTag(listView.SelectedItems[0].Tag?.ToString() ?? "");
+    }
 
-        var item = listView.SelectedItems[0];
-        var tag = item.Tag?.ToString() ?? "";
-
+    /// <summary>
+    /// The shared "activate this item" dispatch — same tag-prefix switch double-click has always
+    /// used, now also driven by Enter (TreeView_KeyDown/ListView_KeyDown) so both input methods
+    /// behave identically instead of Enter needing its own copy of this logic.
+    /// </summary>
+    private void ActivateByTag(string tag)
+    {
         if (tag.StartsWith(TagProject) || tag.StartsWith(TagCollection) || tag.StartsWith(TagFolderRef))
         {
             // Find and select the corresponding tree node
@@ -1632,6 +1716,100 @@ public partial class MainForm : Form
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(filePath) { UseShellExecute = true });
             }
             catch { }
+        }
+    }
+
+    // ── Delete/Remove (shared by context menu items and the Delete key — same confirm dialogs
+    // either way, so there's exactly one place that knows how to delete each type) ──
+
+    private async Task DeleteProjectWithConfirmAsync(Guid projectId)
+    {
+        var project = _projectManager.GetProject(projectId);
+        if (project == null) return;
+        var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (result == DialogResult.Yes)
+        {
+            await _projectManager.DeleteProjectAsync(projectId);
+            _currentProject = null;
+            RefreshTreeView();
+        }
+    }
+
+    private async Task DeleteCollectionWithConfirmAsync(Guid projectId, Guid collectionId)
+    {
+        var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
+            "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (result == DialogResult.Yes)
+        {
+            await _projectManager.DeleteCollectionAsync(projectId, collectionId);
+            RefreshTreeView();
+        }
+    }
+
+    private async Task RemoveFolderReferenceWithConfirmAsync(Guid projectId, Guid folderRefId)
+    {
+        var result = MessageBox.Show("Remove this folder reference from the project?",
+            "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (result == DialogResult.Yes)
+        {
+            await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
+            RefreshTreeView();
+        }
+    }
+
+    private async Task RemoveWebResourceWithConfirmAsync(Guid projectId, Guid resourceId)
+    {
+        var result = MessageBox.Show("Remove this web resource from the project?",
+            "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (result == DialogResult.Yes)
+        {
+            await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
+            RefreshTreeView();
+        }
+    }
+
+    private async Task RemoveFileReferenceWithConfirmAsync(Guid projectId, Guid fileRefId)
+    {
+        var result = MessageBox.Show("Remove this file reference from the project?",
+            "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (result == DialogResult.Yes)
+        {
+            await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
+            RefreshTreeView();
+        }
+    }
+
+    /// <summary>
+    /// Delete-key dispatch for the TreeView/ListView selection — parses the same Tag* prefixes
+    /// ActivateByTag does and routes to whichever confirm-then-delete method above matches, so
+    /// pressing Delete shows the exact same confirmation dialog as the equivalent context-menu item.
+    /// </summary>
+    private async Task DeleteByTagWithConfirmAsync(string tag)
+    {
+        if (tag.StartsWith(TagProject))
+        {
+            await DeleteProjectWithConfirmAsync(Guid.Parse(tag.Substring(TagProject.Length)));
+        }
+        else if (tag.StartsWith(TagCollection))
+        {
+            var parts = tag.Substring(TagCollection.Length).Split(':');
+            if (parts.Length >= 2) await DeleteCollectionWithConfirmAsync(Guid.Parse(parts[0]), Guid.Parse(parts[1]));
+        }
+        else if (tag.StartsWith(TagFolderRef))
+        {
+            var parts = tag.Substring(TagFolderRef.Length).Split(':');
+            if (parts.Length >= 2) await RemoveFolderReferenceWithConfirmAsync(Guid.Parse(parts[0]), Guid.Parse(parts[1]));
+        }
+        else if (tag.StartsWith(TagWebResource))
+        {
+            var parts = tag.Substring(TagWebResource.Length).Split(':');
+            if (parts.Length >= 2) await RemoveWebResourceWithConfirmAsync(Guid.Parse(parts[0]), Guid.Parse(parts[1]));
+        }
+        else if (tag.StartsWith(TagFileRef))
+        {
+            var parts = tag.Substring(TagFileRef.Length).Split(':');
+            if (parts.Length >= 2) await RemoveFileReferenceWithConfirmAsync(Guid.Parse(parts[0]), Guid.Parse(parts[1]));
         }
     }
 
@@ -2100,19 +2278,7 @@ public partial class MainForm : Form
         });
         AddProjectMoveMenuItems(menu, projectId);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Delete Project", null, async (s, e) =>
-        {
-            var project = _projectManager.GetProject(projectId);
-            if (project == null) return;
-            var result = MessageBox.Show($"Delete project '{project.Name}'?", "Confirm Delete",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-            {
-                await _projectManager.DeleteProjectAsync(projectId);
-                _currentProject = null;
-                RefreshTreeView();
-            }
-        });
+        menu.Items.Add("Delete Project", null, async (s, e) => await DeleteProjectWithConfirmAsync(projectId));
     }
 
     private void AddCollectionMenuItems(ContextMenuStrip menu, Guid projectId, Guid collectionId, Action rename)
@@ -2137,16 +2303,7 @@ public partial class MainForm : Form
         });
         AddChildMoveMenuItems(menu, projectId, collectionId);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Delete Collection", null, async (s, e) =>
-        {
-            var result = MessageBox.Show("Delete this collection and remove its folder references from this project?",
-                "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-            {
-                await _projectManager.DeleteCollectionAsync(projectId, collectionId);
-                RefreshTreeView();
-            }
-        });
+        menu.Items.Add("Delete Collection", null, async (s, e) => await DeleteCollectionWithConfirmAsync(projectId, collectionId));
     }
 
     /// <summary>
@@ -2270,16 +2427,7 @@ public partial class MainForm : Form
         });
         AddChildMoveMenuItems(menu, projectId, folderRefId);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Remove from Project", null, async (s, e) =>
-        {
-            var result = MessageBox.Show("Remove this folder reference from the project?",
-                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-            {
-                await _projectManager.RemoveFolderReferenceAsync(projectId, folderRefId);
-                RefreshTreeView();
-            }
-        });
+        menu.Items.Add("Remove from Project", null, async (s, e) => await RemoveFolderReferenceWithConfirmAsync(projectId, folderRefId));
     }
 
     private void AddWebResourceMenuItems(ContextMenuStrip menu, Guid projectId, Guid resourceId, string tag)
@@ -2314,16 +2462,7 @@ public partial class MainForm : Form
         });
         AddChildMoveMenuItems(menu, projectId, resourceId);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Remove from Project", null, async (s, e) =>
-        {
-            var result = MessageBox.Show("Remove this web resource from the project?",
-                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-            {
-                await _projectManager.RemoveWebResourceAsync(projectId, resourceId);
-                RefreshTreeView();
-            }
-        });
+        menu.Items.Add("Remove from Project", null, async (s, e) => await RemoveWebResourceWithConfirmAsync(projectId, resourceId));
     }
 
     private void AddFileReferenceMenuItems(ContextMenuStrip menu, Guid projectId, Guid fileRefId)
@@ -2376,16 +2515,7 @@ public partial class MainForm : Form
         });
         AddChildMoveMenuItems(menu, projectId, fileRefId);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Remove from Project", null, async (s, e) =>
-        {
-            var result = MessageBox.Show("Remove this file reference from the project?",
-                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-            {
-                await _projectManager.RemoveFileReferenceAsync(projectId, fileRefId);
-                RefreshTreeView();
-            }
-        });
+        menu.Items.Add("Remove from Project", null, async (s, e) => await RemoveFileReferenceWithConfirmAsync(projectId, fileRefId));
     }
 
     private void AddRealFolderMenuItems(ContextMenuStrip menu, string path)

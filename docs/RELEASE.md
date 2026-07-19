@@ -37,9 +37,9 @@ existing.
    creates/updates the GitHub Release with `ProjectNest-X.Y.Z-Setup.exe` attached, and only then
    commits `updates/updates.xml` pointing at this version.
 6. **Verify the update path**: install an older version, launch it, and confirm it detects the new
-   release, downloads, and upgrades cleanly. User data in
-   `%APPDATA%\ProjectExplorer\projects.json` must survive the upgrade (the installer's
-   `[UninstallDelete]` intentionally leaves user data alone).
+   release, downloads, and upgrades cleanly. User data in `%APPDATA%\ProjectExplorer\` (`projects.db`,
+   or a pre-1.1.0 `projects.json` that `ProjectStoreMigrator` migrates automatically on first launch)
+   must survive the upgrade (the installer's `[UninstallDelete]` intentionally leaves user data alone).
 
 This path skips testing on a clean VM and code-signing (see the manual path below if you need
 either before the release goes public).

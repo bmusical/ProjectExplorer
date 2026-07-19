@@ -21,6 +21,7 @@ partial class MainForm
     private ToolStripButton btnOpenPowerShell;
     private ToolStripButton btnCopyPath;
     private ToolStripTextBox txtAddress;
+    private ToolStripButton btnSearch;
 
     // Main splitter
     private SplitContainer splitMain;
@@ -50,6 +51,7 @@ partial class MainForm
     private MenuStrip menuStrip;
     private ToolStripMenuItem menuFile;
     private ToolStripMenuItem menuFileNewProject;
+    private ToolStripMenuItem menuFileSearch;
     private ToolStripMenuItem menuFileExportMyData;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
@@ -164,13 +166,20 @@ partial class MainForm
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Segoe UI", 9.5f)
         };
+        this.btnSearch = new ToolStripButton
+        {
+            Image = ChipBitmap("", "Segoe MDL2 Assets", 24, Color.FromArgb(210, 229, 255), Color.FromArgb(20, 90, 180)),
+            ToolTipText = "Search all projects (Ctrl+F)",
+            DisplayStyle = ToolStripItemDisplayStyle.Image
+        };
 
         this.toolStripNav = new ToolStrip
         {
             Items = {
                 this.btnBack, this.btnForward, this.btnUp, new ToolStripSeparator(),
                 this.btnOpenExplorer, this.btnOpenCmd, this.btnOpenPowerShell, this.btnCopyPath,
-                new ToolStripSeparator(), this.txtAddress
+                new ToolStripSeparator(), this.txtAddress,
+                new ToolStripSeparator(), this.btnSearch
             },
             Dock = DockStyle.Top,
             GripStyle = ToolStripGripStyle.Hidden,
@@ -191,14 +200,16 @@ partial class MainForm
         this.btnOpenCmd.Click += BtnOpenCmd_Click;
         this.btnOpenPowerShell.Click += BtnOpenPowerShell_Click;
         this.btnCopyPath.Click += BtnCopyPath_Click;
+        this.btnSearch.Click += (s, e) => OpenSearchForm();
 
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
         this.menuFileNewProject = new ToolStripMenuItem { Text = "New &Project...", ShortcutKeys = Keys.Control | Keys.N };
+        this.menuFileSearch = new ToolStripMenuItem { Text = "&Search...", ShortcutKeys = Keys.Control | Keys.F };
         this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
         this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
-            menuFileNewProject, new ToolStripSeparator(),
+            menuFileNewProject, menuFileSearch, new ToolStripSeparator(),
             menuFileExportMyData, new ToolStripSeparator(), menuFileExit
         });
 
@@ -240,6 +251,7 @@ partial class MainForm
         };
 
         this.menuFileNewProject.Click += MenuFileNewProject_Click;
+        this.menuFileSearch.Click += (s, e) => OpenSearchForm();
         this.menuFileExportMyData.Click += MenuFileExportMyData_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
