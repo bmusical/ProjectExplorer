@@ -11,21 +11,23 @@ public class WebResourceDialog : Form
     private readonly TextBox txtUrl;
     private readonly Label lblDescription;
     private readonly TextBox txtDescription;
+    private readonly CheckBox chkOpenExternalOnly;
     private readonly Button btnOK;
     private readonly Button btnCancel;
 
     public string ResourceName => txtName.Text;
     public string ResourceUrl => txtUrl.Text;
     public string ResourceDescription => txtDescription.Text;
+    public bool OpenExternalOnly => chkOpenExternalOnly.Checked;
 
-    public WebResourceDialog(string title = "Add Web Resource", string name = "", string url = "", string description = "")
+    public WebResourceDialog(string title = "Add Web Resource", string name = "", string url = "", string description = "", bool openExternalOnly = false)
     {
         this.Text = title;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, title == "Edit Web Resource" ? 290 : 280);
+        this.Size = new Size(480, 320);
 
         lblName = new Label
         {
@@ -73,11 +75,19 @@ public class WebResourceDialog : Form
             PlaceholderText = "What is this resource for?"
         };
 
+        chkOpenExternalOnly = new CheckBox
+        {
+            Text = "Always open in external browser (skip inline preview)",
+            Location = new Point(12, 215),
+            Size = new Size(440, 24),
+            Checked = openExternalOnly
+        };
+
         btnOK = new Button
         {
             Text = "OK",
             DialogResult = DialogResult.OK,
-            Location = new Point(280, 215),
+            Location = new Point(280, 252),
             Size = new Size(80, 30)
         };
 
@@ -85,7 +95,7 @@ public class WebResourceDialog : Form
         {
             Text = "Cancel",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(372, 215),
+            Location = new Point(372, 252),
             Size = new Size(80, 30)
         };
 
@@ -93,6 +103,7 @@ public class WebResourceDialog : Form
             lblName, txtName,
             lblUrl, txtUrl,
             lblDescription, txtDescription,
+            chkOpenExternalOnly,
             btnOK, btnCancel
         });
         this.AcceptButton = btnOK;

@@ -81,6 +81,13 @@ public class SqliteProjectRepository : IProjectRepository
             );
             CREATE INDEX IF NOT EXISTS IX_ProjectChildren_ProjectId ON ProjectChildren(ProjectId);
             """);
+
+        // Additive schema migrations — safe to run against already-upgraded databases because
+        // SQLite ignores "duplicate column" errors from ALTER TABLE when suppressed, but we
+        // guard with a pragma-driven column-existence check to stay portable.
+        var cols = connection.Query<string>("SELECT name FROM pragma_table_info('ProjectChildren')").ToHashSet();
+        if (!cols.Contains("OpenExternalOnly"))
+            connection.Execute("ALTER TABLE ProjectChildren ADD COLUMN OpenExternalOnly INTEGER NOT NULL DEFAULT 0;");
     }
 
     /// <summary>
@@ -234,6 +241,7 @@ public class SqliteProjectRepository : IProjectRepository
         public string? Url { get; set; }
         public string? FilePath { get; set; }
         public string? MetadataJson { get; set; }
+        public int OpenExternalOnly { get; set; }
     }
 
     private static Project ToProject(ProjectRow row) => new()
@@ -277,7 +285,7 @@ public class SqliteProjectRepository : IProjectRepository
                 Children = BuildTree(byParent, Guid.Parse(row.Id))
             },
             "folderReference" => new FolderReference { RealPath = row.RealPath ?? "", Description = row.Description },
-            "webResource" => new WebResource { Url = row.Url ?? "", Description = row.Description },
+            "webResource" => new WebResource { Url = row.Url ?? "", Description = row.Description, OpenExternalOnly = row.OpenExternalOnly != 0 },
             "fileReference" => new FileReference { FilePath = row.FilePath ?? "", Description = row.Description },
             _ => throw new InvalidOperationException($"Unknown ChildType '{row.ChildType}' in ProjectChildren row {row.Id}.")
         };
@@ -299,9 +307,9 @@ public class SqliteProjectRepository : IProjectRepository
         {
             await connection.ExecuteAsync("""
                 INSERT INTO ProjectChildren
-                    (Id, ProjectId, ParentId, ChildType, SortOrder, DisplayName, Name, Description, Color, RealPath, Url, FilePath, MetadataJson)
+                    (Id, ProjectId, ParentId, ChildType, SortOrder, DisplayName, Name, Description, Color, RealPath, Url, FilePath, MetadataJson, OpenExternalOnly)
                 VALUES
-                    (@Id, @ProjectId, @ParentId, @ChildType, @SortOrder, @DisplayName, @Name, @Description, @Color, @RealPath, @Url, @FilePath, @MetadataJson)
+                    (@Id, @ProjectId, @ParentId, @ChildType, @SortOrder, @DisplayName, @Name, @Description, @Color, @RealPath, @Url, @FilePath, @MetadataJson, @OpenExternalOnly)
                 """, ToChildParams(child, projectId, parentId), transaction);
 
             if (child is Collection collection)
@@ -330,7 +338,8 @@ public class SqliteProjectRepository : IProjectRepository
         RealPath = (child as FolderReference)?.RealPath,
         Url = (child as WebResource)?.Url,
         FilePath = (child as FileReference)?.FilePath,
-        MetadataJson = child.Metadata.Count > 0 ? JsonSerializer.Serialize(child.Metadata) : null
+        MetadataJson = child.Metadata.Count > 0 ? JsonSerializer.Serialize(child.Metadata) : null,
+        OpenExternalOnly = child is WebResource wr ? (wr.OpenExternalOnly ? 1 : 0) : 0
     };
 
     private static string ChildTypeKey(ChildType type) => type switch
