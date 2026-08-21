@@ -9,7 +9,9 @@ public enum FilePreviewKind
 {
     None,
     Image,
-    Text
+    Text,
+    Html,
+    Markdown
 }
 
 /// <summary>
@@ -25,6 +27,16 @@ public static class FilePreviewHelper
     /// inline preview responsive.
     /// </summary>
     public const int MaxPreviewBytes = 256 * 1024;
+
+    private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".html", ".htm"
+    };
+
+    private static readonly HashSet<string> MarkdownExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".md", ".markdown"
+    };
 
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -59,13 +71,31 @@ public static class FilePreviewHelper
         return IsTextExtension(path.Substring(dot));
     }
 
+    private static string? GetExtension(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        var dot = path.LastIndexOf('.');
+        return dot < 0 ? null : path.Substring(dot);
+    }
+
     /// <summary>Classifies a file path for inline preview purposes.</summary>
     public static FilePreviewKind GetPreviewKind(string? path)
     {
         if (ImageFileHelper.IsImageFile(path))
             return FilePreviewKind.Image;
+
+        var ext = GetExtension(path);
+        if (ext != null)
+        {
+            if (HtmlExtensions.Contains(ext))
+                return FilePreviewKind.Html;
+            if (MarkdownExtensions.Contains(ext))
+                return FilePreviewKind.Markdown;
+        }
+
         if (IsTextFile(path))
             return FilePreviewKind.Text;
+
         return FilePreviewKind.None;
     }
 }

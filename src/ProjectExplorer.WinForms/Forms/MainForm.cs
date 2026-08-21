@@ -1006,7 +1006,7 @@ public partial class MainForm : Form
         listView.Visible = false;
         webResourcePreviewPanel.Visible = true;
 
-        webResourcePreviewPanel.ShowWebResource(webResource.Url, webResource.EffectiveName, imageListExtraLarge.Images["WebResource"]);
+        webResourcePreviewPanel.ShowWebResource(webResource.Url, webResource.EffectiveName, imageListExtraLarge.Images["WebResource"], webResource.OpenExternalOnly);
     }
 
     private void HideWebResourcePreview()
@@ -1585,6 +1585,56 @@ public partial class MainForm : Form
         }
     }
 
+    private void BtnExpandAll_Click()
+    {
+        treeView.BeginUpdate();
+        treeView.ExpandAll();
+        treeView.EndUpdate();
+    }
+
+    private void BtnCollapseAll_Click()
+    {
+        treeView.BeginUpdate();
+        foreach (TreeNode node in treeView.Nodes)
+            node.Collapse(false);
+        // Keep the root expanded so the Projects header is still visible
+        if (treeView.Nodes.Count > 0)
+            treeView.Nodes[0].Expand();
+        treeView.EndUpdate();
+    }
+
+    private void BtnCollapseToTop_Click()
+    {
+        // Collapse every Project branch but keep the project-level nodes themselves visible
+        treeView.BeginUpdate();
+        if (treeView.Nodes.Count > 0)
+        {
+            var root = treeView.Nodes[0];
+            root.Expand();
+            foreach (TreeNode projectNode in root.Nodes)
+                projectNode.Collapse(false);
+        }
+        treeView.EndUpdate();
+    }
+
+    private void BtnExpandBranch_Click()
+    {
+        var node = treeView.SelectedNode;
+        if (node == null) return;
+        treeView.BeginUpdate();
+        node.ExpandAll();
+        treeView.EndUpdate();
+    }
+
+    private void BtnCollapseBranch_Click()
+    {
+        var node = treeView.SelectedNode;
+        if (node == null) return;
+        treeView.BeginUpdate();
+        node.Collapse(false);
+        treeView.EndUpdate();
+    }
+
     private void AddressBar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
@@ -2151,7 +2201,7 @@ public partial class MainForm : Form
 
             if (!string.IsNullOrEmpty(url))
             {
-                await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId);
+                await _projectManager.AddWebResourceAsync(projectId, url, name, description, parentCollectionId, dialog.OpenExternalOnly);
                 RefreshLicense();
                 UpdateLicenseUi();
                 RefreshTreeView();
@@ -2448,14 +2498,15 @@ public partial class MainForm : Form
             var wr = FindWebResource(_projectManager.GetProject(projectId), resourceId);
             if (wr != null)
             {
-                using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "");
+                using var dlg = new WebResourceDialog("Edit Web Resource", wr.DisplayName ?? "", wr.Url, wr.Description ?? "", wr.OpenExternalOnly);
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     await _projectManager.UpdateWebResourceAsync(
                         projectId, resourceId,
                         string.IsNullOrWhiteSpace(dlg.ResourceName) ? null : dlg.ResourceName.Trim(),
                         dlg.ResourceUrl.Trim(),
-                        string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim());
+                        string.IsNullOrWhiteSpace(dlg.ResourceDescription) ? null : dlg.ResourceDescription.Trim(),
+                        dlg.OpenExternalOnly);
                     RefreshTreeView();
                 }
             }
@@ -2742,7 +2793,7 @@ public partial class MainForm : Form
     {
         if (e.Item is not TreeNode node) return;
         var tag = node.Tag?.ToString() ?? "";
-        if (!tag.StartsWith(TagCollection) && !tag.StartsWith(TagFolderRef) && !tag.StartsWith(TagWebResource) && !tag.StartsWith(TagProject))
+        if (!tag.StartsWith(TagCollection) && !tag.StartsWith(TagFolderRef) && !tag.StartsWith(TagWebResource) && !tag.StartsWith(TagProject) && !tag.StartsWith(TagFileRef))
             return;
         treeView.DoDragDrop(node, DragDropEffects.Move);
     }

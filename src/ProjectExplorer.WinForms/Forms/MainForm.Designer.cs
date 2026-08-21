@@ -23,6 +23,14 @@ partial class MainForm
     private ToolStripTextBox txtAddress;
     private ToolStripButton btnSearch;
 
+    // Tree expand/collapse toolbar
+    private ToolStrip toolStripTree;
+    private ToolStripButton btnExpandAll;
+    private ToolStripButton btnCollapseAll;
+    private ToolStripButton btnCollapseToTop;
+    private ToolStripButton btnExpandBranch;
+    private ToolStripButton btnCollapseBranch;
+
     // Main splitter
     private SplitContainer splitMain;
 
@@ -201,6 +209,68 @@ partial class MainForm
         this.btnOpenPowerShell.Click += BtnOpenPowerShell_Click;
         this.btnCopyPath.Click += BtnCopyPath_Click;
         this.btnSearch.Click += (s, e) => OpenSearchForm();
+
+        // ── Tree expand/collapse ToolStrip ──
+        var treeGlyphFont = new Font("Segoe MDL2 Assets", 11f);
+        this.btnExpandAll = new ToolStripButton
+        {
+            Text = "\uE70D", // ChevronDown (expand-all hint)
+            Font = treeGlyphFont,
+            ToolTipText = "Expand All",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnCollapseAll = new ToolStripButton
+        {
+            Text = "\uE70E", // ChevronUp (collapse-all hint)
+            Font = treeGlyphFont,
+            ToolTipText = "Collapse All",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnCollapseToTop = new ToolStripButton
+        {
+            Text = "\uE74B", // Decrease indent / collapse-to-top
+            Font = treeGlyphFont,
+            ToolTipText = "Collapse to Top Level",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnExpandBranch = new ToolStripButton
+        {
+            Text = "\uE76C", // Branch expand
+            Font = treeGlyphFont,
+            ToolTipText = "Expand Selected Branch",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        this.btnCollapseBranch = new ToolStripButton
+        {
+            Text = "\uE76B", // Branch collapse
+            Font = treeGlyphFont,
+            ToolTipText = "Collapse Selected Branch",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+
+        this.toolStripTree = new ToolStrip
+        {
+            Items = {
+                new ToolStripLabel("Tree: ") { ForeColor = SystemColors.GrayText },
+                this.btnExpandAll, this.btnCollapseAll, this.btnCollapseToTop,
+                new ToolStripSeparator(),
+                this.btnExpandBranch, this.btnCollapseBranch
+            },
+            Dock = DockStyle.Top,
+            GripStyle = ToolStripGripStyle.Hidden,
+            ImageScalingSize = new Size(20, 20),
+            AutoSize = false,
+            Height = 32,
+            Padding = new Padding(6, 2, 6, 2),
+            RenderMode = ToolStripRenderMode.System,
+            Renderer = new Toolbar3DRenderer()
+        };
+
+        this.btnExpandAll.Click      += (s, e) => BtnExpandAll_Click();
+        this.btnCollapseAll.Click     += (s, e) => BtnCollapseAll_Click();
+        this.btnCollapseToTop.Click   += (s, e) => BtnCollapseToTop_Click();
+        this.btnExpandBranch.Click    += (s, e) => BtnExpandBranch_Click();
+        this.btnCollapseBranch.Click  += (s, e) => BtnCollapseBranch_Click();
 
         // ── Menu Strip ──
         this.menuFile = new ToolStripMenuItem { Text = "&File" };
@@ -421,6 +491,7 @@ partial class MainForm
         this.Controls.AddRange(new Control[] {
             this.statusStrip,
             this.splitMain,
+            this.toolStripTree,
             this.toolStripNav,
             this.headerPanel,
             this.menuStrip

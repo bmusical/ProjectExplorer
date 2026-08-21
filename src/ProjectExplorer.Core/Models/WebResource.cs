@@ -21,6 +21,13 @@ public class WebResource : ProjectChild
     public string? Description { get; set; }
 
     /// <summary>
+    /// When true, the inline WebView2 preview is skipped entirely and only the
+    /// "Open in External Browser" button is shown. Useful for pages that block
+    /// embedded browser access or that the user always wants in a real browser.
+    /// </summary>
+    public bool OpenExternalOnly { get; set; }
+
+    /// <summary>
     /// Returns the effective display name: DisplayName override if set,
     /// otherwise extracts a reasonable name from the URL.
     /// </summary>

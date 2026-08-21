@@ -177,7 +177,7 @@ public class ProjectManager
 
     // ── WebResource CRUD ──
 
-    public async Task<WebResource> AddWebResourceAsync(Guid projectId, string url, string? displayName = null, string? description = null, Guid? parentCollectionId = null)
+    public async Task<WebResource> AddWebResourceAsync(Guid projectId, string url, string? displayName = null, string? description = null, Guid? parentCollectionId = null, bool openExternalOnly = false)
     {
         var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
 
@@ -186,6 +186,7 @@ public class ProjectManager
             Url = url,
             DisplayName = displayName,
             Description = description,
+            OpenExternalOnly = openExternalOnly,
             ParentId = parentCollectionId ?? project.Id,
             SortOrder = GetNextSortOrder(project, parentCollectionId)
         };
@@ -212,7 +213,7 @@ public class ProjectManager
         await _repository.SaveProjectAsync(project);
     }
 
-    public async Task UpdateWebResourceAsync(Guid projectId, Guid webResourceId, string? newDisplayName = null, string? newUrl = null, string? newDescription = null)
+    public async Task UpdateWebResourceAsync(Guid projectId, Guid webResourceId, string? newDisplayName = null, string? newUrl = null, string? newDescription = null, bool? newOpenExternalOnly = null)
     {
         var project = GetProject(projectId) ?? throw new InvalidOperationException($"Project {projectId} not found.");
         var parentList = project.FindParentList(webResourceId) ?? throw new InvalidOperationException($"Cannot find parent list for web resource {webResourceId}.");
@@ -222,6 +223,7 @@ public class ProjectManager
         if (newDisplayName != null) webResource.DisplayName = newDisplayName;
         if (newUrl != null) webResource.Url = newUrl;
         if (newDescription != null) webResource.Description = newDescription;
+        if (newOpenExternalOnly.HasValue) webResource.OpenExternalOnly = newOpenExternalOnly.Value;
         project.Modified = DateTime.UtcNow;
         await _repository.SaveProjectAsync(project);
     }

@@ -180,7 +180,8 @@ public class JsonProjectRepository : IProjectRepository
             ["sortOrder"] = wr.SortOrder,
             ["url"] = wr.Url,
             ["displayName"] = wr.DisplayName,
-            ["description"] = wr.Description
+            ["description"] = wr.Description,
+            ["openExternalOnly"] = wr.OpenExternalOnly
         };
 
         if (wr.Metadata.Count > 0)
@@ -329,7 +330,8 @@ public class JsonProjectRepository : IProjectRepository
             SortOrder = node["sortOrder"]?.GetValue<int>() ?? 0,
             Url = node["url"]?.GetValue<string>() ?? "",
             DisplayName = node["displayName"]?.GetValue<string>(),
-            Description = node["description"]?.GetValue<string>()
+            Description = node["description"]?.GetValue<string>(),
+            OpenExternalOnly = node["openExternalOnly"]?.GetValue<bool>() ?? false
         };
 
         var metaObj = node["metadata"]?.AsObject();

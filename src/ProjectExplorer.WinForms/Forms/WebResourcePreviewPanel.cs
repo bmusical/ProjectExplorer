@@ -19,6 +19,7 @@ public sealed class WebResourcePreviewPanel : Panel
     private readonly Label _urlLabel;
     private readonly WebView2 _webView;
     private readonly Label _unavailableLabel;
+    private readonly Button _btnBack;
 
     private bool _coreReady;
     private string? _pendingUrl;
@@ -74,11 +75,24 @@ public sealed class WebResourcePreviewPanel : Panel
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(12, 6, 12, 6)
         };
-        var btnOpenExternal = new Button { Text = "Open in External Browser", AutoSize = true, Padding = new Padding(12, 4, 12, 4) };
+        _btnBack = new Button { Text = "← Back", AutoSize = true, Padding = new Padding(8, 4, 8, 4), Enabled = false };
+        _btnBack.Click += (_, _) =>
+        {
+            if (_coreReady && _webView.CoreWebView2 is { CanGoBack: true } core)
+                core.GoBack();
+        };
+        var btnOpenExternal = new Button { Text = "Open in External Browser", AutoSize = true, Padding = new Padding(12, 4, 12, 4), Margin = new Padding(8, 0, 0, 0) };
         btnOpenExternal.Click += (_, e) => OpenExternalRequested?.Invoke(this, e);
+        footer.Controls.Add(_btnBack);
         footer.Controls.Add(btnOpenExternal);
 
         _webView = new WebView2 { Dock = DockStyle.Fill, Visible = false };
+        _webView.CoreWebView2InitializationCompleted += (_, _) =>
+        {
+            if (_coreReady && _webView.CoreWebView2 != null)
+                _webView.CoreWebView2.HistoryChanged += (_, _) =>
+                    _btnBack.Enabled = _webView.CoreWebView2.CanGoBack;
+        };
         _unavailableLabel = new Label
         {
             Dock = DockStyle.Fill,
@@ -100,13 +114,22 @@ public sealed class WebResourcePreviewPanel : Panel
     /// <summary>
     /// Displays the given web resource: updates the header and navigates the
     /// embedded browser to its URL (initializing WebView2 lazily on first use).
+    /// When <paramref name="openExternalOnly"/> is <c>true</c> the inline browser
+    /// is skipped and a prompt to use the external browser is shown instead.
     /// </summary>
-    public void ShowWebResource(string url, string displayName, Image? icon)
+    public void ShowWebResource(string url, string displayName, Image? icon, bool openExternalOnly = false)
     {
         _nameLabel.Text = displayName;
         _urlLabel.Text = url;
         _iconBox.Image?.Dispose();
         _iconBox.Image = (Image?)icon?.Clone();
+
+        if (openExternalOnly)
+        {
+            _btnBack.Enabled = false;
+            ShowUnavailable("This resource is set to always open in an external browser.\nUse \"Open in External Browser\" below.");
+            return;
+        }
 
         Navigate(url);
     }
@@ -141,6 +164,9 @@ public sealed class WebResourcePreviewPanel : Panel
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
             await _webView.EnsureCoreWebView2Async(environment);
             _coreReady = true;
+
+            _webView.CoreWebView2.HistoryChanged += (_, _) =>
+                _btnBack.Enabled = _webView.CoreWebView2.CanGoBack;
 
             if (_pendingUrl != null)
             {
