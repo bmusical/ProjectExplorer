@@ -262,3 +262,85 @@ project list within a single running instance, not multiple independent processe
 own stale copy of `projects.db`. That's a real architectural lift (MainForm isn't currently
 built to run more than one instance against shared state), so it's parked here pending actual
 customer demand rather than scheduled speculatively.
+
+## Version 2 — the online direction (planned, not started)
+
+Everything above (Recently Shipped + Roadmap) is about the current **local, single-user, Windows
+desktop** product. Version 2 is a deliberate step change: the same core idea (a nest of projects,
+collections, and folder/file/web references) but with an **online UX** and the ability to hand
+pieces of a nest to other people. This section captures the intended direction so contributors
+don't accidentally paint the codebase into a local-only corner in the meantime. It is a
+**vision/scoping doc, not a committed plan** — treat specifics as provisional and expect them to
+change once real customer signal and design work land. The three pillars below build on each other
+in order.
+
+### 1. Decouple the UX from the underlying code (the prerequisite)
+
+The single most important groundwork item for V2 is cleanly separating **presentation** (the
+WinForms shell) from the **underlying model + logic** (everything in `ProjectExplorer.Core`), so
+the exact same core can drive an *online* UX (web / hosted client) instead of only the desktop
+WinForms UI — without a rewrite of the domain logic each time.
+
+The good news is the seam already mostly exists and should be *hardened*, not invented:
+
+- `ProjectExplorer.Core` has **zero** WinForms/Shell dependency today — models (`Project`,
+  `Collection`, `FolderReference`, `FileReference`, `WebResource`, `ProjectChild`), the
+  `ProjectManager` service, the `IProjectRepository` abstraction (SQLite today; the interface was
+  deliberately kept storage-agnostic so a `SqlServerProjectRepository` — or a server-backed/HTTP
+  repository — can slot in later), `SearchService`, `LicenseManager`, and
+  `ResourceAvailabilityChecker` all live UI-free in Core. That boundary is the template for
+  everything V2 needs.
+- The work is to **finish** the separation: pull any remaining UI-agnostic logic still living in
+  `MainForm.cs` (the 3300+ line WinForms file) down into Core services, so the WinForms project
+  becomes a thin presentation layer over Core that a future online client can mirror rather than
+  reimplement.
+- Define a **stable, transport-neutral serialization/DTO shape** for a nest (and for a subtree of
+  one) that is *not* tied to the SQLite schema or to any WinForms type. This is the same artifact
+  the Medium-term **Export / share a project** (`.peproj`) and Far-term **Packaged nest
+  distribution** items already need — V2 makes it a first-class, versioned contract shared by the
+  desktop app, the online UX, and the sharing features below, rather than an export-only
+  afterthought.
+
+Practical rule for contributors in the meantime: **keep new domain logic in Core behind
+interfaces, keep WinForms types out of Core, and don't assume the store is a local file.** The
+existing `IProjectRepository` seam and the availability/search services are the model to follow.
+
+### 2. Shared nests
+
+A **shared nest** is a nest (a whole project tree, or a portion of one) that lives online and can
+be shared with — and potentially collaborated on by — other people, instead of being a single
+local `projects.db` on one machine. This is what the online UX in pillar 1 unlocks.
+
+- Depends on pillar 1 (a UI-neutral core) **plus** a server-backed `IProjectRepository`
+  implementation and an identity/sync story (who can see/edit which nest, how concurrent edits
+  reconcile).
+- Explicitly **distinct from the Far-term "Cloud sync" roadmap item**, which is only about syncing
+  the *local SQLite file* through OneDrive/Dropbox for one user across their own machines — that is
+  file-level sync of a single-user store, not multi-user sharing. Shared nests are the real
+  multi-user feature; cloud-sync is a stopgap for one person's several devices.
+- The single-instance / shared-state concurrency lesson from **Data Flow** and the "Multiple
+  windows / tabs" note applies here at a larger scale: two editors against one nest need real
+  reconciliation, not last-writer-wins over a whole file.
+
+### 3. Nest eggs (send a branch)
+
+A **nest egg** is a portable, sendable unit carved out of a nest — for example, a **branch of the
+tree** (a Collection and everything under it, or a whole Project) that you hand to someone else,
+conceptually like sending a *git branch* rather than the whole repository. The recipient can drop
+it into their own nest.
+
+- Builds directly on the shareable nest format from pillar 1 and on the existing roadmap handoff
+  items: **Export / share a project** (Medium-term — a `.peproj` for a recipient who already has
+  the app) and **Packaged nest distribution** (Far-term — bundling a nest with a first-run import
+  so a brand-new recipient is populated on first launch). "Nest egg" is the V2 branding and
+  first-class feature for that handoff, generalized from "one whole project" to **any branch/subtree**
+  and with a real *receive/import-into-an-existing-nest* path (including collision handling when the
+  incoming branch overlaps what the recipient already has).
+- With shared nests (pillar 2) online, sending a nest egg can become a first-class online action
+  (share a branch with a teammate) rather than only an exported file passed around out-of-band.
+
+**Why document this now:** the immediate, concrete asks in this line of work are still local-desktop
+polish (e.g. the dialog-sizing pass — see `CHANGELOG.md` `[Unreleased]`). But the *reason* to keep
+Core UI-free and the serialization format clean is this V2 arc. Anyone adding features should avoid
+choices that couple the domain to WinForms or to a local-file-only store, so pillars 1–3 stay
+reachable without a rewrite.
