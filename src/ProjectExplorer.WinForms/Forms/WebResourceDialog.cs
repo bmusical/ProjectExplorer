@@ -27,7 +27,13 @@ public class WebResourceDialog : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 320);
+        this.Font = new Font("Segoe UI", 9F);
+        this.AutoScaleDimensions = new SizeF(7F, 15F);
+        this.AutoScaleMode = AutoScaleMode.Font;
+        // ClientSize (not Size): lay the window out by its usable interior, so the button row
+        // isn't clipped by the title bar/borders — and, with AutoScaleMode.Font above, the whole
+        // thing scales correctly on high-DPI displays under Program.cs's PerMonitorV2 mode.
+        this.ClientSize = new Size(464, 294);
 
         lblName = new Label
         {

@@ -32,7 +32,13 @@ public class RegistrationDialog : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 336);
+        this.Font = new Font("Segoe UI", 9F);
+        this.AutoScaleDimensions = new SizeF(7F, 15F);
+        this.AutoScaleMode = AutoScaleMode.Font;
+        // ClientSize (not Size): lay the window out by its usable interior, so the Close button
+        // isn't crowded against the bottom edge — and, with AutoScaleMode.Font above, the whole
+        // thing scales correctly on high-DPI displays under Program.cs's PerMonitorV2 mode.
+        this.ClientSize = new Size(466, 308);
 
         // ── Banner ──
         var banner = new Panel

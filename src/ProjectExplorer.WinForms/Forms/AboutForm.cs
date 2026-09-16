@@ -14,7 +14,13 @@ public class AboutForm : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(420, 300);
+        this.Font = new Font("Segoe UI", 9F);
+        this.AutoScaleDimensions = new SizeF(7F, 15F);
+        this.AutoScaleMode = AutoScaleMode.Font;
+        // ClientSize (not Size): the previous outer Size left the body too short, so the data-note
+        // label and the Close button overlapped; sizing by the interior gives the body real room.
+        // AutoScaleMode.Font also makes this scale correctly under Program.cs's PerMonitorV2 mode.
+        this.ClientSize = new Size(404, 280);
         this.Padding = new Padding(0);
 
         // ── Banner panel ──

@@ -4,6 +4,17 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
+## [Unreleased]
+
+- Fix cramped/clipped dialogs. Every dialog (Add/Edit Web Resource, Add/Edit File, the name-input
+  prompt, About, Registration, Search, Help, and the Image Viewer) now sets `AutoScaleMode.Font`,
+  so they scale correctly with the display's DPI/scaling instead of overflowing their fixed pixel
+  layout — the app runs in `PerMonitorV2` high-DPI mode but the dialogs never opted into scaling,
+  which is why they looked wrong at 125%/150%/175%. The fixed-size dialogs are also now sized by
+  their usable interior (`ClientSize`) rather than the outer window (`Size`), so the bottom button
+  row is no longer clipped by the title bar, and the About box's data-note line no longer overlaps
+  the Close button.
+
 ## [1.0.8] — 2026-07-19
 
 - **SQLite is now the default storage backend**, replacing the JSON file store. The old store

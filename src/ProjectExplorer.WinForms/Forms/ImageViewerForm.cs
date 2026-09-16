@@ -27,6 +27,9 @@ public sealed class ImageViewerForm : Form
         _model = new ImageViewerModel(imagesInFolder, currentImagePath);
 
         Text = "Image Viewer";
+        Font = new Font("Segoe UI", 9F);
+        AutoScaleDimensions = new SizeF(7F, 15F);
+        AutoScaleMode = AutoScaleMode.Font;
         Width = 900;
         Height = 700;
         StartPosition = FormStartPosition.CenterParent;
