@@ -11,13 +11,12 @@ Releases tagged `<version>` (no `v` prefix).
   generous padding, clear field labels, comfortable inputs, a divider above the button bar, and
   modern flat buttons with an accent primary. Applies to the name/description prompt, Add/Edit Web
   Resource, Add/Edit File, About, and Registration dialogs.
-- Fix badly-sized / clipped dialogs. Every dialog now lays itself out with auto-sizing layout
-  panels (`TableLayoutPanel` + a right-aligned button `FlowLayoutPanel`) and the forms are
-  `AutoSize`, so the window always grows to exactly fit its content at the current display scaling.
-  This replaces the old hardcoded pixel positions + fixed `Size`, which clipped the button row
-  (and the Web Resource "open in external browser" checkbox) — especially under the app's
-  `PerMonitorV2` high-DPI mode at 125/150/175%, where child controls scaled but the fixed window
-  size did not. All dialogs also set `AutoScaleMode.Font` for correct DPI scaling.
+- Fix badly-sized / clipped dialogs. The button bar is now docked to the bottom of each dialog
+  (so OK/Cancel — and the Web Resource "open in external browser" checkbox — can never be clipped),
+  the dialogs are wider and more comfortable, and each form's height is computed from its measured
+  content at runtime. This replaces the old hardcoded pixel positions + fixed `Size`, which clipped
+  the button row under the app's `PerMonitorV2` high-DPI mode at 125/150/175%. All dialogs set
+  `AutoScaleMode.Font` for correct DPI scaling.
 - The About box now shows the correct data-file path (`projects.db`, not the pre-1.1.0
   `projects.json`).
 - Open the project tree at a sensible width. The left tree/content splitter now opens at ~32% of

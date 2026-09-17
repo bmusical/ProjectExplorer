@@ -5,7 +5,7 @@ namespace ProjectExplorer.WinForms;
 /// <summary>
 /// Dialog for adding or editing a web resource (URL with name and description).
 /// Built from the shared <see cref="DialogTheme"/>: branded header, spacious fields, and a
-/// right-aligned accent button bar. Auto-sizes to content so nothing (including the
+/// bottom-docked accent button bar. Sized from measured content so nothing (including the
 /// "open external" checkbox and the button row) is ever clipped.
 /// </summary>
 public class WebResourceDialog : Form
@@ -22,7 +22,7 @@ public class WebResourceDialog : Form
 
     public WebResourceDialog(string title = "Add Web Resource", string name = "", string url = "", string description = "", bool openExternalOnly = false)
     {
-        DialogTheme.InitDialog(this, minWidth: 560);
+        DialogTheme.InitDialog(this);
         this.Text = title;
 
         txtName = DialogTheme.Input(name, "Leave blank to use the hostname");
@@ -36,7 +36,7 @@ public class WebResourceDialog : Form
             AutoSize = true,
             Font = DialogTheme.BodyFont,
             ForeColor = DialogTheme.TextPrimary,
-            Margin = new Padding(2, 0, 2, 2)
+            Margin = new Padding(2, 2, 2, 2)
         };
 
         var btnOK = DialogTheme.PrimaryButton("OK", DialogResult.OK);
@@ -50,11 +50,10 @@ public class WebResourceDialog : Form
         body.Controls.Add(DialogTheme.FieldLabel("Description (optional)"));
         body.Controls.Add(txtDescription);
         body.Controls.Add(chkOpenExternalOnly);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 14));
-        body.Controls.Add(DialogTheme.ButtonBar(btnOK, btnCancel));
 
-        this.Controls.Add(body);
-        this.Controls.Add(DialogTheme.BuildHeader(title, "Bring a project-related web page into your nest."));
+        DialogTheme.Compose(this, width: 700,
+            DialogTheme.BuildHeader(title, "Bring a project-related web page into your nest."),
+            body, btnOK, btnCancel);
 
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;

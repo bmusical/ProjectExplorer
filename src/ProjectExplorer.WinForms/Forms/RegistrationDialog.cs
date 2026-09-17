@@ -28,7 +28,7 @@ public class RegistrationDialog : Form
 
     private void InitializeComponent()
     {
-        DialogTheme.InitDialog(this, minWidth: 520);
+        DialogTheme.InitDialog(this);
         this.Text = "Project Nest Explorer — Registration";
 
         lblStatus = new Label
@@ -36,18 +36,18 @@ public class RegistrationDialog : Form
             AutoSize = true,
             Font = DialogTheme.BodyFont,
             BackColor = Color.FromArgb(244, 246, 250),
-            Padding = new Padding(12, 10, 12, 10),
+            Padding = new Padding(14, 12, 14, 12),
             Margin = new Padding(2, 0, 2, 4),
-            MaximumSize = new Size(468, 0)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right
         };
 
         txtKey = new TextBox
         {
-            Font = new Font("Consolas", 10F),
+            Font = new Font("Consolas", 10.5F),
             BorderStyle = BorderStyle.FixedSingle,
             Anchor = AnchorStyles.Left | AnchorStyles.Right,
             PlaceholderText = "Paste your license key here",
-            Margin = new Padding(2, 0, 2, 10)
+            Margin = new Padding(2, 0, 2, 12)
         };
 
         lnkBuy = new LinkLabel
@@ -72,15 +72,14 @@ public class RegistrationDialog : Form
 
         var body = DialogTheme.BuildBody();
         body.Controls.Add(lblStatus);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 12, bottomMargin: 14));
+        body.Controls.Add(DialogTheme.DividerLine(topMargin: 14, bottomMargin: 16));
         body.Controls.Add(DialogTheme.FieldLabel("Enter your license key"));
         body.Controls.Add(txtKey);
         body.Controls.Add(lnkBuy);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 16, bottomMargin: 12));
-        body.Controls.Add(DialogTheme.ButtonBar(btnActivate, btnClose));
 
-        this.Controls.Add(body);
-        this.Controls.Add(DialogTheme.BuildHeader("Registration", "Unlock unlimited projects and references."));
+        DialogTheme.Compose(this, width: 660,
+            DialogTheme.BuildHeader("Registration", "Unlock unlimited projects and references."),
+            body, btnActivate, btnClose);
 
         this.AcceptButton = btnActivate;
         this.CancelButton = btnClose;

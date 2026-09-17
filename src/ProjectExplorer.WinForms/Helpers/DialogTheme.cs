@@ -7,9 +7,11 @@ namespace ProjectExplorer.WinForms.Helpers;
 /// modern flat buttons, and consistent field controls — so every dialog looks cohesive, spacious,
 /// and current instead of cramped default-gray Win32.
 ///
-/// All dialogs are built as AutoSize forms stacking a <see cref="BuildHeader"/> band on top of an
-/// auto-sizing content <see cref="TableLayoutPanel"/>, so nothing is ever clipped at any DPI while
-/// still looking designed.
+/// Layout model (see <see cref="Compose"/>): each dialog is a fixed-width form with a header
+/// docked to the top, a button bar docked to the BOTTOM (so buttons can never be clipped), and the
+/// field content filling the middle. The form's height is computed from the measured content at
+/// runtime, so nothing is ever cut off at any DPI — this replaces the AutoSize-form approach,
+/// which under-measured height and clipped the button row.
 /// </summary>
 internal static class DialogTheme
 {
@@ -22,7 +24,7 @@ internal static class DialogTheme
     public static readonly Color Surface       = Color.White;
     public static readonly Color TextPrimary   = Color.FromArgb(28, 30, 34);
     public static readonly Color TextMuted      = Color.FromArgb(104, 108, 116);
-    public static readonly Color Divider       = Color.FromArgb(228, 230, 234);
+    public static readonly Color DividerColor  = Color.FromArgb(228, 230, 234);
     public static readonly Color ButtonBorder  = Color.FromArgb(203, 206, 212);
     public static readonly Color ButtonHover   = Color.FromArgb(244, 246, 249);
     public static readonly Color ButtonDown    = Color.FromArgb(233, 236, 240);
@@ -36,24 +38,68 @@ internal static class DialogTheme
     public static readonly Font BodyFont   = new("Segoe UI", 9.5F);
     public static readonly Font ButtonFont = new("Segoe UI", 9.75F);
 
-    /// <summary>Applies the shared dialog chrome (white surface, DPI auto-scale, fixed-tool border).</summary>
-    public static void InitDialog(Form form, int minWidth, bool resizable = false)
+    private const int FooterHeight = 66;
+
+    /// <summary>Applies the shared dialog chrome. Height is set later by <see cref="Compose"/>.</summary>
+    public static void InitDialog(Form form)
     {
-        form.FormBorderStyle = resizable ? FormBorderStyle.Sizable : FormBorderStyle.FixedDialog;
+        form.FormBorderStyle = FormBorderStyle.FixedDialog;
         form.MaximizeBox = false;
         form.MinimizeBox = false;
         form.ShowInTaskbar = false;
-        form.StartPosition = FormStartPosition.CenterParent;
+        form.StartPosition = FormStartPosition.Manual;
         form.BackColor = Surface;
         form.Font = BodyFont;
         form.AutoScaleDimensions = new SizeF(7F, 15F);
         form.AutoScaleMode = AutoScaleMode.Font;
-        if (!resizable)
+    }
+
+    /// <summary>
+    /// Assembles a dialog: header docked top, button bar docked bottom, content filling the middle
+    /// (scrollable if it ever exceeds the screen). Computes and sets the form's client size from the
+    /// measured content once the handle exists, then centers on the owner. Buttons live in the
+    /// bottom bar, so they are always fully visible regardless of any measurement rounding.
+    /// </summary>
+    public static void Compose(Form form, int width, Panel header, TableLayoutPanel body, params Button[] buttonsRightToLeft)
+    {
+        var footer = BuildFooter(buttonsRightToLeft);
+
+        var host = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Surface };
+        body.Dock = DockStyle.Top;
+        host.Controls.Add(body);
+
+        // Docking order: Fill first, then edges (Bottom, then Top which claims the top strip).
+        form.Controls.Add(host);
+        form.Controls.Add(footer);
+        form.Controls.Add(header);
+
+        form.ClientSize = new Size(width, 240);
+
+        void SizeAndCenter()
         {
-            form.AutoSize = true;
-            form.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            int contentHeight = body.PreferredSize.Height;
+            int need = header.Height + contentHeight + footer.Height;
+            var wa = Screen.FromControl(form).WorkingArea;
+            int h = Math.Min(need, wa.Height - 48);
+            form.ClientSize = new Size(width, h);
+
+            var owner = form.Owner ?? Form.ActiveForm;
+            if (owner != null && owner != form && owner.Visible)
+            {
+                form.Location = new Point(
+                    owner.Left + (owner.Width - form.Width) / 2,
+                    owner.Top + (owner.Height - form.Height) / 2);
+            }
+            else
+            {
+                var area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
+                form.Location = new Point(
+                    area.X + (area.Width - form.Width) / 2,
+                    area.Y + (area.Height - form.Height) / 2);
+            }
         }
-        form.MinimumSize = new Size(minWidth, 0);
+
+        form.Load += (s, e) => SizeAndCenter();
     }
 
     /// <summary>
@@ -65,9 +111,9 @@ internal static class DialogTheme
         var banner = new Panel
         {
             Dock = DockStyle.Top,
-            Height = subtitle == null ? 72 : 84,
+            Height = subtitle == null ? 74 : 88,
             BackColor = Accent,
-            Padding = new Padding(20, 0, 20, 0)
+            Padding = new Padding(22, 0, 22, 0)
         };
 
         var grid = new TableLayoutPanel
@@ -83,8 +129,8 @@ internal static class DialogTheme
         var logo = new PictureBox
         {
             SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(40, 40),
-            Margin = new Padding(0, 0, 14, 0),
+            Size = new Size(42, 42),
+            Margin = new Padding(0, 0, 16, 0),
             Anchor = AnchorStyles.None, // vertically centered in its cell
             BackColor = Color.Transparent
         };
@@ -107,8 +153,7 @@ internal static class DialogTheme
             BackColor = Color.Transparent,
             Margin = new Padding(0)
         };
-
-        var eyebrow = new Label
+        textStack.Controls.Add(new Label
         {
             Text = "PROJECT NEST",
             Font = EyebrowFont,
@@ -116,8 +161,8 @@ internal static class DialogTheme
             AutoSize = true,
             BackColor = Color.Transparent,
             Margin = new Padding(0, 0, 0, 1)
-        };
-        var lblTitle = new Label
+        });
+        textStack.Controls.Add(new Label
         {
             Text = title,
             Font = TitleFont,
@@ -125,9 +170,7 @@ internal static class DialogTheme
             AutoSize = true,
             BackColor = Color.Transparent,
             Margin = new Padding(0)
-        };
-        textStack.Controls.Add(eyebrow);
-        textStack.Controls.Add(lblTitle);
+        });
         if (subtitle != null)
         {
             textStack.Controls.Add(new Label
@@ -137,7 +180,7 @@ internal static class DialogTheme
                 ForeColor = BannerSubtle,
                 AutoSize = true,
                 BackColor = Color.Transparent,
-                Margin = new Padding(0, 2, 0, 0)
+                Margin = new Padding(0, 3, 0, 0)
             });
         }
 
@@ -147,7 +190,7 @@ internal static class DialogTheme
         return banner;
     }
 
-    /// <summary>The padded, auto-sizing content column that sits under the header.</summary>
+    /// <summary>The padded, auto-sizing content column that fills the middle of the dialog.</summary>
     public static TableLayoutPanel BuildBody()
     {
         var body = new TableLayoutPanel
@@ -157,10 +200,35 @@ internal static class DialogTheme
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             BackColor = Surface,
-            Padding = new Padding(24, 20, 24, 18)
+            Padding = new Padding(26, 22, 26, 20)
         };
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         return body;
+    }
+
+    private static Panel BuildFooter(Button[] buttonsRightToLeft)
+    {
+        var footer = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = FooterHeight,
+            BackColor = Surface,
+            Padding = new Padding(26, 0, 26, 0)
+        };
+        footer.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 1, BackColor = DividerColor });
+
+        var bar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Padding = new Padding(0, 14, 0, 0),
+            BackColor = Surface
+        };
+        foreach (var b in buttonsRightToLeft)
+            bar.Controls.Add(b);
+        footer.Controls.Add(bar);
+        return footer;
     }
 
     public static Label FieldLabel(string text) => new()
@@ -190,43 +258,25 @@ internal static class DialogTheme
             BorderStyle = BorderStyle.FixedSingle,
             Multiline = multiline,
             Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            Margin = new Padding(2, 0, 2, 16)
+            Margin = new Padding(2, 0, 2, 18)
         };
         if (placeholder != null) tb.PlaceholderText = placeholder;
         if (multiline)
         {
-            tb.Height = height > 0 ? height : 76;
+            tb.Height = height > 0 ? height : 84;
             tb.ScrollBars = ScrollBars.Vertical;
         }
         return tb;
     }
 
-    /// <summary>A thin horizontal rule for separating sections / the button bar.</summary>
+    /// <summary>A thin horizontal rule for separating sections within the body.</summary>
     public static Panel DividerLine(int topMargin = 4, int bottomMargin = 14) => new()
     {
         Height = 1,
-        BackColor = Divider,
+        BackColor = DividerColor,
         Dock = DockStyle.Fill,
         Margin = new Padding(0, topMargin, 0, bottomMargin)
     };
-
-    /// <summary>A right-aligned button bar. Primary (accent) sits at the far right.</summary>
-    public static FlowLayoutPanel ButtonBar(params Button[] rightToLeft)
-    {
-        var bar = new FlowLayoutPanel
-        {
-            FlowDirection = FlowDirection.RightToLeft,
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            Margin = new Padding(0),
-            Padding = new Padding(0)
-        };
-        foreach (var b in rightToLeft)
-            bar.Controls.Add(b);
-        return bar;
-    }
 
     public static Button PrimaryButton(string text, DialogResult result = DialogResult.None)
     {
@@ -256,7 +306,7 @@ internal static class DialogTheme
         Text = text,
         DialogResult = result,
         AutoSize = false,
-        Size = new Size(116, 38),
+        Size = new Size(120, 38),
         Font = ButtonFont,
         FlatStyle = FlatStyle.Flat,
         Cursor = Cursors.Hand,

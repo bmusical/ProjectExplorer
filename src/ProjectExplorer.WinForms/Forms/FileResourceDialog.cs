@@ -5,7 +5,7 @@ namespace ProjectExplorer.WinForms;
 /// <summary>
 /// Dialog for adding or editing a file resource (a reference to a single file on disk,
 /// with an optional name and description). Built from the shared <see cref="DialogTheme"/> to
-/// match <see cref="WebResourceDialog"/> and auto-size to its content.
+/// match <see cref="WebResourceDialog"/> and sized from its measured content.
 /// </summary>
 public class FileResourceDialog : Form
 {
@@ -19,7 +19,7 @@ public class FileResourceDialog : Form
 
     public FileResourceDialog(string title = "Add File", string name = "", string filePath = "", string description = "")
     {
-        DialogTheme.InitDialog(this, minWidth: 560);
+        DialogTheme.InitDialog(this);
         this.Text = title;
 
         txtName = DialogTheme.Input(name, "Leave blank to use the file name");
@@ -36,7 +36,7 @@ public class FileResourceDialog : Form
             Anchor = AnchorStyles.Left | AnchorStyles.Right
         };
         var btnBrowse = DialogTheme.SecondaryButton("Browse…");
-        btnBrowse.Size = new Size(104, 30);
+        btnBrowse.Size = new Size(112, 30);
         btnBrowse.Margin = new Padding(0);
         btnBrowse.Click += BtnBrowse_Click;
 
@@ -47,7 +47,7 @@ public class FileResourceDialog : Form
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 0, 0, 16),
+            Margin = new Padding(0, 0, 0, 18),
             BackColor = DialogTheme.Surface
         };
         pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -67,11 +67,10 @@ public class FileResourceDialog : Form
         body.Controls.Add(pathRow);
         body.Controls.Add(DialogTheme.FieldLabel("Description (optional)"));
         body.Controls.Add(txtDescription);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 14));
-        body.Controls.Add(DialogTheme.ButtonBar(btnOK, btnCancel));
 
-        this.Controls.Add(body);
-        this.Controls.Add(DialogTheme.BuildHeader(title, "Reference a single file, opened with its default app."));
+        DialogTheme.Compose(this, width: 700,
+            DialogTheme.BuildHeader(title, "Reference a single file, opened with its default app."),
+            body, btnOK, btnCancel);
 
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;

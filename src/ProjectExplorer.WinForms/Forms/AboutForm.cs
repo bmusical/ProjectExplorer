@@ -11,7 +11,7 @@ public class AboutForm : Form
 
     private void InitializeComponent()
     {
-        DialogTheme.InitDialog(this, minWidth: 460);
+        DialogTheme.InitDialog(this);
         this.Text = "About Project Nest Explorer";
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
@@ -21,7 +21,7 @@ public class AboutForm : Form
             $"Version {version.Major}.{version.Minor}.{version.Build}",
             DialogTheme.TextPrimary,
             new Font("Segoe UI", 11F, FontStyle.Bold));
-        lblVersion.Margin = new Padding(2, 0, 0, 10);
+        lblVersion.Margin = new Padding(2, 0, 0, 12);
 
         var lblCompany = DialogTheme.BodyText("HxM Blazor Software LLC", DialogTheme.TextPrimary, DialogTheme.LabelFont);
         lblCompany.Margin = new Padding(2, 0, 0, 2);
@@ -33,8 +33,8 @@ public class AboutForm : Form
         lblCopyright.Margin = new Padding(2, 0, 0, 0);
 
         var lblDataHeading = DialogTheme.BodyText("Your data is stored locally in", DialogTheme.TextMuted, new Font("Segoe UI", 8.5F));
-        lblDataHeading.Margin = new Padding(2, 0, 0, 2);
-        var lblDataPath = DialogTheme.BodyText(@"%APPDATA%\ProjectExplorer\projects.db", DialogTheme.TextPrimary, new Font("Consolas", 9F));
+        lblDataHeading.Margin = new Padding(2, 0, 0, 3);
+        var lblDataPath = DialogTheme.BodyText(@"%APPDATA%\ProjectExplorer\projects.db", DialogTheme.TextPrimary, new Font("Consolas", 9.5F));
         lblDataPath.Margin = new Padding(2, 0, 0, 0);
 
         var btnClose = DialogTheme.PrimaryButton("Close", DialogResult.OK);
@@ -43,14 +43,13 @@ public class AboutForm : Form
         body.Controls.Add(lblVersion);
         body.Controls.Add(lblCompany);
         body.Controls.Add(lblCopyright);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 16, bottomMargin: 14));
+        body.Controls.Add(DialogTheme.DividerLine(topMargin: 18, bottomMargin: 16));
         body.Controls.Add(lblDataHeading);
         body.Controls.Add(lblDataPath);
-        body.Controls.Add(DialogTheme.DividerLine(topMargin: 16, bottomMargin: 12));
-        body.Controls.Add(DialogTheme.ButtonBar(btnClose));
 
-        this.Controls.Add(body);
-        this.Controls.Add(DialogTheme.BuildHeader("Project Nest Explorer", "All your projects, one place."));
+        DialogTheme.Compose(this, width: 560,
+            DialogTheme.BuildHeader("Project Nest Explorer", "All your projects, one place."),
+            body, btnClose);
 
         this.AcceptButton = btnClose;
         this.CancelButton = btnClose;

@@ -5,7 +5,7 @@ namespace ProjectExplorer.WinForms;
 /// <summary>
 /// Simple input dialog for entering names/descriptions (projects, collections, etc.).
 /// Built from the shared <see cref="DialogTheme"/> so it matches the rest of the app's dialogs
-/// and auto-sizes to its content (never clipped, at any DPI).
+/// and is sized from its measured content (never clipped, at any DPI).
 /// </summary>
 public class InputDialog : Form
 {
@@ -15,7 +15,7 @@ public class InputDialog : Form
 
     public InputDialog(string title, string prompt, string defaultValue = "")
     {
-        DialogTheme.InitDialog(this, minWidth: 460);
+        DialogTheme.InitDialog(this);
         this.Text = title;
 
         txtInput = DialogTheme.Input(defaultValue);
@@ -26,12 +26,8 @@ public class InputDialog : Form
         var body = DialogTheme.BuildBody();
         body.Controls.Add(DialogTheme.FieldLabel(prompt));
         body.Controls.Add(txtInput);
-        body.Controls.Add(DialogTheme.DividerLine());
-        body.Controls.Add(DialogTheme.ButtonBar(btnOK, btnCancel));
 
-        // Dock=Top stack: add the body first, then the header, so the header sits on top.
-        this.Controls.Add(body);
-        this.Controls.Add(DialogTheme.BuildHeader(title));
+        DialogTheme.Compose(this, width: 580, DialogTheme.BuildHeader(title), body, btnOK, btnCancel);
 
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
