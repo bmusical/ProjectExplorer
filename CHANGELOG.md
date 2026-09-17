@@ -6,15 +6,18 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
-- Fix cramped/clipped dialogs. Every dialog (Add/Edit Web Resource, Add/Edit File, the name-input
-  prompt, About, Registration, Search, Help, the Image Viewer, and the folder-loading progress
-  dialog) now sets `AutoScaleMode.Font`,
-  so they scale correctly with the display's DPI/scaling instead of overflowing their fixed pixel
-  layout — the app runs in `PerMonitorV2` high-DPI mode but the dialogs never opted into scaling,
-  which is why they looked wrong at 125%/150%/175%. The fixed-size dialogs are also now sized by
-  their usable interior (`ClientSize`) rather than the outer window (`Size`), so the bottom button
-  row is no longer clipped by the title bar, and the About box's data-note line no longer overlaps
-  the Close button.
+- Fix badly-sized / clipped dialogs. The name/description prompt, Add/Edit Web Resource, and
+  Add/Edit File dialogs were rebuilt to lay themselves out with auto-sizing layout panels (a
+  `TableLayoutPanel` plus a right-aligned button row) and the forms are now `AutoSize`, so the
+  window always grows to exactly fit its content at the current display scaling. This replaces the
+  old hardcoded pixel positions + fixed `Size`, which clipped the OK/Cancel row (and, on the Web
+  Resource dialog, the "Always open in external browser" checkbox) — especially under the app's
+  `PerMonitorV2` high-DPI mode at 125%/150%/175%, where the child controls scaled but the fixed
+  window size did not. All dialogs also set `AutoScaleMode.Font` for correct DPI scaling, and the
+  Registration dialog's Close button is now docked to the bottom so it can never be clipped.
+- Open the project tree at a sensible width. The left tree/content splitter now opens at ~32% of
+  the window width (with a floor) instead of a fixed 250px sliver, and the tree pane has a larger
+  minimum width, so it no longer comes up as a skinny column on wide or high-DPI displays.
 
 ## [1.0.8] — 2026-07-19
 

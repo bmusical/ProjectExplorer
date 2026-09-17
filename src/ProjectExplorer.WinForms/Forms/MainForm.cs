@@ -228,9 +228,11 @@ public partial class MainForm : Form
     {
         base.OnLoad(e);
 
-        splitMain.SplitterDistance = Math.Max(300, splitMain.Width / 4);
-        splitMain.Panel1MinSize = 150;
-        splitMain.Panel2MinSize = 150;
+        // Give the tree (Panel1) and content (Panel2) sensible minimums so the tree can never
+        // render as a skinny sliver; the actual initial width is set proportionally in OnShown
+        // once the window's final size is known.
+        splitMain.Panel1MinSize = 220;
+        splitMain.Panel2MinSize = 220;
 
         UpdateLicenseUi();
     }
@@ -360,11 +362,12 @@ public partial class MainForm : Form
     {
         base.OnShown(e);
 
-        // Set splitter distance after form is shown and fully laid out
-        // Calculate a safe value that's always within valid range
-        int desiredDistance = 250;
+        // Set splitter distance after the form is shown and fully laid out. Open the tree at
+        // ~32% of the window width (with a sane floor) instead of a fixed 250px sliver, so it
+        // comes up usably wide at any window size or display scaling. Clamp into the valid range.
         int minDistance = splitMain.Panel1MinSize;
         int maxDistance = splitMain.Width - splitMain.Panel2MinSize;
+        int desiredDistance = Math.Max(340, (int)(splitMain.Width * 0.32));
 
         if (maxDistance > minDistance)
         {

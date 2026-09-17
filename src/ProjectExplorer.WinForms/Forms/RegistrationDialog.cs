@@ -147,13 +147,29 @@ public class RegistrationDialog : Form
         {
             Text = "Close",
             DialogResult = DialogResult.OK,
-            Size = new Size(88, 30),
-            Location = new Point(360, 262)
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(88, 30)
         };
 
+        // Dock the Close button to the bottom edge so it can never be clipped by the title bar
+        // or by any DPI-scaling mismatch, regardless of the form's client height.
+        var footer = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            FlowDirection = FlowDirection.RightToLeft,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            Padding = new Padding(12, 8, 12, 12)
+        };
+        footer.Controls.Add(btnClose);
+
+        // Add the absolutely-positioned body controls first, then the docked footer and banner
+        // (docked controls are laid out last-added-first, so banner claims the top edge).
         this.Controls.AddRange(new Control[]
         {
-            banner, lblStatus, sep, lblEnter, txtKey, btnActivate, lnkBuy, btnClose
+            lblStatus, sep, lblEnter, txtKey, btnActivate, lnkBuy, footer, banner
         });
         this.AcceptButton = btnActivate;
         this.CancelButton = btnClose;

@@ -1,15 +1,17 @@
 namespace ProjectExplorer.WinForms;
 
 /// <summary>
-/// Dialog for adding or editing a web resource (URL with name and description)
+/// Dialog for adding or editing a web resource (URL with name and description).
+///
+/// Built from auto-sizing layout panels + an <c>AutoSize</c> form on purpose — see the note in
+/// <see cref="InputDialog"/> for why hardcoded pixel positions / a fixed ClientSize get clipped
+/// under PerMonitorV2 high-DPI. The "Always open in external browser" checkbox lives in its own
+/// row so it can't be pushed off the bottom edge.
 /// </summary>
 public class WebResourceDialog : Form
 {
-    private readonly Label lblName;
     private readonly TextBox txtName;
-    private readonly Label lblUrl;
     private readonly TextBox txtUrl;
-    private readonly Label lblDescription;
     private readonly TextBox txtDescription;
     private readonly CheckBox chkOpenExternalOnly;
     private readonly Button btnOK;
@@ -26,98 +28,112 @@ public class WebResourceDialog : Form
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
+        this.ShowInTaskbar = false;
         this.StartPosition = FormStartPosition.CenterParent;
         this.Font = new Font("Segoe UI", 9F);
         this.AutoScaleDimensions = new SizeF(7F, 15F);
         this.AutoScaleMode = AutoScaleMode.Font;
-        // ClientSize (not Size): lay the window out by its usable interior, so the button row
-        // isn't clipped by the title bar/borders — and, with AutoScaleMode.Font above, the whole
-        // thing scales correctly on high-DPI displays under Program.cs's PerMonitorV2 mode.
-        // (Supersedes the earlier Size = 480x332 stopgap that just padded the outer height.)
-        this.ClientSize = new Size(464, 294);
+        this.AutoSize = true;
+        this.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        this.MinimumSize = new Size(520, 0);
 
-        lblName = new Label
-        {
-            Text = "Name (optional):",
-            Location = new Point(12, 15),
-            AutoSize = true
-        };
-
+        var lblName = MakeLabel("Name (optional):");
         txtName = new TextBox
         {
             Text = name,
-            Location = new Point(12, 38),
-            Size = new Size(440, 25),
-            PlaceholderText = "Leave blank to use hostname"
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Width = 470,
+            PlaceholderText = "Leave blank to use hostname",
+            Margin = new Padding(3, 0, 3, 10)
         };
 
-        lblUrl = new Label
-        {
-            Text = "URL:",
-            Location = new Point(12, 73),
-            AutoSize = true
-        };
-
+        var lblUrl = MakeLabel("URL:");
         txtUrl = new TextBox
         {
             Text = url,
-            Location = new Point(12, 96),
-            Size = new Size(440, 25),
-            PlaceholderText = "https://example.com"
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Width = 470,
+            PlaceholderText = "https://example.com",
+            Margin = new Padding(3, 0, 3, 10)
         };
 
-        lblDescription = new Label
-        {
-            Text = "Description (optional):",
-            Location = new Point(12, 131),
-            AutoSize = true
-        };
-
+        var lblDescription = MakeLabel("Description (optional):");
         txtDescription = new TextBox
         {
             Text = description,
-            Location = new Point(12, 154),
-            Size = new Size(440, 50),
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Width = 470,
+            Height = 60,
             Multiline = true,
-            PlaceholderText = "What is this resource for?"
+            PlaceholderText = "What is this resource for?",
+            Margin = new Padding(3, 0, 3, 10)
         };
 
         chkOpenExternalOnly = new CheckBox
         {
             Text = "Always open in external browser (skip inline preview)",
-            Location = new Point(12, 215),
-            Size = new Size(440, 24),
-            Checked = openExternalOnly
+            Checked = openExternalOnly,
+            AutoSize = true,
+            Margin = new Padding(3, 0, 3, 0)
         };
 
-        btnOK = new Button
+        btnOK = MakeButton("OK", DialogResult.OK);
+        btnCancel = MakeButton("Cancel", DialogResult.Cancel);
+
+        var buttonRow = new FlowLayoutPanel
         {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            Location = new Point(280, 252),
-            Size = new Size(80, 30)
+            FlowDirection = FlowDirection.RightToLeft,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 14, 0, 0),
+            Padding = new Padding(0)
         };
+        buttonRow.Controls.Add(btnCancel);
+        buttonRow.Controls.Add(btnOK);
 
-        btnCancel = new Button
+        var layout = new TableLayoutPanel
         {
-            Text = "Cancel",
-            DialogResult = DialogResult.Cancel,
-            Location = new Point(372, 252),
-            Size = new Size(80, 30)
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(14, 14, 14, 12)
         };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(lblName);
+        layout.Controls.Add(txtName);
+        layout.Controls.Add(lblUrl);
+        layout.Controls.Add(txtUrl);
+        layout.Controls.Add(lblDescription);
+        layout.Controls.Add(txtDescription);
+        layout.Controls.Add(chkOpenExternalOnly);
+        layout.Controls.Add(buttonRow);
 
-        this.Controls.AddRange(new Control[] {
-            lblName, txtName,
-            lblUrl, txtUrl,
-            lblDescription, txtDescription,
-            chkOpenExternalOnly,
-            btnOK, btnCancel
-        });
+        this.Controls.Add(layout);
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
 
         this.Load += (s, e) => txtUrl.Focus();
     }
+
+    private static Label MakeLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Margin = new Padding(3, 0, 3, 3)
+    };
+
+    private static Button MakeButton(string text, DialogResult result) => new()
+    {
+        Text = text,
+        DialogResult = result,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(88, 30),
+        Margin = new Padding(6, 0, 0, 0)
+    };
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
