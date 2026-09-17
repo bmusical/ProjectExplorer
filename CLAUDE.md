@@ -227,6 +227,8 @@ These were tracked as "Planned Feature" sections in earlier versions of this fil
 
 ## Roadmap
 
+See [Project Nest Roadmap](docs/ROADMAP.md) for the Version 2 direction: Nest Eggs, plugins, expanded Explorer operations, Windows Explorer shell DLLs, and possible browser extensions. Version 3 will emerge from Version 2 decisions and brainstorming rather than a fixed scope now. That major-version roadmap takes precedence where it overlaps the backlog below.
+
 Roughly ordered by value vs. effort. Items marked **Near** are well-scoped and unambiguously useful; **Far** items need more user signal before committing to them.
 
 ### Near-term

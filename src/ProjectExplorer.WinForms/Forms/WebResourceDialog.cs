@@ -27,7 +27,7 @@ public class WebResourceDialog : Form
         this.MaximizeBox = false;
         this.MinimizeBox = false;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 320);
+        this.Size = new Size(480, 332);
 
         lblName = new Label
         {
