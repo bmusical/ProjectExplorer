@@ -1,5 +1,6 @@
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
+using ProjectExplorer.WinForms.Helpers;
 
 namespace ProjectExplorer.WinForms;
 
@@ -27,114 +28,36 @@ public class RegistrationDialog : Form
 
     private void InitializeComponent()
     {
+        DialogTheme.InitDialog(this, minWidth: 520);
         this.Text = "Project Nest Explorer — Registration";
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Font = new Font("Segoe UI", 9F);
-        this.AutoScaleDimensions = new SizeF(7F, 15F);
-        this.AutoScaleMode = AutoScaleMode.Font;
-        // ClientSize (not Size): lay the window out by its usable interior, so the Close button
-        // isn't crowded against the bottom edge — and, with AutoScaleMode.Font above, the whole
-        // thing scales correctly on high-DPI displays under Program.cs's PerMonitorV2 mode.
-        this.ClientSize = new Size(466, 308);
 
-        // ── Banner ──
-        var banner = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 80,
-            BackColor = Color.FromArgb(30, 80, 160)
-        };
-        var logo = new PictureBox
-        {
-            SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(48, 48),
-            Location = new Point(16, 16)
-        };
-        try
-        {
-            using var logoStream = System.Reflection.Assembly
-                .GetExecutingAssembly()
-                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.logo.png");
-            if (logoStream != null)
-                logo.Image = Image.FromStream(logoStream);
-        }
-        catch { /* logo is decorative — ignore load failures */ }
-
-        var lblProduct = new Label
-        {
-            Text = "PROJECT NEST",
-            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(150, 185, 240),
-            AutoSize = true,
-            Location = new Point(78, 12)
-        };
-        var lblTitle = new Label
-        {
-            Text = "Project Nest Explorer",
-            Font = new Font("Segoe UI", 16f, FontStyle.Bold),
-            ForeColor = Color.White,
-            AutoSize = true,
-            Location = new Point(76, 28)
-        };
-        var lblSub = new Label
-        {
-            Text = "HxM Blazor Software LLC",
-            Font = new Font("Segoe UI", 8.5f),
-            ForeColor = Color.FromArgb(200, 220, 255),
-            AutoSize = true,
-            Location = new Point(78, 58)
-        };
-        banner.Controls.AddRange(new Control[] { logo, lblProduct, lblTitle, lblSub });
-
-        // ── Body ──
         lblStatus = new Label
         {
-            Font = new Font("Segoe UI", 9f),
-            Location = new Point(18, 96),
-            Size = new Size(430, 48),
-            AutoSize = false
-        };
-
-        var sep = new Label
-        {
-            BorderStyle = BorderStyle.Fixed3D,
-            Location = new Point(18, 150),
-            Size = new Size(430, 2)
-        };
-
-        var lblEnter = new Label
-        {
-            Text = "Enter license key:",
-            Font = new Font("Segoe UI", 9f),
             AutoSize = true,
-            Location = new Point(18, 162)
+            Font = DialogTheme.BodyFont,
+            BackColor = Color.FromArgb(244, 246, 250),
+            Padding = new Padding(12, 10, 12, 10),
+            Margin = new Padding(2, 0, 2, 4),
+            MaximumSize = new Size(468, 0)
         };
 
         txtKey = new TextBox
         {
-            Font = new Font("Consolas", 9f),
-            Location = new Point(18, 184),
-            Size = new Size(430, 24),
-            PlaceholderText = "Paste your license key here"
+            Font = new Font("Consolas", 10F),
+            BorderStyle = BorderStyle.FixedSingle,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            PlaceholderText = "Paste your license key here",
+            Margin = new Padding(2, 0, 2, 10)
         };
-
-        btnActivate = new Button
-        {
-            Text = "Activate",
-            Size = new Size(96, 30),
-            Location = new Point(18, 220)
-        };
-        btnActivate.Click += BtnActivate_Click;
 
         lnkBuy = new LinkLabel
         {
-            Text = "Purchase a license →",
-            Font = new Font("Segoe UI", 9f),
+            Text = "Don't have a key? Purchase a license →",
+            Font = DialogTheme.BodyFont,
+            LinkColor = DialogTheme.Accent,
+            ActiveLinkColor = DialogTheme.AccentHover,
             AutoSize = true,
-            Location = new Point(130, 226)
+            Margin = new Padding(2, 0, 2, 0)
         };
         lnkBuy.LinkClicked += (s, e) =>
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -143,34 +66,22 @@ public class RegistrationDialog : Form
                 UseShellExecute = true
             });
 
-        btnClose = new Button
-        {
-            Text = "Close",
-            DialogResult = DialogResult.OK,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(88, 30)
-        };
+        btnActivate = DialogTheme.PrimaryButton("Activate", DialogResult.None);
+        btnActivate.Click += BtnActivate_Click;
+        btnClose = DialogTheme.SecondaryButton("Close", DialogResult.OK);
 
-        // Dock the Close button to the bottom edge so it can never be clipped by the title bar
-        // or by any DPI-scaling mismatch, regardless of the form's client height.
-        var footer = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom,
-            FlowDirection = FlowDirection.RightToLeft,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            Padding = new Padding(12, 8, 12, 12)
-        };
-        footer.Controls.Add(btnClose);
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(lblStatus);
+        body.Controls.Add(DialogTheme.DividerLine(topMargin: 12, bottomMargin: 14));
+        body.Controls.Add(DialogTheme.FieldLabel("Enter your license key"));
+        body.Controls.Add(txtKey);
+        body.Controls.Add(lnkBuy);
+        body.Controls.Add(DialogTheme.DividerLine(topMargin: 16, bottomMargin: 12));
+        body.Controls.Add(DialogTheme.ButtonBar(btnActivate, btnClose));
 
-        // Add the absolutely-positioned body controls first, then the docked footer and banner
-        // (docked controls are laid out last-added-first, so banner claims the top edge).
-        this.Controls.AddRange(new Control[]
-        {
-            lblStatus, sep, lblEnter, txtKey, btnActivate, lnkBuy, footer, banner
-        });
+        this.Controls.Add(body);
+        this.Controls.Add(DialogTheme.BuildHeader("Registration", "Unlock unlimited projects and references."));
+
         this.AcceptButton = btnActivate;
         this.CancelButton = btnClose;
     }
@@ -208,28 +119,28 @@ public class RegistrationDialog : Form
         {
             case LicenseState.Licensed:
                 lblStatus.Text = $"✔  Licensed to: {info.Email}\n" +
-                                 $"   Activated on: {info.LicensedOn:MMMM d, yyyy}";
-                lblStatus.ForeColor = Color.FromArgb(0, 130, 0);
+                                 $"      Activated on: {info.LicensedOn:MMMM d, yyyy}";
+                lblStatus.ForeColor = Color.FromArgb(0, 120, 60);
                 txtKey.Enabled = false;
                 btnActivate.Enabled = false;
                 break;
 
             case LicenseState.Free:
-                lblStatus.Text = $"⭐  Free version — {info.ProjectCount}/{info.ProjectLimit} projects, " +
+                lblStatus.Text = $"★  Free version — {info.ProjectCount}/{info.ProjectLimit} projects, " +
                                  $"{info.LeafNodeCount}/{info.LeafNodeLimit} references used.\n" +
-                                  "   Enter a license key below to unlock unlimited access.";
-                lblStatus.ForeColor = Color.FromArgb(180, 100, 0);
+                                  "      Enter a license key below to unlock unlimited access.";
+                lblStatus.ForeColor = Color.FromArgb(170, 95, 0);
                 break;
 
             case LicenseState.LimitReached:
                 lblStatus.Text = $"⚠  Free limit reached — {info.LeafNodeCount} references across {info.ProjectCount} projects.\n" +
-                                  "   Purchase a license key to add more projects and references.";
+                                  "      Purchase a license key to add more projects and references.";
                 lblStatus.ForeColor = Color.Firebrick;
                 break;
 
             case LicenseState.Invalid:
                 lblStatus.Text = "✘  The stored license key is invalid.\n" +
-                                  "   Please re-enter your key or contact support.";
+                                  "      Please re-enter your key or contact support.";
                 lblStatus.ForeColor = Color.Firebrick;
                 break;
         }

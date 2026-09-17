@@ -6,15 +6,20 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
-- Fix badly-sized / clipped dialogs. The name/description prompt, Add/Edit Web Resource, and
-  Add/Edit File dialogs were rebuilt to lay themselves out with auto-sizing layout panels (a
-  `TableLayoutPanel` plus a right-aligned button row) and the forms are now `AutoSize`, so the
-  window always grows to exactly fit its content at the current display scaling. This replaces the
-  old hardcoded pixel positions + fixed `Size`, which clipped the OK/Cancel row (and, on the Web
-  Resource dialog, the "Always open in external browser" checkbox) — especially under the app's
-  `PerMonitorV2` high-DPI mode at 125%/150%/175%, where the child controls scaled but the fixed
-  window size did not. All dialogs also set `AutoScaleMode.Font` for correct DPI scaling, and the
-  Registration dialog's Close button is now docked to the bottom so it can never be clipped.
+- Redesign the dialogs to be attractive and spacious, on a shared visual language
+  (`Helpers/DialogTheme`): a branded blue header band (logo + "PROJECT NEST" eyebrow + title),
+  generous padding, clear field labels, comfortable inputs, a divider above the button bar, and
+  modern flat buttons with an accent primary. Applies to the name/description prompt, Add/Edit Web
+  Resource, Add/Edit File, About, and Registration dialogs.
+- Fix badly-sized / clipped dialogs. Every dialog now lays itself out with auto-sizing layout
+  panels (`TableLayoutPanel` + a right-aligned button `FlowLayoutPanel`) and the forms are
+  `AutoSize`, so the window always grows to exactly fit its content at the current display scaling.
+  This replaces the old hardcoded pixel positions + fixed `Size`, which clipped the button row
+  (and the Web Resource "open in external browser" checkbox) — especially under the app's
+  `PerMonitorV2` high-DPI mode at 125/150/175%, where child controls scaled but the fixed window
+  size did not. All dialogs also set `AutoScaleMode.Font` for correct DPI scaling.
+- The About box now shows the correct data-file path (`projects.db`, not the pre-1.1.0
+  `projects.json`).
 - Open the project tree at a sensible width. The left tree/content splitter now opens at ~32% of
   the window width (with a floor) instead of a fixed 250px sliver, and the tree pane has a larger
   minimum width, so it no longer comes up as a skinny column on wide or high-DPI displays.

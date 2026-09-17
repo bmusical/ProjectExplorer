@@ -1,101 +1,38 @@
+using ProjectExplorer.WinForms.Helpers;
+
 namespace ProjectExplorer.WinForms;
 
 /// <summary>
 /// Simple input dialog for entering names/descriptions (projects, collections, etc.).
-///
-/// Layout note: the whole dialog is built from auto-sizing layout panels (a
-/// <see cref="TableLayoutPanel"/> plus a right-aligned button <see cref="FlowLayoutPanel"/>)
-/// and the form itself is <c>AutoSize</c>. This is deliberate: hardcoding pixel positions +
-/// a fixed <c>ClientSize</c> breaks under the app's PerMonitorV2 high-DPI mode (child controls
-/// get DPI-scaled but a fixed client area does not, so the button row gets clipped at 125–175%).
-/// Letting the layout panels compute the size means the buttons are always fully visible.
+/// Built from the shared <see cref="DialogTheme"/> so it matches the rest of the app's dialogs
+/// and auto-sizes to its content (never clipped, at any DPI).
 /// </summary>
 public class InputDialog : Form
 {
-    private readonly Label lblPrompt;
     private readonly TextBox txtInput;
-    private readonly Button btnOK;
-    private readonly Button btnCancel;
 
     public string InputText => txtInput.Text;
 
     public InputDialog(string title, string prompt, string defaultValue = "")
     {
+        DialogTheme.InitDialog(this, minWidth: 460);
         this.Text = title;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.ShowInTaskbar = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Font = new Font("Segoe UI", 9F);
-        this.AutoScaleDimensions = new SizeF(7F, 15F);
-        this.AutoScaleMode = AutoScaleMode.Font;
-        this.AutoSize = true;
-        this.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        this.MinimumSize = new Size(440, 0);
 
-        lblPrompt = new Label
-        {
-            Text = prompt,
-            AutoSize = true,
-            Margin = new Padding(3, 3, 3, 6)
-        };
+        txtInput = DialogTheme.Input(defaultValue);
 
-        txtInput = new TextBox
-        {
-            Text = defaultValue,
-            Width = 400,
-            Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            Margin = new Padding(3, 0, 3, 0)
-        };
+        var btnOK = DialogTheme.PrimaryButton("OK", DialogResult.OK);
+        var btnCancel = DialogTheme.SecondaryButton("Cancel", DialogResult.Cancel);
 
-        btnOK = new Button
-        {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(88, 30),
-            Margin = new Padding(6, 0, 0, 0)
-        };
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(DialogTheme.FieldLabel(prompt));
+        body.Controls.Add(txtInput);
+        body.Controls.Add(DialogTheme.DividerLine());
+        body.Controls.Add(DialogTheme.ButtonBar(btnOK, btnCancel));
 
-        btnCancel = new Button
-        {
-            Text = "Cancel",
-            DialogResult = DialogResult.Cancel,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(88, 30),
-            Margin = new Padding(6, 0, 0, 0)
-        };
+        // Dock=Top stack: add the body first, then the header, so the header sits on top.
+        this.Controls.Add(body);
+        this.Controls.Add(DialogTheme.BuildHeader(title));
 
-        var buttonRow = new FlowLayoutPanel
-        {
-            FlowDirection = FlowDirection.RightToLeft,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(0, 12, 0, 0),
-            Padding = new Padding(0)
-        };
-        buttonRow.Controls.Add(btnCancel);
-        buttonRow.Controls.Add(btnOK);
-
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Padding = new Padding(14, 14, 14, 12)
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.Controls.Add(lblPrompt);
-        layout.Controls.Add(txtInput);
-        layout.Controls.Add(buttonRow);
-
-        this.Controls.Add(layout);
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
 
