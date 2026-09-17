@@ -18,7 +18,10 @@ public class HelpForm : Form
         this.MinimizeBox = false;
         this.MaximizeBox = true;
         this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(640, 620);
+        this.Font = new Font("Segoe UI", 9F);
+        this.AutoScaleDimensions = new SizeF(7F, 15F);
+        this.AutoScaleMode = AutoScaleMode.Font;
+        this.ClientSize = new Size(640, 620);
         this.MinimumSize = new Size(480, 400);
 
         // ── Banner ──

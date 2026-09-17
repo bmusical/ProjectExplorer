@@ -4,6 +4,25 @@ All notable changes to Project Nest Explorer are documented here. Versions corre
 `<Version>` in `src/ProjectExplorer.WinForms/ProjectExplorer.WinForms.csproj` and to GitHub
 Releases tagged `<version>` (no `v` prefix).
 
+## [Unreleased]
+
+- Redesign the dialogs to be attractive and spacious, on a shared visual language
+  (`Helpers/DialogTheme`): a branded blue header band (logo + "PROJECT NEST" eyebrow + title),
+  generous padding, clear field labels, comfortable inputs, a divider above the button bar, and
+  modern flat buttons with an accent primary. Applies to the name/description prompt, Add/Edit Web
+  Resource, Add/Edit File, About, and Registration dialogs.
+- Fix badly-sized / clipped dialogs. The button bar is now docked to the bottom of each dialog
+  (so OK/Cancel — and the Web Resource "open in external browser" checkbox — can never be clipped),
+  the dialogs are wider and more comfortable, and each form's height is computed from its measured
+  content at runtime. This replaces the old hardcoded pixel positions + fixed `Size`, which clipped
+  the button row under the app's `PerMonitorV2` high-DPI mode at 125/150/175%. All dialogs set
+  `AutoScaleMode.Font` for correct DPI scaling.
+- The About box now shows the correct data-file path (`projects.db`, not the pre-1.1.0
+  `projects.json`).
+- Open the project tree at a sensible width. The left tree/content splitter now opens at ~32% of
+  the window width (with a floor) instead of a fixed 250px sliver, and the tree pane has a larger
+  minimum width, so it no longer comes up as a skinny column on wide or high-DPI displays.
+
 ## [1.0.8] — 2026-07-19
 
 - **SQLite is now the default storage backend**, replacing the JSON file store. The old store

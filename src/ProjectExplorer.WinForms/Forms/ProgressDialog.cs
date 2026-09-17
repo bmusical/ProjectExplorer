@@ -23,6 +23,9 @@ internal sealed class ProgressDialog : Form
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
+        Font = new Font("Segoe UI", 9F);
+        AutoScaleDimensions = new SizeF(7F, 15F);
+        AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new Size(360, 110);
 
         _messageLabel = new Label

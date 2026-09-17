@@ -264,3 +264,23 @@ project list within a single running instance, not multiple independent processe
 own stale copy of `projects.db`. That's a real architectural lift (MainForm isn't currently
 built to run more than one instance against shared state), so it's parked here pending actual
 customer demand rather than scheduled speculatively.
+
+## Version 2 — the online direction
+
+The authoritative major-version plan lives in **[`docs/ROADMAP.md`](docs/ROADMAP.md)** (added on
+`master` alongside the 1.0.9 changes). That is the source of truth for the V2/V3 direction —
+including **Nest Eggs** (shareable packages sent from one nest to another), going online / shared
+nests, deeper Explorer integration, shell-extension DLLs, and the **"Engine / UX separation:
+planning inventory"** (from branch `planning/engine-ux-boundaries`) that maps every current
+method to a UX / engine / infrastructure / platform-adapter boundary. Per the pointer under
+`## Roadmap` above, `docs/ROADMAP.md` takes precedence wherever it overlaps the near/medium-term
+backlog here — don't duplicate that content in this file.
+
+The single contributor guardrail worth repeating here, because it constrains everyday work now:
+**keep new domain logic in `ProjectExplorer.Core` behind interfaces, keep WinForms/`System.Drawing`
+types out of Core, and don't assume the store is a local file.** `ProjectExplorer.Core` already has
+zero WinForms dependency (models, `ProjectManager`, the storage-agnostic `IProjectRepository`,
+`SearchService`, `LicenseManager`, `ResourceAvailabilityChecker`); the engine/UX split in
+`docs/ROADMAP.md` is only reachable without a rewrite if that boundary stays clean. See
+`docs/ROADMAP.md`'s "Correctness and portability conditions" for the specifics (state ownership,
+logical transactions, single-writer ownership, portable path handling).

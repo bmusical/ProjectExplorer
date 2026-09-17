@@ -1,62 +1,37 @@
+using ProjectExplorer.WinForms.Helpers;
+
 namespace ProjectExplorer.WinForms;
 
 /// <summary>
-/// Simple input dialog for entering names (projects, collections, etc.)
+/// Simple input dialog for entering names/descriptions (projects, collections, etc.).
+/// Built from the shared <see cref="DialogTheme"/> so it matches the rest of the app's dialogs
+/// and is sized from its measured content (never clipped, at any DPI).
 /// </summary>
 public class InputDialog : Form
 {
-    private readonly Label lblPrompt;
     private readonly TextBox txtInput;
-    private readonly Button btnOK;
-    private readonly Button btnCancel;
 
     public string InputText => txtInput.Text;
 
     public InputDialog(string title, string prompt, string defaultValue = "")
     {
+        DialogTheme.InitDialog(this);
         this.Text = title;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(400, 160);
 
-        lblPrompt = new Label
-        {
-            Text = prompt,
-            Location = new Point(12, 15),
-            AutoSize = true
-        };
+        txtInput = DialogTheme.Input(defaultValue);
 
-        txtInput = new TextBox
-        {
-            Text = defaultValue,
-            Location = new Point(12, 40),
-            Size = new Size(360, 25)
-        };
-        txtInput.SelectAll();
-        txtInput.Focus();
+        var btnOK = DialogTheme.PrimaryButton("OK", DialogResult.OK);
+        var btnCancel = DialogTheme.SecondaryButton("Cancel", DialogResult.Cancel);
 
-        btnOK = new Button
-        {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            Location = new Point(200, 75),
-            Size = new Size(80, 30)
-        };
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(DialogTheme.FieldLabel(prompt));
+        body.Controls.Add(txtInput);
 
-        btnCancel = new Button
-        {
-            Text = "Cancel",
-            DialogResult = DialogResult.Cancel,
-            Location = new Point(292, 75),
-            Size = new Size(80, 30)
-        };
+        DialogTheme.Compose(this, width: 580, DialogTheme.BuildHeader(title), body, btnOK, btnCancel);
 
-        this.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOK, btnCancel });
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
 
-        this.Load += (s, e) => txtInput.SelectAll();
+        this.Load += (s, e) => { txtInput.SelectAll(); txtInput.Focus(); };
     }
 }

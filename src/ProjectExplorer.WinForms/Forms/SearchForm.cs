@@ -24,6 +24,9 @@ public class SearchForm : Form
 
         Text = "Search";
         StartPosition = FormStartPosition.CenterParent;
+        Font = new Font("Segoe UI", 9F);
+        AutoScaleDimensions = new SizeF(7F, 15F);
+        AutoScaleMode = AutoScaleMode.Font;
         Size = new Size(640, 480);
         MinimumSize = new Size(420, 300);
         ShowIcon = false;

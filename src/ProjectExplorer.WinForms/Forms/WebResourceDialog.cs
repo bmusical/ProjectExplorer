@@ -1,19 +1,19 @@
+using ProjectExplorer.WinForms.Helpers;
+
 namespace ProjectExplorer.WinForms;
 
 /// <summary>
-/// Dialog for adding or editing a web resource (URL with name and description)
+/// Dialog for adding or editing a web resource (URL with name and description).
+/// Built from the shared <see cref="DialogTheme"/>: branded header, spacious fields, and a
+/// bottom-docked accent button bar. Sized from measured content so nothing (including the
+/// "open external" checkbox and the button row) is ever clipped.
 /// </summary>
 public class WebResourceDialog : Form
 {
-    private readonly Label lblName;
     private readonly TextBox txtName;
-    private readonly Label lblUrl;
     private readonly TextBox txtUrl;
-    private readonly Label lblDescription;
     private readonly TextBox txtDescription;
     private readonly CheckBox chkOpenExternalOnly;
-    private readonly Button btnOK;
-    private readonly Button btnCancel;
 
     public string ResourceName => txtName.Text;
     public string ResourceUrl => txtUrl.Text;
@@ -22,90 +22,39 @@ public class WebResourceDialog : Form
 
     public WebResourceDialog(string title = "Add Web Resource", string name = "", string url = "", string description = "", bool openExternalOnly = false)
     {
+        DialogTheme.InitDialog(this);
         this.Text = title;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 332);
 
-        lblName = new Label
-        {
-            Text = "Name (optional):",
-            Location = new Point(12, 15),
-            AutoSize = true
-        };
-
-        txtName = new TextBox
-        {
-            Text = name,
-            Location = new Point(12, 38),
-            Size = new Size(440, 25),
-            PlaceholderText = "Leave blank to use hostname"
-        };
-
-        lblUrl = new Label
-        {
-            Text = "URL:",
-            Location = new Point(12, 73),
-            AutoSize = true
-        };
-
-        txtUrl = new TextBox
-        {
-            Text = url,
-            Location = new Point(12, 96),
-            Size = new Size(440, 25),
-            PlaceholderText = "https://example.com"
-        };
-
-        lblDescription = new Label
-        {
-            Text = "Description (optional):",
-            Location = new Point(12, 131),
-            AutoSize = true
-        };
-
-        txtDescription = new TextBox
-        {
-            Text = description,
-            Location = new Point(12, 154),
-            Size = new Size(440, 50),
-            Multiline = true,
-            PlaceholderText = "What is this resource for?"
-        };
+        txtName = DialogTheme.Input(name, "Leave blank to use the hostname");
+        txtUrl = DialogTheme.Input(url, "https://example.com");
+        txtDescription = DialogTheme.Input(description, "What is this resource for?", multiline: true);
 
         chkOpenExternalOnly = new CheckBox
         {
-            Text = "Always open in external browser (skip inline preview)",
-            Location = new Point(12, 215),
-            Size = new Size(440, 24),
-            Checked = openExternalOnly
+            Text = "Always open in an external browser (skip the inline preview)",
+            Checked = openExternalOnly,
+            AutoSize = true,
+            Font = DialogTheme.BodyFont,
+            ForeColor = DialogTheme.TextPrimary,
+            Margin = new Padding(2, 2, 2, 2)
         };
 
-        btnOK = new Button
-        {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            Location = new Point(280, 252),
-            Size = new Size(80, 30)
-        };
+        var btnOK = DialogTheme.PrimaryButton("OK", DialogResult.OK);
+        var btnCancel = DialogTheme.SecondaryButton("Cancel", DialogResult.Cancel);
 
-        btnCancel = new Button
-        {
-            Text = "Cancel",
-            DialogResult = DialogResult.Cancel,
-            Location = new Point(372, 252),
-            Size = new Size(80, 30)
-        };
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(DialogTheme.FieldLabel("Name (optional)"));
+        body.Controls.Add(txtName);
+        body.Controls.Add(DialogTheme.FieldLabel("URL"));
+        body.Controls.Add(txtUrl);
+        body.Controls.Add(DialogTheme.FieldLabel("Description (optional)"));
+        body.Controls.Add(txtDescription);
+        body.Controls.Add(chkOpenExternalOnly);
 
-        this.Controls.AddRange(new Control[] {
-            lblName, txtName,
-            lblUrl, txtUrl,
-            lblDescription, txtDescription,
-            chkOpenExternalOnly,
-            btnOK, btnCancel
-        });
+        DialogTheme.Compose(this, width: 700,
+            DialogTheme.BuildHeader(title, "Bring a project-related web page into your nest."),
+            body, btnOK, btnCancel);
+
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
 
@@ -114,14 +63,11 @@ public class WebResourceDialog : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (this.DialogResult == DialogResult.OK)
+        if (this.DialogResult == DialogResult.OK && string.IsNullOrWhiteSpace(txtUrl.Text))
         {
-            if (string.IsNullOrWhiteSpace(txtUrl.Text))
-            {
-                MessageBox.Show("Please enter a URL.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                e.Cancel = true;
-                txtUrl.Focus();
-            }
+            MessageBox.Show("Please enter a URL.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            e.Cancel = true;
+            txtUrl.Focus();
         }
         base.OnFormClosing(e);
     }

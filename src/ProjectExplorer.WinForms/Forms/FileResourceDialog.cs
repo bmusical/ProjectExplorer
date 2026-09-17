@@ -1,21 +1,17 @@
+using ProjectExplorer.WinForms.Helpers;
+
 namespace ProjectExplorer.WinForms;
 
 /// <summary>
 /// Dialog for adding or editing a file resource (a reference to a single file on disk,
-/// with an optional name and description). Works like <see cref="WebResourceDialog"/>
-/// but targets a specific file that is opened by its associated application (file-type).
+/// with an optional name and description). Built from the shared <see cref="DialogTheme"/> to
+/// match <see cref="WebResourceDialog"/> and sized from its measured content.
 /// </summary>
 public class FileResourceDialog : Form
 {
-    private readonly Label lblName;
     private readonly TextBox txtName;
-    private readonly Label lblPath;
     private readonly TextBox txtPath;
-    private readonly Button btnBrowse;
-    private readonly Label lblDescription;
     private readonly TextBox txtDescription;
-    private readonly Button btnOK;
-    private readonly Button btnCancel;
 
     public string ResourceName => txtName.Text;
     public string ResourceFilePath => txtPath.Text;
@@ -23,89 +19,59 @@ public class FileResourceDialog : Form
 
     public FileResourceDialog(string title = "Add File", string name = "", string filePath = "", string description = "")
     {
+        DialogTheme.InitDialog(this);
         this.Text = title;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(480, 300);
 
-        lblName = new Label
-        {
-            Text = "Name (optional):",
-            Location = new Point(12, 15),
-            AutoSize = true
-        };
+        txtName = DialogTheme.Input(name, "Leave blank to use the file name");
 
-        txtName = new TextBox
-        {
-            Text = name,
-            Location = new Point(12, 38),
-            Size = new Size(440, 25),
-            PlaceholderText = "Leave blank to use the file name"
-        };
-
-        lblPath = new Label
-        {
-            Text = "File:",
-            Location = new Point(12, 73),
-            AutoSize = true
-        };
-
+        // File row: path textbox + Browse button, side by side.
         txtPath = new TextBox
         {
             Text = filePath,
-            Location = new Point(12, 96),
-            Size = new Size(350, 25),
-            PlaceholderText = @"C:\path\to\file.ext"
+            Font = DialogTheme.InputFont,
+            BorderStyle = BorderStyle.FixedSingle,
+            Dock = DockStyle.Fill,
+            PlaceholderText = @"C:\path\to\file.ext",
+            Margin = new Padding(2, 1, 8, 0),
+            Anchor = AnchorStyles.Left | AnchorStyles.Right
         };
-
-        btnBrowse = new Button
-        {
-            Text = "Browse...",
-            Location = new Point(372, 95),
-            Size = new Size(80, 27)
-        };
+        var btnBrowse = DialogTheme.SecondaryButton("Browse…");
+        btnBrowse.Size = new Size(112, 30);
+        btnBrowse.Margin = new Padding(0);
         btnBrowse.Click += BtnBrowse_Click;
 
-        lblDescription = new Label
+        var pathRow = new TableLayoutPanel
         {
-            Text = "Description (optional):",
-            Location = new Point(12, 131),
-            AutoSize = true
+            ColumnCount = 2,
+            RowCount = 1,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 0, 18),
+            BackColor = DialogTheme.Surface
         };
+        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        pathRow.Controls.Add(txtPath, 0, 0);
+        pathRow.Controls.Add(btnBrowse, 1, 0);
 
-        txtDescription = new TextBox
-        {
-            Text = description,
-            Location = new Point(12, 154),
-            Size = new Size(440, 50),
-            Multiline = true,
-            PlaceholderText = "What is this file for?"
-        };
+        txtDescription = DialogTheme.Input(description, "What is this file for?", multiline: true);
 
-        btnOK = new Button
-        {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            Location = new Point(280, 220),
-            Size = new Size(80, 30)
-        };
+        var btnOK = DialogTheme.PrimaryButton("OK", DialogResult.OK);
+        var btnCancel = DialogTheme.SecondaryButton("Cancel", DialogResult.Cancel);
 
-        btnCancel = new Button
-        {
-            Text = "Cancel",
-            DialogResult = DialogResult.Cancel,
-            Location = new Point(372, 220),
-            Size = new Size(80, 30)
-        };
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(DialogTheme.FieldLabel("Name (optional)"));
+        body.Controls.Add(txtName);
+        body.Controls.Add(DialogTheme.FieldLabel("File"));
+        body.Controls.Add(pathRow);
+        body.Controls.Add(DialogTheme.FieldLabel("Description (optional)"));
+        body.Controls.Add(txtDescription);
 
-        this.Controls.AddRange(new Control[] {
-            lblName, txtName,
-            lblPath, txtPath, btnBrowse,
-            lblDescription, txtDescription,
-            btnOK, btnCancel
-        });
+        DialogTheme.Compose(this, width: 700,
+            DialogTheme.BuildHeader(title, "Reference a single file, opened with its default app."),
+            body, btnOK, btnCancel);
+
         this.AcceptButton = btnOK;
         this.CancelButton = btnCancel;
 
@@ -121,7 +87,6 @@ public class FileResourceDialog : Form
             Filter = "All files (*.*)|*.*"
         };
 
-        // Pre-seed the dialog with the current directory if a valid path is present.
         if (!string.IsNullOrWhiteSpace(txtPath.Text))
         {
             try
@@ -134,21 +99,16 @@ public class FileResourceDialog : Form
         }
 
         if (dlg.ShowDialog(this) == DialogResult.OK)
-        {
             txtPath.Text = dlg.FileName;
-        }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (this.DialogResult == DialogResult.OK)
+        if (this.DialogResult == DialogResult.OK && string.IsNullOrWhiteSpace(txtPath.Text))
         {
-            if (string.IsNullOrWhiteSpace(txtPath.Text))
-            {
-                MessageBox.Show("Please select a file.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                e.Cancel = true;
-                txtPath.Focus();
-            }
+            MessageBox.Show("Please select a file.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            e.Cancel = true;
+            txtPath.Focus();
         }
         base.OnFormClosing(e);
     }

@@ -1,3 +1,5 @@
+using ProjectExplorer.WinForms.Helpers;
+
 namespace ProjectExplorer.WinForms;
 
 public class AboutForm : Form
@@ -9,147 +11,47 @@ public class AboutForm : Form
 
     private void InitializeComponent()
     {
+        DialogTheme.InitDialog(this);
         this.Text = "About Project Nest Explorer";
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.Size = new Size(420, 300);
-        this.Padding = new Padding(0);
 
-        // ── Banner panel ──
-        var banner = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 88,
-            BackColor = Color.FromArgb(30, 80, 160)
-        };
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+                      ?? new Version(1, 0, 0);
 
-        var logo = new PictureBox
-        {
-            SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(56, 56),
-            Location = new Point(16, 16),
-            BackColor = Color.Transparent
-        };
-        try
-        {
-            using var logoStream = System.Reflection.Assembly
-                .GetExecutingAssembly()
-                .GetManifestResourceStream("ProjectExplorer.WinForms.Assets.logo.png");
-            if (logoStream != null)
-                logo.Image = Image.FromStream(logoStream);
-        }
-        catch { /* logo is decorative — ignore load failures */ }
+        var lblVersion = DialogTheme.BodyText(
+            $"Version {version.Major}.{version.Minor}.{version.Build}",
+            DialogTheme.TextPrimary,
+            new Font("Segoe UI", 11F, FontStyle.Bold));
+        lblVersion.Margin = new Padding(2, 0, 0, 12);
 
-        // Product line (eyebrow) — "Project Nest" is the product; the app below is the program.
-        var lblProduct = new Label
-        {
-            Text = "PROJECT NEST",
-            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(150, 185, 240),
-            AutoSize = true,
-            BackColor = Color.Transparent,
-            Location = new Point(86, 14)
-        };
+        var lblCompany = DialogTheme.BodyText("HxM Blazor Software LLC", DialogTheme.TextPrimary, DialogTheme.LabelFont);
+        lblCompany.Margin = new Padding(2, 0, 0, 2);
 
-        var lblAppName = new Label
-        {
-            Text = "Project Nest Explorer",
-            Font = new Font("Segoe UI", 17f, FontStyle.Bold),
-            ForeColor = Color.White,
-            AutoSize = true,
-            BackColor = Color.Transparent,
-            Location = new Point(84, 30)
-        };
+        var lblCopyright = DialogTheme.BodyText(
+            $"© {DateTime.Now.Year} HxM Blazor Software LLC. All rights reserved.",
+            DialogTheme.TextMuted,
+            new Font("Segoe UI", 8.5F));
+        lblCopyright.Margin = new Padding(2, 0, 0, 0);
 
-        var lblTagline = new Label
-        {
-            Text = "All your projects, one place.",
-            Font = new Font("Segoe UI", 9f, FontStyle.Italic),
-            ForeColor = Color.FromArgb(200, 220, 255),
-            AutoSize = true,
-            BackColor = Color.Transparent,
-            Location = new Point(86, 62)
-        };
+        var lblDataHeading = DialogTheme.BodyText("Your data is stored locally in", DialogTheme.TextMuted, new Font("Segoe UI", 8.5F));
+        lblDataHeading.Margin = new Padding(2, 0, 0, 3);
+        var lblDataPath = DialogTheme.BodyText(@"%APPDATA%\ProjectExplorer\projects.db", DialogTheme.TextPrimary, new Font("Consolas", 9.5F));
+        lblDataPath.Margin = new Padding(2, 0, 0, 0);
 
-        banner.Controls.AddRange(new Control[] { logo, lblProduct, lblAppName, lblTagline });
+        var btnClose = DialogTheme.PrimaryButton("Close", DialogResult.OK);
 
-        // ── Body ──
-        var body = new Panel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(20, 16, 20, 0)
-        };
+        var body = DialogTheme.BuildBody();
+        body.Controls.Add(lblVersion);
+        body.Controls.Add(lblCompany);
+        body.Controls.Add(lblCopyright);
+        body.Controls.Add(DialogTheme.DividerLine(topMargin: 18, bottomMargin: 16));
+        body.Controls.Add(lblDataHeading);
+        body.Controls.Add(lblDataPath);
 
-        var version = System.Reflection.Assembly
-            .GetExecutingAssembly()
-            .GetName()
-            .Version ?? new Version(1, 0, 0);
+        DialogTheme.Compose(this, width: 560,
+            DialogTheme.BuildHeader("Project Nest Explorer", "All your projects, one place."),
+            body, btnClose);
 
-        var info = new Label
-        {
-            Text = $"Version {version.Major}.{version.Minor}.{version.Build}",
-            Font = new Font("Segoe UI", 9f),
-            AutoSize = true,
-            Location = new Point(20, 16)
-        };
-
-        var company = new Label
-        {
-            Text = "HxM Blazor Software LLC",
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-            AutoSize = true,
-            Location = new Point(20, 40)
-        };
-
-        var copyright = new Label
-        {
-            Text = $"© {DateTime.Now.Year} HxM Blazor Software LLC. All rights reserved.",
-            Font = new Font("Segoe UI", 8f),
-            ForeColor = Color.Gray,
-            AutoSize = true,
-            Location = new Point(20, 62)
-        };
-
-        var separator = new Label
-        {
-            BorderStyle = BorderStyle.Fixed3D,
-            Location = new Point(20, 90),
-            Size = new Size(360, 2)
-        };
-
-        var lblDataNote = new Label
-        {
-            Text = "Project data is stored in:\n%APPDATA%\\ProjectExplorer\\projects.json",
-            Font = new Font("Segoe UI", 8f),
-            ForeColor = Color.DimGray,
-            AutoSize = true,
-            Location = new Point(20, 100)
-        };
-
-        var btnClose = new Button
-        {
-            Text = "Close",
-            DialogResult = DialogResult.OK,
-            Size = new Size(88, 32),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Right
-        };
-        btnClose.Location = new Point(this.ClientSize.Width - btnClose.Width - 20,
-                                      this.ClientSize.Height - btnClose.Height - 16);
-
-        body.Controls.AddRange(new Control[] { info, company, copyright, separator, lblDataNote, btnClose });
-
-        this.Controls.AddRange(new Control[] { body, banner });
         this.AcceptButton = btnClose;
         this.CancelButton = btnClose;
-
-        // Reposition close button after layout is known
-        this.Load += (s, e) =>
-        {
-            btnClose.Location = new Point(
-                body.ClientSize.Width - btnClose.Width - 4,
-                body.ClientSize.Height - btnClose.Height - 8);
-        };
     }
 }
