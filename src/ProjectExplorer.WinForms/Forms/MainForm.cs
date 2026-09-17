@@ -1022,6 +1022,116 @@ public partial class MainForm : Form
         if (_currentPreviewWebResource != null) LaunchWebResource(_currentPreviewWebResource);
     }
 
+    /// <summary>Plain-data mirror of a folder subtree, built off the UI thread so a background
+    /// worker never touches live <see cref="TreeNode"/> instances.</summary>
+    private sealed record FolderTreeData(string Name, string Path, List<FolderTreeData> Children);
+
+    /// <summary>
+    /// Recursively materializes every still-lazy ("...") folder node under <paramref name="nodes"/>
+    /// (and under <paramref name="root"/> itself, if it's also a lazy placeholder parent), so a
+    /// subsequent ExpandAll doesn't need to hit the disk node-by-node as it recurses. The actual
+    /// directory walk runs on a background thread behind a cancellable progress dialog, since a
+    /// deep or wide folder tree can otherwise freeze the UI for a long time.
+    /// </summary>
+    private async Task PreloadLazyFoldersAsync(TreeNodeCollection nodes, TreeNode? root = null)
+    {
+        var targets = new List<TreeNode>();
+        if (root != null && IsLazyPlaceholderParent(root)) targets.Add(root);
+        CollectLazyPlaceholderParents(nodes, targets);
+        if (targets.Count == 0) return;
+
+        var targetPaths = new List<(TreeNode Node, string Path)>();
+        foreach (var node in targets)
+        {
+            var path = GetFolderPathForNode(node);
+            if (path != null && Directory.Exists(path))
+                targetPaths.Add((node, path));
+        }
+        if (targetPaths.Count == 0) return;
+
+        var trees = await ProgressDialog.RunAsync(this, "Expanding Folders", "Scanning folders, this may take a moment...", ct =>
+        {
+            var result = new List<(TreeNode Node, FolderTreeData Data)>();
+            foreach (var (node, path) in targetPaths)
+            {
+                ct.ThrowIfCancellationRequested();
+                result.Add((node, BuildFolderTreeData(Path.GetFileName(path), path, ct)));
+            }
+            return result;
+        });
+
+        if (trees == null) return;
+
+        treeView.BeginUpdate();
+        foreach (var (node, data) in trees)
+            ApplyFolderTreeData(node, data);
+        treeView.EndUpdate();
+    }
+
+    private static bool IsLazyPlaceholderParent(TreeNode node)
+        => node.Nodes.Count == 1 && node.Nodes[0].Tag as string == "Dummy";
+
+    private static void CollectLazyPlaceholderParents(TreeNodeCollection nodes, List<TreeNode> results)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (IsLazyPlaceholderParent(node))
+                results.Add(node);
+            else
+                CollectLazyPlaceholderParents(node.Nodes, results);
+        }
+    }
+
+    private string? GetFolderPathForNode(TreeNode node)
+    {
+        var tag = node.Tag?.ToString() ?? "";
+        if (tag.StartsWith(TagFolderRef))
+        {
+            var parts = tag.Substring(TagFolderRef.Length).Split(':');
+            var projectId = Guid.Parse(parts[0]);
+            var folderRefId = Guid.Parse(parts[1]);
+            var project = _projectManager.GetProject(projectId);
+            var folderRef = FindFolderRef(project, folderRefId);
+            return folderRef?.RealPath;
+        }
+        if (tag.StartsWith(TagRealFolder))
+            return tag.Substring(TagRealFolder.Length);
+        return null;
+    }
+
+    private static FolderTreeData BuildFolderTreeData(string name, string path, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var children = new List<FolderTreeData>();
+        try
+        {
+            foreach (var dir in Directory.GetDirectories(path))
+            {
+                ct.ThrowIfCancellationRequested();
+                children.Add(BuildFolderTreeData(new DirectoryInfo(dir).Name, dir, ct));
+            }
+        }
+        catch (UnauthorizedAccessException) { /* access denied */ }
+        catch (IOException) { /* e.g. disconnected network path */ }
+        return new FolderTreeData(name, path, children);
+    }
+
+    private void ApplyFolderTreeData(TreeNode node, FolderTreeData data)
+    {
+        node.Nodes.Clear();
+        foreach (var child in data.Children)
+        {
+            var childNode = new TreeNode(child.Name)
+            {
+                Tag = TagRealFolder + child.Path,
+                ImageIndex = GetImageIndex("Folder"),
+                SelectedImageIndex = GetImageIndex("FolderOpen")
+            };
+            ApplyFolderTreeData(childNode, child);
+            node.Nodes.Add(childNode);
+        }
+    }
+
     private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
     {
         if (e.Node == null) return;
@@ -1044,6 +1154,11 @@ public partial class MainForm : Form
             {
                 path = tag.Substring(TagRealFolder.Length);
             }
+
+            // Only scan the disk the first time this node is expanded — once real subfolder
+            // nodes have replaced the "..." placeholder, re-expanding shouldn't re-hit the disk.
+            var isDummyPlaceholder = e.Node.Nodes.Count == 1 && e.Node.Nodes[0].Tag as string == "Dummy";
+            if (!isDummyPlaceholder) return;
 
             if (Directory.Exists(path))
             {
@@ -1587,6 +1702,12 @@ public partial class MainForm : Form
 
     private void BtnExpandAll_Click()
     {
+        _ = ExpandAllAsync();
+    }
+
+    private async Task ExpandAllAsync()
+    {
+        await PreloadLazyFoldersAsync(treeView.Nodes);
         treeView.BeginUpdate();
         treeView.ExpandAll();
         treeView.EndUpdate();
@@ -1621,6 +1742,12 @@ public partial class MainForm : Form
     {
         var node = treeView.SelectedNode;
         if (node == null) return;
+        _ = ExpandBranchAsync(node);
+    }
+
+    private async Task ExpandBranchAsync(TreeNode node)
+    {
+        await PreloadLazyFoldersAsync(node.Nodes, node);
         treeView.BeginUpdate();
         node.ExpandAll();
         treeView.EndUpdate();
@@ -3045,8 +3172,8 @@ public partial class MainForm : Form
             };
         }
 
-        // Reparent / reorder: Collection, FolderReference, or WebResource within the same project.
-        if (!dragTag.StartsWith(TagCollection) && !dragTag.StartsWith(TagFolderRef) && !dragTag.StartsWith(TagWebResource))
+        // Reparent / reorder: Collection, FolderReference, WebResource, or FileReference within the same project.
+        if (!dragTag.StartsWith(TagCollection) && !dragTag.StartsWith(TagFolderRef) && !dragTag.StartsWith(TagWebResource) && !dragTag.StartsWith(TagFileRef))
             return null;
 
         var projectId = GetProjectIdFromTag(dragTag);

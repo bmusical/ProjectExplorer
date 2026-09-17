@@ -488,9 +488,11 @@ partial class MainForm
 
         // ── Form ──
         // Docked controls are added in reverse visual order (last added docks first / topmost).
+        // splitMain (Dock.Fill) must be added before statusStrip (Dock.Bottom) so the Fill
+        // layout excludes the status strip's reserved space instead of overlapping it.
         this.Controls.AddRange(new Control[] {
-            this.statusStrip,
             this.splitMain,
+            this.statusStrip,
             this.toolStripTree,
             this.toolStripNav,
             this.headerPanel,

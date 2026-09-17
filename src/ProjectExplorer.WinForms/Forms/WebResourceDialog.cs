@@ -33,6 +33,7 @@ public class WebResourceDialog : Form
         // ClientSize (not Size): lay the window out by its usable interior, so the button row
         // isn't clipped by the title bar/borders — and, with AutoScaleMode.Font above, the whole
         // thing scales correctly on high-DPI displays under Program.cs's PerMonitorV2 mode.
+        // (Supersedes the earlier Size = 480x332 stopgap that just padded the outer height.)
         this.ClientSize = new Size(464, 294);
 
         lblName = new Label

@@ -7,7 +7,8 @@ Releases tagged `<version>` (no `v` prefix).
 ## [Unreleased]
 
 - Fix cramped/clipped dialogs. Every dialog (Add/Edit Web Resource, Add/Edit File, the name-input
-  prompt, About, Registration, Search, Help, and the Image Viewer) now sets `AutoScaleMode.Font`,
+  prompt, About, Registration, Search, Help, the Image Viewer, and the folder-loading progress
+  dialog) now sets `AutoScaleMode.Font`,
   so they scale correctly with the display's DPI/scaling instead of overflowing their fixed pixel
   layout — the app runs in `PerMonitorV2` high-DPI mode but the dialogs never opted into scaling,
   which is why they looked wrong at 125%/150%/175%. The fixed-size dialogs are also now sized by
