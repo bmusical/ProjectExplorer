@@ -6,6 +6,8 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+## [1.0.9] — 2026-09-19
+
 - Redesign the dialogs to be attractive and spacious, on a shared visual language
   (`Helpers/DialogTheme`): a branded blue header band (logo + "PROJECT NEST" eyebrow + title),
   generous padding, clear field labels, comfortable inputs, a divider above the button bar, and
@@ -22,6 +24,20 @@ Releases tagged `<version>` (no `v` prefix).
 - Open the project tree at a sensible width. The left tree/content splitter now opens at ~32% of
   the window width (with a floor) instead of a fixed 250px sliver, and the tree pane has a larger
   minimum width, so it no longer comes up as a skinny column on wide or high-DPI displays.
+- Add a **Tree** toolbar above the project tree: Expand All, Collapse All, Collapse to Top Level,
+  Expand Selected Branch, and Collapse Selected Branch. Expanding All or a branch that has to walk
+  the file system shows a cancellable "Expanding Folders" progress dialog so the UI stays
+  responsive on a large nest.
+- File References to `.html`/`.htm` now render in the inline preview via WebView2 (instead of as
+  raw source). `.md`/`.markdown` files render as formatted HTML in the same preview.
+- Web Resources can be marked **"Always open in an external browser (skip the inline preview)"**
+  when adding or editing one. Selecting that resource then shows the external-browser prompt
+  instead of loading the page in WebView2 — useful for sites that block embedded browsers or that
+  you always want in a real browser.
+- The Web Resource preview panel now has a **← Back** button that walks the embedded browser
+  history (enabled only when there is somewhere to go back to).
+- File References can now be dragged in the TreeView to reparent or reorder them, the same way
+  Collections, Folder References, and Web Resources already could.
 
 ## [1.0.8] — 2026-07-19
 
