@@ -1,5 +1,6 @@
 using ProjectExplorer.Core.Interfaces;
 using ProjectExplorer.Core.Models;
+using ProjectExplorer.Core.Sharing;
 
 namespace ProjectExplorer.Core.Services;
 
@@ -64,6 +65,26 @@ public class ProjectManager
     {
         _projects.RemoveAll(p => p.Id == projectId);
         await _repository.DeleteProjectAsync(projectId);
+    }
+
+    /// <summary>
+    /// Adds a project that was materialized from a Nest Egg. The free-tier check
+    /// runs here, before the row is written. The in-memory list is updated only
+    /// after the save succeeds.
+    /// </summary>
+    public async Task<Project> ImportSharedProjectAsync(Project project, LicenseInfo license)
+    {
+        var reason = NestEggImporter.FreeTierBlockReason(license, project);
+        if (reason != null)
+            throw new InvalidOperationException(reason);
+        if (string.IsNullOrWhiteSpace(project.Name))
+            throw new InvalidOperationException("The shared project has no name.");
+        if (_projects.Any(p => p.Id == project.Id))
+            throw new InvalidOperationException($"Project {project.Id} already exists.");
+
+        await _repository.SaveProjectAsync(project);
+        _projects.Add(project);
+        return project;
     }
 
     public Project? GetProject(Guid projectId)

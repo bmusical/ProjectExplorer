@@ -6,6 +6,12 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- **Share a project with another computer** (a Version 2 learning slice). File ▸ Share Project…
+  sends the selected project to a small sharing server and shows a short code. File ▸ Receive
+  Shared Project… on the other computer imports a copy. Folder and file paths are copied as
+  stored, not uploaded. See `docs/SHARING_PHASE1.md` for the server database, the data flows,
+  and how to run it on two machines.
+
 ## [1.0.9] — 2026-09-19
 
 - Redesign the dialogs to be attractive and spacious, on a shared visual language

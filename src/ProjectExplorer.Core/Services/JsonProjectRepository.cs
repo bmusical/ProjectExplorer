@@ -100,7 +100,25 @@ public class JsonProjectRepository : IProjectRepository
             ["modified"] = project.Modified.ToString("O"),
             ["children"] = SerializeChildren(project.Children)
         };
+        if (project.Metadata.Count > 0)
+            obj["metadata"] = SerializeMetadata(project.Metadata);
         return obj;
+    }
+
+    private static JsonObject SerializeMetadata(Dictionary<string, string> metadata)
+    {
+        var meta = new JsonObject();
+        foreach (var kvp in metadata)
+            meta[kvp.Key] = kvp.Value;
+        return meta;
+    }
+
+    private static void ReadMetadata(JsonNode node, Dictionary<string, string> target)
+    {
+        var metaObj = node["metadata"]?.AsObject();
+        if (metaObj == null) return;
+        foreach (var kvp in metaObj)
+            target[kvp.Key] = kvp.Value?.GetValue<string>() ?? "";
     }
 
     private static JsonArray SerializeChildren(List<ProjectChild> children)
@@ -235,6 +253,7 @@ public class JsonProjectRepository : IProjectRepository
             Created = DateTime.TryParse(node["created"]?.GetValue<string>(), out var created) ? created : DateTime.UtcNow,
             Modified = DateTime.TryParse(node["modified"]?.GetValue<string>(), out var modified) ? modified : DateTime.UtcNow
         };
+        ReadMetadata(node, project.Metadata);
 
         var childrenArr = node["children"]?.AsArray();
         if (childrenArr != null)

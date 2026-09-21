@@ -13,4 +13,15 @@ public class AppSettings
     public int? WindowWidth { get; set; }
     public int? WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+
+    /// <summary>
+    /// Address of the phase-1 sharing server (for example http://192.168.1.20:5088).
+    /// Remembered so both Share and Receive use the same host.
+    /// </summary>
+    public string? ShareServerUrl { get; set; }
+
+    /// <summary>
+    /// Name this computer sends with a Nest Egg, so the other computer can see who it came from.
+    /// </summary>
+    public string? ShareMachineLabel { get; set; }
 }

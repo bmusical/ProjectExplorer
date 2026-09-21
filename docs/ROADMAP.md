@@ -18,7 +18,7 @@ Version 2 focuses on going online, making sharing between nests successful end t
 
 Nest Eggs are packages of information that can be shared from one nest to another. Version 2 covers both the packages and the supporting capabilities needed to make that sharing useful to the recipient, not just exporting a file.
 
-The online architecture, package contents, delivery/import flow, and handling of references to resources on another machine remain to be scoped. The relationship to the earlier `.peproj` single-project handoff idea should be resolved as part of that work rather than assuming separate formats. The existing `File ▸ Export All My Data...` remains a one-user personal-data export, not the sharing workflow.
+The first slice is a two-computer experiment, specified in [`SHARING_PHASE1.md`](SHARING_PHASE1.md). One project is packed as a Nest Egg, stored on a small sharing server, and imported on the other computer as a new project when someone enters a short code. Paths are copied as stored. File contents, accounts, and merging are left out so that using the slice can show what the package and the server tables need to become. For this slice the egg is the earlier `.peproj` handoff; a second format stays open only if a later slice needs one. `File ▸ Export All My Data...` remains a one-user personal-data export, not the sharing workflow.
 
 ### Deeper Explorer integration
 

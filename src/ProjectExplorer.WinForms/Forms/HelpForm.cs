@@ -263,6 +263,17 @@ public class HelpForm : Form
             "If the main window's saved position has drifted off every screen you currently have " +
             "connected, it's moved back onto your primary screen the next time it becomes visible.");
 
+        AppendHeading("Sharing a project with another computer");
+        AppendParagraph(
+            "File ▸ Share Project… sends the project selected in the tree to a sharing server " +
+            "you run, and shows a short code. File ▸ Receive Shared Project… on the other " +
+            "computer imports a copy. Folder and file paths are copied exactly as stored — the " +
+            "files themselves are not uploaded — so a path that exists only on the sending " +
+            "computer shows as unavailable on the receiving one. Web addresses are copied too.");
+        AppendBullet(
+            "Nothing is shared until you use one of these commands. A share code is the only " +
+            "key: anyone who has it can fetch that project until it expires or you revoke it.");
+
         AppendHeading("Exporting your data");
         AppendParagraph(
             "File ▸ Export All My Data… bundles everything Project Nest Explorer has written to " +
@@ -285,8 +296,9 @@ public class HelpForm : Form
         AppendParagraph(
             "Help ▸ Check for Updates… checks for a newer version. Besides that, loading Web " +
             "Resource previews you've added, and checking whether a Web Resource is currently " +
-            "reachable (see \"Unavailable folders, files, and web resources\" above), everything " +
-            "else works fully offline.");
+            "reachable (see \"Unavailable folders, files, and web resources\" above), the app " +
+            "stays offline. File ▸ Share Project… and Receive Shared Project… contact your " +
+            "sharing server only when you use them.");
 
         AppendHeading("Getting help");
         AppendParagraph("Questions, bugs, or anything not covered here: support@blaznaccess.com");
