@@ -6,15 +6,17 @@ This is the first slice of Version 2. The goal is something you can run yourself
 
 ## What you do
 
-1. On the computer that will hold the server (either of the two is fine):
+1. On SQL Server, run [`src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`](../src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql) once in SSMS. That creates database `ProjectNestSharing`, the three tables, and the stored procedures. Local `dotnet run` is Development, so it reads `ConnectionStrings:ControlPlane` from `src/ProjectNest.Server/appsettings.Development.json` (database `ProjectNestSharing` on `MIGHTYK10\SQLEXPRESS`). `DefaultConnection` in that file points at `db_acdaa1_conproddb` and is not the sharing store. `Sharing:ConnectionString` in `appsettings.json` stays empty. To point a different machine at SQL Server, set `Sharing:ConnectionString` or the environment variable `Sharing__ConnectionString`; that value wins over ControlPlane. A set `Sharing:DatabasePath` stays on SQLite, which is how the automated tests run.
+
+2. Start the sharing server on the computer that other machines can reach:
 
    ```bash
    dotnet run --project src/ProjectNest.Server
    ```
 
-   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation.
+   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation. The startup log says it is using SQL Server via `ConnectionStrings:ControlPlane`. If that string and `Sharing:ConnectionString` are both empty, it falls back to a local SQLite file instead.
 
-2. If the other computer is on the same network, allow the port through Windows Firewall on the server machine:
+3. If the other computer is on the same network, allow the port through Windows Firewall on the server machine:
 
    ```powershell
    netsh advfirewall firewall add rule name="Project Nest Sharing" dir=in action=allow protocol=TCP localport=5088
@@ -22,13 +24,13 @@ This is the first slice of Version 2. The goal is something you can run yourself
 
    Find the server's LAN address with `ipconfig` (the IPv4 address on the Wi-Fi or Ethernet adapter, for example `192.168.1.20`).
 
-3. On computer A, select a project and choose **File ▸ Share Project…**. Set the server to `http://192.168.1.20:5088` (or `http://localhost:5088` if the app and the server are on the same machine). Share. Copy the code (`ABCD-EFGH`).
+4. On computer A, select a project and choose **File ▸ Share Project…**. Set the server to `http://192.168.1.20:5088` (or `http://localhost:5088` if the app and the server are on the same machine). Share. Copy the code (`ABCD-EFGH`).
 
-4. On computer B, choose **File ▸ Receive Shared Project…**, use the same server address, enter the code, Preview, then Import.
+5. On computer B, choose **File ▸ Receive Shared Project…**, use the same server address, enter the code, Preview, then Import.
 
-5. On computer A, **Refresh activity**. You should see Created, Previewed, Fetched, and Imported, with each computer's name.
+6. On computer A, **Refresh activity**. You should see Created, Previewed, Fetched, and Imported, with each computer's name.
 
-6. Look at the imported project on B. Web addresses should still open. Folder and file paths are the paths from A. If those disks are not on B, the rows show as unavailable. That is the result this slice is for.
+7. Look at the imported project on B. Web addresses should still open. Folder and file paths are the paths from A. If those disks are not on B, the rows show as unavailable. That is the result this slice is for.
 
 The server address and the computer name are remembered in `appsettings.json` on each machine.
 
@@ -36,9 +38,11 @@ A code lasts 7 days. **Revoke code** on the share dialog makes the next fetch fa
 
 ## Server database
 
-SQLite file `sharing.db`, separate from each computer's `%APPDATA%\ProjectExplorer\projects.db`. The default path is `src/ProjectNest.Server/data/sharing.db` when you run from the repo (gitignored). Override it with `Sharing:DatabasePath`. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
+SQL Server database `ProjectNestSharing`, created by `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. It is separate from each computer's `%APPDATA%\ProjectExplorer\projects.db` and from `db_acdaa1_conproddb`. The sharing server does not create this database. You run the script once in SSMS. Local Development then uses `ConnectionStrings:ControlPlane` for the instance. Before it connects, the server writes `Sharing:Database` (`ProjectNestSharing`) in as the SQL Server catalog, including when the connection string names a different database on that instance. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
 
-The SQL is ordinary tables and indexes so it can move to SQL Server later without changing the flows. Phase 1 runs on SQLite so two computers can try it with `dotnet run` and no database install.
+The script creates three tables and these procedures: `dbo.usp_Share_CodeExists`, `dbo.usp_Share_Create`, `dbo.usp_Share_GetByCode`, `dbo.usp_ShareEvent_Insert`, `dbo.usp_Share_RecordFetch`, `dbo.usp_Share_RecordImport`, `dbo.usp_Share_Revoke`, and `dbo.usp_ShareEvent_List`. Re-running the script updates the procedures (`CREATE OR ALTER`) and leaves existing tables in place.
+
+Times are `datetime2` stored as UTC. Ids are `uniqueidentifier`. The egg JSON is `nvarchar(max)`.
 
 ### NestEggs
 
@@ -46,9 +50,9 @@ One row per published project. The payload is the Nest Egg JSON. The row is not 
 
 | Column | Role |
 |---|---|
-| `Id` | Server id of this stored egg (GUID text, primary key) |
+| `Id` | Server id of this stored egg (`uniqueidentifier`, primary key) |
 | `SchemaVersion` | Egg format. Phase 1 accepts `1` only |
-| `CreatedUtc` | When the server stored it (ISO-8601) |
+| `CreatedUtc` | When the server stored it (`datetime2`, UTC) |
 | `ExpiresUtc` | Same instant as the share's expiry |
 | `SenderLabel` | The computer name typed in Share Project |
 | `ProjectName` | Copied from the egg so a listing does not have to parse JSON |
@@ -63,7 +67,7 @@ The claim ticket for one egg. Phase 1 creates one share per egg.
 
 | Column | Role |
 |---|---|
-| `Id` | GUID text, primary key |
+| `Id` | `uniqueidentifier`, primary key |
 | `EggId` | References `NestEggs.Id` |
 | `Code` | 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, stored without a hyphen, unique |
 | `CreatedUtc` | When the code was issued |
@@ -80,7 +84,7 @@ Append-only. This is the log you read with Refresh activity.
 
 | Column | Role |
 |---|---|
-| `Id` | GUID text, primary key |
+| `Id` | `uniqueidentifier`, primary key |
 | `ShareId` | The share this event belongs to |
 | `EggId` | The egg |
 | `EventType` | `Created`, `Previewed`, `Fetched`, `Imported`, `Revoked`, or `Rejected` |
@@ -88,7 +92,7 @@ Append-only. This is the log you read with Refresh activity.
 | `MachineLabel` | Computer name, when the caller sent one. Truncated at 80 characters |
 | `Detail` | Short note (project name on create, "expired"/"revoked" on reject, the new project id on import). Truncated at 500 characters |
 
-`IX_ShareEvents_ShareId` supports the activity list.
+`IX_ShareEvents_ShareId_OccurredUtc` supports the activity list.
 
 What is deliberately not in this database: user accounts, devices, license keys, file bytes, UI layout, and the receiver's copy of the project. The receiver's copy lives only in that computer's `projects.db`.
 
