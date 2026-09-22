@@ -8,10 +8,29 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 
 var app = builder.Build();
 var options = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharingOptions>>().Value;
-var databasePath = string.IsNullOrWhiteSpace(options.DatabasePath)
-    ? Path.Combine(app.Environment.ContentRootPath, "data", "sharing.db")
-    : options.DatabasePath;
-var store = new SharingStore(databasePath);
+SharingStore store;
+// Sharing:ConnectionString wins. An explicit Sharing:DatabasePath (the tests)
+// stays on SQLite. Otherwise Development uses ConnectionStrings:ControlPlane
+// (ProjectNestSharing). DefaultConnection is a different database and is not read here.
+var sqlConnection = ResolveSqlConnection(options, app.Configuration);
+if (sqlConnection != null)
+{
+    store = SharingStore.SqlServer(sqlConnection.Value, options.Database);
+    app.Logger.LogInformation(
+        "Sharing database is SQL Server database {Database} via {Source}.",
+        string.IsNullOrWhiteSpace(options.Database) ? SharingOptions.DefaultDatabaseName : options.Database.Trim(),
+        sqlConnection.Source);
+}
+else
+{
+    var databasePath = string.IsNullOrWhiteSpace(options.DatabasePath)
+        ? Path.Combine(app.Environment.ContentRootPath, "data", "sharing.db")
+        : options.DatabasePath;
+    store = SharingStore.Sqlite(databasePath);
+    app.Logger.LogInformation(
+        "Sharing database is the local SQLite file {Path}. Run Sql/001_CreateSharingDatabase.sql, then set ConnectionStrings:ControlPlane or Sharing:ConnectionString to use SQL Server.",
+        databasePath);
+}
 
 app.MapGet("/", () => Results.Text(
     "Project Nest sharing server is running.\nUse File > Share Project in Project Nest Explorer, pointed at this address.\n",
@@ -87,6 +106,21 @@ app.MapDelete("/api/shares/{code}", (string code, string? machine) =>
 
 app.Run();
 
+static SqlConnectionChoice? ResolveSqlConnection(SharingOptions options, IConfiguration configuration)
+{
+    if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        return new SqlConnectionChoice(options.ConnectionString, "Sharing:ConnectionString");
+
+    if (!string.IsNullOrWhiteSpace(options.DatabasePath))
+        return null;
+
+    var controlPlane = configuration.GetConnectionString("ControlPlane");
+    if (!string.IsNullOrWhiteSpace(controlPlane))
+        return new SqlConnectionChoice(controlPlane, "ConnectionStrings:ControlPlane");
+
+    return null;
+}
+
 static IResult Lookup<T>(string code, Func<string, string?, ShareLookup<T>> read, string? machine)
 {
     if (!TryCanonical(code, out var canonical, out var error))
@@ -115,5 +149,7 @@ static IResult StatusFor(ShareStatus status, string? message) => status switch
     ShareStatus.Expired or ShareStatus.Revoked => Results.Json(new ShareApiError { Error = message ?? "That share is no longer available." }, statusCode: StatusCodes.Status410Gone),
     _ => Results.BadRequest(new ShareApiError { Error = message ?? "The sharing server rejected the request." })
 };
+
+file sealed record SqlConnectionChoice(string Value, string Source);
 
 public partial class Program;
