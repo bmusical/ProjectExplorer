@@ -38,7 +38,7 @@ A code lasts 7 days. **Revoke code** on the share dialog makes the next fetch fa
 
 ## Server database
 
-SQL Server database `ProjectNestSharing`, created by `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. It is separate from each computer's `%APPDATA%\ProjectExplorer\projects.db` and from `db_acdaa1_conproddb`. The sharing server does not create this database. You run the script once in SSMS. Local Development then uses `ConnectionStrings:ControlPlane`. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
+SQL Server database `ProjectNestSharing`, created by `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. It is separate from each computer's `%APPDATA%\ProjectExplorer\projects.db` and from `db_acdaa1_conproddb`. The sharing server does not create this database. You run the script once in SSMS. Local Development then uses `ConnectionStrings:ControlPlane` for the instance. Before it connects, the server writes `Sharing:Database` (`ProjectNestSharing`) in as the SQL Server catalog, including when the connection string names a different database on that instance. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
 
 The script creates three tables and these procedures: `dbo.usp_Share_CodeExists`, `dbo.usp_Share_Create`, `dbo.usp_Share_GetByCode`, `dbo.usp_ShareEvent_Insert`, `dbo.usp_Share_RecordFetch`, `dbo.usp_Share_RecordImport`, `dbo.usp_Share_Revoke`, and `dbo.usp_ShareEvent_List`. Re-running the script updates the procedures (`CREATE OR ALTER`) and leaves existing tables in place.
 

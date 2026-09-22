@@ -3,6 +3,7 @@ namespace ProjectNest.Server;
 public sealed class SharingOptions
 {
     public const string SectionName = "Sharing";
+    public const string DefaultDatabaseName = "ProjectNestSharing";
 
     /// <summary>
     /// How long a share code keeps working. Values below 1 expire immediately
@@ -18,6 +19,13 @@ public sealed class SharingOptions
     /// ConnectionStrings:ControlPlane (appsettings.Development.json).
     /// </summary>
     public string ConnectionString { get; set; } = "";
+
+    /// <summary>
+    /// SQL Server database the sharing server opens. Written into the
+    /// connection string as Initial Catalog before connect, so a string that
+    /// names another database on the same instance still lands here.
+    /// </summary>
+    public string Database { get; set; } = DefaultDatabaseName;
 
     /// <summary>
     /// SQLite file used when <see cref="ConnectionString"/> is empty.

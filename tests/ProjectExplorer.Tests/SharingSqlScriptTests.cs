@@ -1,7 +1,21 @@
+using ProjectNest.Server;
+
 namespace ProjectExplorer.Tests;
 
 public class SharingSqlScriptTests
 {
+    [Fact]
+    public void UseDatabase_WritesProjectNestSharingIntoTheConnection()
+    {
+        const string local = "Server=MIGHTYK10\\SQLEXPRESS;Database=db_acdaa1_conproddb;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+
+        var sharing = SharingConnection.UseDatabase(local);
+
+        Assert.Contains("Initial Catalog=ProjectNestSharing", sharing, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(@"Data Source=MIGHTYK10\SQLEXPRESS", sharing, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("db_acdaa1_conproddb", sharing, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void CreateScript_DefinesTheSharingProcedures()
     {

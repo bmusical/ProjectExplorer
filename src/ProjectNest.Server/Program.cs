@@ -15,9 +15,10 @@ SharingStore store;
 var sqlConnection = ResolveSqlConnection(options, app.Configuration);
 if (sqlConnection != null)
 {
-    store = SharingStore.SqlServer(sqlConnection.Value);
+    store = SharingStore.SqlServer(sqlConnection.Value, options.Database);
     app.Logger.LogInformation(
-        "Sharing database is SQL Server (ProjectNestSharing) via {Source}.",
+        "Sharing database is SQL Server database {Database} via {Source}.",
+        string.IsNullOrWhiteSpace(options.Database) ? SharingOptions.DefaultDatabaseName : options.Database.Trim(),
         sqlConnection.Source);
 }
 else

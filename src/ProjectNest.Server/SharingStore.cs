@@ -4,8 +4,8 @@ using ProjectExplorer.Core.Sharing;
 namespace ProjectNest.Server;
 
 /// <summary>
-/// Share codes, expiry, and the activity log. Storage is either SQL Server
-/// (when Sharing:ConnectionString is set) or the SQLite stand-in.
+/// Share codes, expiry, and the activity log. Storage is SQL Server database
+/// ProjectNestSharing when a connection string is configured, or the SQLite stand-in.
 /// </summary>
 public sealed class SharingStore
 {
@@ -18,7 +18,8 @@ public sealed class SharingStore
 
     public static SharingStore Sqlite(string databasePath) => new(new SqliteShareDatabase(databasePath));
 
-    public static SharingStore SqlServer(string connectionString) => new(new SqlShareDatabase(connectionString));
+    public static SharingStore SqlServer(string connectionString, string? database = null) =>
+        new(new SqlShareDatabase(SharingConnection.UseDatabase(connectionString, database)));
 
     public PublishedShare Create(NestEggDocument egg, string canonicalJson, string machineLabel, DateTime expiresUtc)
     {

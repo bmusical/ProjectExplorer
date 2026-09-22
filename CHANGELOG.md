@@ -14,7 +14,8 @@ Releases tagged `<version>` (no `v` prefix).
   `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql` to create `ProjectNestSharing`
   and its stored procedures. Local Development uses `ConnectionStrings:ControlPlane`
   in `appsettings.Development.json` (`ProjectNestSharing` on `MIGHTYK10\SQLEXPRESS`).
-  `DefaultConnection` in that file is not the sharing store.
+  `DefaultConnection` in that file is not the sharing store. The server writes
+  `Sharing:Database` (`ProjectNestSharing`) into the SQL connection before it opens it.
 
 ## [1.0.9] — 2026-09-19
 
