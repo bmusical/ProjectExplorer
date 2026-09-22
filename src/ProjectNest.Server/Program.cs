@@ -9,10 +9,16 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 var app = builder.Build();
 var options = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharingOptions>>().Value;
 SharingStore store;
-if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+// Sharing:ConnectionString wins. An explicit Sharing:DatabasePath (the tests)
+// stays on SQLite. Otherwise Development uses ConnectionStrings:ControlPlane
+// (ProjectNestSharing). DefaultConnection is a different database and is not read here.
+var sqlConnection = ResolveSqlConnection(options, app.Configuration);
+if (sqlConnection != null)
 {
-    store = SharingStore.SqlServer(options.ConnectionString);
-    app.Logger.LogInformation("Sharing database is SQL Server (ProjectNestSharing).");
+    store = SharingStore.SqlServer(sqlConnection.Value);
+    app.Logger.LogInformation(
+        "Sharing database is SQL Server (ProjectNestSharing) via {Source}.",
+        sqlConnection.Source);
 }
 else
 {
@@ -21,7 +27,7 @@ else
         : options.DatabasePath;
     store = SharingStore.Sqlite(databasePath);
     app.Logger.LogInformation(
-        "Sharing database is the local SQLite file {Path}. Set Sharing:ConnectionString after running Sql/001_CreateSharingDatabase.sql to use SQL Server.",
+        "Sharing database is the local SQLite file {Path}. Run Sql/001_CreateSharingDatabase.sql, then set ConnectionStrings:ControlPlane or Sharing:ConnectionString to use SQL Server.",
         databasePath);
 }
 
@@ -99,6 +105,21 @@ app.MapDelete("/api/shares/{code}", (string code, string? machine) =>
 
 app.Run();
 
+static SqlConnectionChoice? ResolveSqlConnection(SharingOptions options, IConfiguration configuration)
+{
+    if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        return new SqlConnectionChoice(options.ConnectionString, "Sharing:ConnectionString");
+
+    if (!string.IsNullOrWhiteSpace(options.DatabasePath))
+        return null;
+
+    var controlPlane = configuration.GetConnectionString("ControlPlane");
+    if (!string.IsNullOrWhiteSpace(controlPlane))
+        return new SqlConnectionChoice(controlPlane, "ConnectionStrings:ControlPlane");
+
+    return null;
+}
+
 static IResult Lookup<T>(string code, Func<string, string?, ShareLookup<T>> read, string? machine)
 {
     if (!TryCanonical(code, out var canonical, out var error))
@@ -127,5 +148,7 @@ static IResult StatusFor(ShareStatus status, string? message) => status switch
     ShareStatus.Expired or ShareStatus.Revoked => Results.Json(new ShareApiError { Error = message ?? "That share is no longer available." }, statusCode: StatusCodes.Status410Gone),
     _ => Results.BadRequest(new ShareApiError { Error = message ?? "The sharing server rejected the request." })
 };
+
+file sealed record SqlConnectionChoice(string Value, string Source);
 
 public partial class Program;

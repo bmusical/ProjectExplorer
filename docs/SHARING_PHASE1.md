@@ -6,11 +6,7 @@ This is the first slice of Version 2. The goal is something you can run yourself
 
 ## What you do
 
-1. On SQL Server, run [`src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`](../src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql). That creates database `ProjectNestSharing`, the three tables, and the stored procedures. Then set `Sharing:ConnectionString` in `src/ProjectNest.Server/appsettings.json` (or an environment variable `Sharing__ConnectionString`):
-
-   ```text
-   Server=localhost;Database=ProjectNestSharing;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True
-   ```
+1. On SQL Server, run [`src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`](../src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql) once in SSMS. That creates database `ProjectNestSharing`, the three tables, and the stored procedures. Local `dotnet run` is Development, so it reads `ConnectionStrings:ControlPlane` from `src/ProjectNest.Server/appsettings.Development.json` (database `ProjectNestSharing` on `MIGHTYK10\SQLEXPRESS`). `DefaultConnection` in that file points at `db_acdaa1_conproddb` and is not the sharing store. `Sharing:ConnectionString` in `appsettings.json` stays empty. To point a different machine at SQL Server, set `Sharing:ConnectionString` or the environment variable `Sharing__ConnectionString`; that value wins over ControlPlane. A set `Sharing:DatabasePath` stays on SQLite, which is how the automated tests run.
 
 2. Start the sharing server on the computer that other machines can reach:
 
@@ -18,7 +14,7 @@ This is the first slice of Version 2. The goal is something you can run yourself
    dotnet run --project src/ProjectNest.Server
    ```
 
-   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation. The startup log says it is using SQL Server. If `ConnectionString` is empty, it falls back to a local SQLite file instead, which is how the automated tests run.
+   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation. The startup log says it is using SQL Server via `ConnectionStrings:ControlPlane`. If that string and `Sharing:ConnectionString` are both empty, it falls back to a local SQLite file instead.
 
 3. If the other computer is on the same network, allow the port through Windows Firewall on the server machine:
 
@@ -42,7 +38,7 @@ A code lasts 7 days. **Revoke code** on the share dialog makes the next fetch fa
 
 ## Server database
 
-SQL Server database `ProjectNestSharing`, created by `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. It is separate from each computer's `%APPDATA%\ProjectExplorer\projects.db`. The sharing server does not create this database. You run the script once in SSMS, then set `Sharing:ConnectionString`. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
+SQL Server database `ProjectNestSharing`, created by `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. It is separate from each computer's `%APPDATA%\ProjectExplorer\projects.db` and from `db_acdaa1_conproddb`. The sharing server does not create this database. You run the script once in SSMS. Local Development then uses `ConnectionStrings:ControlPlane`. `Sharing:LifetimeDays` defaults to 7 and is capped at 30.
 
 The script creates three tables and these procedures: `dbo.usp_Share_CodeExists`, `dbo.usp_Share_Create`, `dbo.usp_Share_GetByCode`, `dbo.usp_ShareEvent_Insert`, `dbo.usp_Share_RecordFetch`, `dbo.usp_Share_RecordImport`, `dbo.usp_Share_Revoke`, and `dbo.usp_ShareEvent_List`. Re-running the script updates the procedures (`CREATE OR ALTER`) and leaves existing tables in place.
 

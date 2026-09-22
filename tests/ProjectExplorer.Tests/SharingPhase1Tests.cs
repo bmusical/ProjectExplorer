@@ -280,8 +280,10 @@ public class SharingPhase1Tests : IClassFixture<SharingPhase1Tests.SharingServer
             {
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["Sharing:ConnectionString"] = "",
                     ["Sharing:DatabasePath"] = DbPath,
-                    ["Sharing:LifetimeDays"] = LifetimeDays.ToString()
+                    ["Sharing:LifetimeDays"] = LifetimeDays.ToString(),
+                    ["ConnectionStrings:ControlPlane"] = ""
                 });
             });
         }

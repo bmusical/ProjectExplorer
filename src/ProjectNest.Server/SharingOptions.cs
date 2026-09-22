@@ -13,15 +13,17 @@ public sealed class SharingOptions
     /// <summary>
     /// SQL Server connection string for database ProjectNestSharing.
     /// When this is set, the server calls the stored procedures created by
-    /// Sql/001_CreateSharingDatabase.sql. When it is empty, the server uses a
-    /// local SQLite file instead (tests, and a machine that has not created the
-    /// SQL Server database yet).
+    /// Sql/001_CreateSharingDatabase.sql. When it is empty and
+    /// <see cref="DatabasePath"/> is also empty, Development uses
+    /// ConnectionStrings:ControlPlane (appsettings.Development.json).
     /// </summary>
     public string ConnectionString { get; set; } = "";
 
     /// <summary>
-    /// SQLite file used only when <see cref="ConnectionString"/> is empty.
-    /// Empty uses data/sharing.db under the content root.
+    /// SQLite file used when <see cref="ConnectionString"/> is empty.
+    /// A non-empty path wins over ConnectionStrings:ControlPlane so tests
+    /// stay on a temp file. Empty, with no ControlPlane string, uses
+    /// data/sharing.db under the content root.
     /// </summary>
     public string DatabasePath { get; set; } = "";
 

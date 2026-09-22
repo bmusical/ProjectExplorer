@@ -12,7 +12,9 @@ Releases tagged `<version>` (no `v` prefix).
   stored, not uploaded. See `docs/SHARING_PHASE1.md` for the server database, the data flows,
   and how to run it on two machines. The sharing database is SQL Server: run
   `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql` to create `ProjectNestSharing`
-  and its stored procedures, then set `Sharing:ConnectionString`.
+  and its stored procedures. Local Development uses `ConnectionStrings:ControlPlane`
+  in `appsettings.Development.json` (`ProjectNestSharing` on `MIGHTYK10\SQLEXPRESS`).
+  `DefaultConnection` in that file is not the sharing store.
 
 ## [1.0.9] — 2026-09-19
 
