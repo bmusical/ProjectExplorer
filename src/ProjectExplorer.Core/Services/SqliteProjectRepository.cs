@@ -62,7 +62,8 @@ public class SqliteProjectRepository : IProjectRepository
                 IconKey TEXT NULL,
                 Created TEXT NOT NULL,
                 Modified TEXT NOT NULL,
-                SortOrder INTEGER NOT NULL DEFAULT 0
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                MetadataJson TEXT NULL
             );
             CREATE TABLE IF NOT EXISTS ProjectChildren (
                 Id TEXT PRIMARY KEY,
@@ -88,6 +89,10 @@ public class SqliteProjectRepository : IProjectRepository
         var cols = connection.Query<string>("SELECT name FROM pragma_table_info('ProjectChildren')").ToHashSet();
         if (!cols.Contains("OpenExternalOnly"))
             connection.Execute("ALTER TABLE ProjectChildren ADD COLUMN OpenExternalOnly INTEGER NOT NULL DEFAULT 0;");
+
+        var projectCols = connection.Query<string>("SELECT name FROM pragma_table_info('Projects')").ToHashSet();
+        if (!projectCols.Contains("MetadataJson"))
+            connection.Execute("ALTER TABLE Projects ADD COLUMN MetadataJson TEXT NULL;");
     }
 
     /// <summary>
@@ -159,8 +164,8 @@ public class SqliteProjectRepository : IProjectRepository
         {
             var project = projectList[i];
             await connection.ExecuteAsync("""
-                INSERT INTO Projects (Id, Name, Description, Color, IconKey, Created, Modified, SortOrder)
-                VALUES (@Id, @Name, @Description, @Color, @IconKey, @Created, @Modified, @SortOrder)
+                INSERT INTO Projects (Id, Name, Description, Color, IconKey, Created, Modified, SortOrder, MetadataJson)
+                VALUES (@Id, @Name, @Description, @Color, @IconKey, @Created, @Modified, @SortOrder, @MetadataJson)
                 """, ToProjectParams(project, i), transaction);
 
             await InsertChildrenAsync(connection, transaction, project.Id, project.Id, project.Children);
@@ -184,12 +189,12 @@ public class SqliteProjectRepository : IProjectRepository
             ?? await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Projects", transaction: transaction);
 
         await connection.ExecuteAsync("""
-            INSERT INTO Projects (Id, Name, Description, Color, IconKey, Created, Modified, SortOrder)
-            VALUES (@Id, @Name, @Description, @Color, @IconKey, @Created, @Modified, @SortOrder)
+            INSERT INTO Projects (Id, Name, Description, Color, IconKey, Created, Modified, SortOrder, MetadataJson)
+            VALUES (@Id, @Name, @Description, @Color, @IconKey, @Created, @Modified, @SortOrder, @MetadataJson)
             ON CONFLICT(Id) DO UPDATE SET
                 Name = excluded.Name, Description = excluded.Description, Color = excluded.Color,
                 IconKey = excluded.IconKey, Created = excluded.Created, Modified = excluded.Modified,
-                SortOrder = excluded.SortOrder
+                SortOrder = excluded.SortOrder, MetadataJson = excluded.MetadataJson
             """, ToProjectParams(project, sortOrder), transaction);
 
         // Replace just this project's children — the actual perf win over the JSON store, which
@@ -224,6 +229,7 @@ public class SqliteProjectRepository : IProjectRepository
         public string Created { get; set; } = "";
         public string Modified { get; set; } = "";
         public int SortOrder { get; set; }
+        public string? MetadataJson { get; set; }
     }
 
     private sealed class ProjectChildRow
@@ -252,7 +258,10 @@ public class SqliteProjectRepository : IProjectRepository
         Color = row.Color,
         IconKey = row.IconKey,
         Created = DateTime.TryParse(row.Created, out var created) ? created : DateTime.UtcNow,
-        Modified = DateTime.TryParse(row.Modified, out var modified) ? modified : DateTime.UtcNow
+        Modified = DateTime.TryParse(row.Modified, out var modified) ? modified : DateTime.UtcNow,
+        Metadata = string.IsNullOrEmpty(row.MetadataJson)
+            ? new Dictionary<string, string>()
+            : JsonSerializer.Deserialize<Dictionary<string, string>>(row.MetadataJson) ?? new()
     };
 
     private static object ToProjectParams(Project project, int sortOrder) => new
@@ -264,7 +273,8 @@ public class SqliteProjectRepository : IProjectRepository
         project.IconKey,
         Created = project.Created.ToString("O"),
         Modified = project.Modified.ToString("O"),
-        SortOrder = sortOrder
+        SortOrder = sortOrder,
+        MetadataJson = project.Metadata.Count > 0 ? JsonSerializer.Serialize(project.Metadata) : null
     };
 
     private static List<ProjectChild> BuildTree(Dictionary<string, List<ProjectChildRow>> byParent, Guid parentId)

@@ -3,6 +3,7 @@ using System.Text.Json;
 using AutoUpdaterDotNET;
 using ProjectExplorer.Core.Models;
 using ProjectExplorer.Core.Services;
+using ProjectExplorer.Core.Sharing;
 using ProjectExplorer.Shell;
 using ProjectExplorer.Shell.Services;
 using ProjectExplorer.WinForms.Helpers;
@@ -2853,6 +2854,72 @@ public partial class MainForm : Form
         SaveTreeState();
         SaveWindowBounds();
         base.OnFormClosing(e);
+    }
+
+    private void MenuFileShareProject_Click(object? sender, EventArgs e)
+    {
+        if (_currentProject == null)
+        {
+            MessageBox.Show(this,
+                "Select a project in the tree first. Sharing sends that one project.",
+                "Share Project", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var settings = _appSettingsManager.Load();
+        using var dlg = new ShareProjectDialog(
+            _currentProject,
+            settings.ShareServerUrl ?? "",
+            settings.ShareMachineLabel ?? "",
+            Application.ProductVersion,
+            SaveShareSettings);
+        dlg.ShowDialog(this);
+    }
+
+    private async void MenuFileReceiveShare_Click(object? sender, EventArgs e)
+    {
+        var settings = _appSettingsManager.Load();
+        using var dlg = new ReceiveShareDialog(
+            settings.ShareServerUrl ?? "",
+            settings.ShareMachineLabel ?? "",
+            SaveShareSettings,
+            async (egg, code, machine) =>
+            {
+                var project = NestEggImporter.Materialize(egg, code, _projectManager.Projects.Select(p => p.Name));
+                RefreshLicense();
+                var saved = await _projectManager.ImportSharedProjectAsync(project, _license);
+                try
+                {
+                    var latest = _appSettingsManager.Load();
+                    if (NestShareClient.TryParseServer(latest.ShareServerUrl, out var server))
+                    {
+                        await NestShareClient.CreateDefault().ReportImportedAsync(
+                            server, code, machine, "new project " + saved.Id);
+                    }
+                }
+                catch (NestShareException)
+                {
+                    // The project is already in the local nest. The sender's activity log
+                    // can miss this one receive; the import itself succeeded.
+                }
+                return saved;
+            });
+
+        if (dlg.ShowDialog(this) == DialogResult.OK && dlg.Imported != null)
+        {
+            RefreshLicense();
+            UpdateLicenseUi();
+            RefreshTreeView();
+            SelectTreeNodeByTag(TagProject + dlg.Imported.Id);
+        }
+    }
+
+    private void SaveShareSettings(string serverUrl, string machineLabel)
+    {
+        var settings = _appSettingsManager.Load();
+        settings.ShareServerUrl = serverUrl;
+        settings.ShareMachineLabel = machineLabel;
+        _appSettingsManager.Save(settings);
     }
 
     /// <summary>

@@ -64,6 +64,7 @@ To build a distributable installer, see [`docs/RELEASE.md`](docs/RELEASE.md).
 | `src/ProjectExplorer.Core` | Models, business logic (`ProjectManager`), SQLite persistence, licensing |
 | `src/ProjectExplorer.Shell` | Windows Shell P/Invoke (icons, Fluent window styling) |
 | `src/ProjectExplorer.WinForms` | The desktop app itself |
+| `src/ProjectNest.Server` | Phase-1 sharing server — see [`docs/SHARING_PHASE1.md`](docs/SHARING_PHASE1.md) |
 | `tools/KeyGen` | Internal license key generator — see [`tools/KeyGen/README.md`](tools/KeyGen/README.md) |
 | `tests/ProjectExplorer.Tests` | xUnit test suite |
 | `installer/` | Inno Setup installer script and build automation |
@@ -71,6 +72,13 @@ To build a distributable installer, see [`docs/RELEASE.md`](docs/RELEASE.md).
 
 `CLAUDE.md` has a deeper architecture writeup, roadmap, and target-user notes for anyone
 contributing to the codebase.
+
+## Sharing a project between two computers
+
+File ▸ Share Project… sends one project to a sharing server and gives you a short code.
+File ▸ Receive Shared Project… on another computer imports a copy. Paths are copied as stored;
+the files themselves are not uploaded. How to run the server, and the database behind it, is
+in [`docs/SHARING_PHASE1.md`](docs/SHARING_PHASE1.md).
 
 ## Help
 

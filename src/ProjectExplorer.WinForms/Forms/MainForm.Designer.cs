@@ -61,6 +61,8 @@ partial class MainForm
     private ToolStripMenuItem menuFileNewProject;
     private ToolStripMenuItem menuFileSearch;
     private ToolStripMenuItem menuFileExportMyData;
+    private ToolStripMenuItem menuFileShareProject;
+    private ToolStripMenuItem menuFileReceiveShare;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
@@ -277,9 +279,12 @@ partial class MainForm
         this.menuFileNewProject = new ToolStripMenuItem { Text = "New &Project...", ShortcutKeys = Keys.Control | Keys.N };
         this.menuFileSearch = new ToolStripMenuItem { Text = "&Search...", ShortcutKeys = Keys.Control | Keys.F };
         this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
+        this.menuFileShareProject = new ToolStripMenuItem { Text = "&Share Project..." };
+        this.menuFileReceiveShare = new ToolStripMenuItem { Text = "&Receive Shared Project..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
         this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
             menuFileNewProject, menuFileSearch, new ToolStripSeparator(),
+            menuFileShareProject, menuFileReceiveShare, new ToolStripSeparator(),
             menuFileExportMyData, new ToolStripSeparator(), menuFileExit
         });
 
@@ -323,6 +328,8 @@ partial class MainForm
         this.menuFileNewProject.Click += MenuFileNewProject_Click;
         this.menuFileSearch.Click += (s, e) => OpenSearchForm();
         this.menuFileExportMyData.Click += MenuFileExportMyData_Click;
+        this.menuFileShareProject.Click += MenuFileShareProject_Click;
+        this.menuFileReceiveShare.Click += MenuFileReceiveShare_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;

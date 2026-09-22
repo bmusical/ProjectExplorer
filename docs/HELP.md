@@ -146,6 +146,21 @@ If the main window's last saved position has drifted off every screen you curren
 connected (for example, it was on a second monitor that's since been unplugged), it's
 automatically moved back onto your primary screen the next time it becomes visible.
 
+## Sharing a project with another computer
+
+**File ▸ Share Project…** sends the project selected in the tree to a sharing server you run,
+and shows a short code. **File ▸ Receive Shared Project…** on the other computer imports a
+copy under a new name if you already have one with the same name. Folder and file paths are
+copied exactly as stored — the files themselves are not uploaded — so a path that exists only
+on the sending computer shows as unavailable on the receiving one. Web addresses are copied
+too, and those should still open.
+
+The server address is remembered on this computer. Nothing is shared until you use one of
+these commands. The steps for starting the server are in `docs/SHARING_PHASE1.md` in the
+source repository. A share code is the only key: anyone who has the code can fetch that
+project until it expires or you revoke it, so don't share a project that has secrets in its
+names or URLs.
+
 ## Exporting your data
 
 **File ▸ Export All My Data...** bundles everything Project Nest Explorer has written to
@@ -174,7 +189,8 @@ limit entirely.
 **Help ▸ Check for Updates…** checks for a newer version and offers to download it. Besides that
 and loading Web Resource previews you've added, the only other automatic network activity is
 checking whether a Web Resource is currently reachable (see **Unavailable folders, files, and web
-resources** above) — everything else works fully offline.
+resources** above). **File ▸ Share Project…** and **Receive Shared Project…** contact your
+sharing server only when you use them. Everything else works fully offline.
 
 ## Getting help
 

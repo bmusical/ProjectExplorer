@@ -18,11 +18,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProjectExplorer.Core\ProjectExplorer.Core.csproj" />
     <ProjectReference Include="..\..\src\ProjectExplorer.Shell\ProjectExplorer.Shell.csproj" />
+    <ProjectReference Include="..\..\src\ProjectNest.Server\ProjectNest.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>

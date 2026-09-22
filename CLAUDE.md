@@ -111,6 +111,7 @@ silently discard the first copy's edits this way (whichever repository is behind
 - `src/ProjectExplorer.Core/Services/FilePreviewHelper.cs` — classifies a file path as Image/Text/None for `FilePreviewPanel`, shared with `ImageFileHelper`
 - `src/ProjectExplorer.Core/Services/ResourceAvailabilityChecker.cs` — classifies a FolderReference/FileReference/WebResource's location (local disk vs. network/removable drive vs. web via `ResourceLocationKind`) and checks reachability (`AvailabilityStatus`); stateless, no caching. `MainForm.cs` owns the per-session cache, the "unavailable" grey-out/strikethrough styling, and the retry timer — see Availability & Broken References below
 - `src/ProjectExplorer.Core/Services/UserDataExportService.cs` — zips whichever of `projects.db`/`license.json`/`uisettings.json`/`appsettings.json` (plus any leftover `projects.json`/`.bak`/`.migrated` from an older version) currently exist in the storage directory into one file the user picks, for `File ▸ Export All My Data...` (`MainForm.cs`) — see Recently Shipped below
+- `src/ProjectExplorer.Core/Sharing/` and `src/ProjectNest.Server/` — phase-1 Nest Egg exchange (short code, SQLite `sharing.db`). See `docs/SHARING_PHASE1.md`
 - `src/ProjectExplorer.WinForms/Forms/WebResourcePreviewPanel.cs` — inline preview panel shown in place of the ListView when a WebResource tree node is selected (a ListView row for one routes here too, via `SelectTreeNodeByTag`); renders the URL with WebView2 (`Microsoft.Web.WebView2` package — requires the WebView2 Runtime, falls back to a message + "Open in External Browser" if it's missing), always offers "Open in External Browser"
 - `src/ProjectExplorer.Shell/Services/ShellIconProvider.cs` — Windows-only icon retrieval; shell32.dll P/Invoke in `Interop/ShellNativeMethods.cs`
 - `src/ProjectExplorer.Shell/Services/ModernWindowStyler.cs` — Windows 11 Fluent/dark-mode window styling via DWM P/Invoke in `Interop/DwmNativeMethods.cs`
@@ -274,7 +275,11 @@ nests, deeper Explorer integration, shell-extension DLLs, and the **"Engine / UX
 planning inventory"** (from branch `planning/engine-ux-boundaries`) that maps every current
 method to a UX / engine / infrastructure / platform-adapter boundary. Per the pointer under
 `## Roadmap` above, `docs/ROADMAP.md` takes precedence wherever it overlaps the near/medium-term
-backlog here — don't duplicate that content in this file.
+backlog here — don't duplicate that content in this file. The first online slice is the
+two-computer sharing experiment in [`docs/SHARING_PHASE1.md`](docs/SHARING_PHASE1.md)
+(`ProjectNest.Server`, plus File ▸ Share Project… / Receive Shared Project…). It hands one
+Nest Egg across a short code and imports it as a new local project. It is the learning
+server, not the finished sync design.
 
 The single contributor guardrail worth repeating here, because it constrains everyday work now:
 **keep new domain logic in `ProjectExplorer.Core` behind interfaces, keep WinForms/`System.Drawing`

@@ -33,6 +33,12 @@ public class Project
     public DateTime Modified { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// Optional key-value facts about the project itself. A received share stores
+    /// its source id, share code, and sender here. Not shown as a child node.
+    /// </summary>
+    public Dictionary<string, string> Metadata { get; set; } = new();
+
+    /// <summary>
     /// The top-level children of this Project — can be Collections or FolderReferences.
     /// </summary>
     public List<ProjectChild> Children { get; set; } = new();

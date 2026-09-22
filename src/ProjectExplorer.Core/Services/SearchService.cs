@@ -23,7 +23,13 @@ public static class SearchService
 
         foreach (var project in projects)
         {
-            var match = FindFirstMatch(query, [("Name", project.Name), ("Description", project.Description)]);
+            var projectFields = new List<(string Field, string? Value)>
+            {
+                ("Name", project.Name),
+                ("Description", project.Description)
+            };
+            projectFields.AddRange(MetadataFields(project.Metadata));
+            var match = FindFirstMatch(query, projectFields);
             if (match != null)
             {
                 results.Add(new SearchResult
