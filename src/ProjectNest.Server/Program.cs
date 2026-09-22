@@ -8,10 +8,22 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 
 var app = builder.Build();
 var options = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharingOptions>>().Value;
-var databasePath = string.IsNullOrWhiteSpace(options.DatabasePath)
-    ? Path.Combine(app.Environment.ContentRootPath, "data", "sharing.db")
-    : options.DatabasePath;
-var store = new SharingStore(databasePath);
+SharingStore store;
+if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+{
+    store = SharingStore.SqlServer(options.ConnectionString);
+    app.Logger.LogInformation("Sharing database is SQL Server (ProjectNestSharing).");
+}
+else
+{
+    var databasePath = string.IsNullOrWhiteSpace(options.DatabasePath)
+        ? Path.Combine(app.Environment.ContentRootPath, "data", "sharing.db")
+        : options.DatabasePath;
+    store = SharingStore.Sqlite(databasePath);
+    app.Logger.LogInformation(
+        "Sharing database is the local SQLite file {Path}. Set Sharing:ConnectionString after running Sql/001_CreateSharingDatabase.sql to use SQL Server.",
+        databasePath);
+}
 
 app.MapGet("/", () => Results.Text(
     "Project Nest sharing server is running.\nUse File > Share Project in Project Nest Explorer, pointed at this address.\n",

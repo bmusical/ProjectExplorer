@@ -11,7 +11,17 @@ public sealed class SharingOptions
     public int LifetimeDays { get; set; } = 7;
 
     /// <summary>
-    /// SQLite file for the sharing tables. Empty uses data/sharing.db under the content root.
+    /// SQL Server connection string for database ProjectNestSharing.
+    /// When this is set, the server calls the stored procedures created by
+    /// Sql/001_CreateSharingDatabase.sql. When it is empty, the server uses a
+    /// local SQLite file instead (tests, and a machine that has not created the
+    /// SQL Server database yet).
+    /// </summary>
+    public string ConnectionString { get; set; } = "";
+
+    /// <summary>
+    /// SQLite file used only when <see cref="ConnectionString"/> is empty.
+    /// Empty uses data/sharing.db under the content root.
     /// </summary>
     public string DatabasePath { get; set; } = "";
 
