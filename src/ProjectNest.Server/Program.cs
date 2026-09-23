@@ -32,6 +32,30 @@ else
         databasePath);
 }
 
+app.Use(async (context, next) =>
+{
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    try
+    {
+        await next();
+    }
+    finally
+    {
+        watch.Stop();
+        var path = context.Request.Path.Value ?? "/";
+        var kind = path is "/" or "/api/health" ? "Contact" : "Request";
+        app.Logger.LogInformation(
+            "{Kind} {Method} {Path}{Query} -> {Status} from {Remote} ({Elapsed} ms)",
+            kind,
+            context.Request.Method,
+            path,
+            context.Request.QueryString.Value,
+            context.Response.StatusCode,
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            watch.ElapsedMilliseconds);
+    }
+});
+
 app.MapGet("/", () => Results.Text(
     "Project Nest sharing server is running.\nUse File > Share Project in Project Nest Explorer, pointed at this address.\n",
     "text/plain"));
