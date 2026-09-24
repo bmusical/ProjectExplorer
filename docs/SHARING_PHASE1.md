@@ -14,7 +14,7 @@ This is the first slice of Version 2. The goal is something you can run yourself
    dotnet run --project src/ProjectNest.Server
    ```
 
-   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation. The startup log says it is using SQL Server via `ConnectionStrings:ControlPlane`. If that string and `Sharing:ConnectionString` are both empty, it falls back to a local SQLite file instead.
+   The server listens on `http://0.0.0.0:5088`. A browser on that machine can open `http://localhost:5088` and should see a one-line confirmation. The startup log says it is using SQL Server via `ConnectionStrings:ControlPlane`. If that string and `Sharing:ConnectionString` are both empty, it falls back to a local SQLite file instead. Each contact (`/` and `/api/health`) and each share request is written to that same console, including the path, status code, and the caller's address.
 
 3. If the other computer is on the same network, allow the port through Windows Firewall on the server machine:
 

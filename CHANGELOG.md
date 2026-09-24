@@ -6,6 +6,8 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- The sharing server writes each contact and each share request to its console: method, path, status, and caller address.
+
 ## [1.1.0] — 2026-09-23
 
 - **Share a project with another computer.** File ▸ Share Project… sends the selected project
