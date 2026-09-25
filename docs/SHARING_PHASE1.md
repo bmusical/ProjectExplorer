@@ -223,6 +223,25 @@ After a real send between two machines, the useful notes are:
 
 Those answers are the input to accounts, merge, and any later Blazor or MAUI host. They are not settled here.
 
+## Publishing to project-nest.com
+
+The public address is `https://project-nest.com`. Everleap hosts that site. The sharing server is not inside the desktop installer. GitHub Actions workflow **Deploy sharing server** (`.github/workflows/deploy-sharing.yml`) publishes `ProjectNest.Server` there when you run it from the Actions tab.
+
+Before the first run, add these repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `EVERLEAP_SITE` | Site name from Control Panel → Sites → Manage → Web Deploy |
+| `EVERLEAP_USERNAME` | Web Deploy user from that same publish profile |
+| `EVERLEAP_PASSWORD` | Web Deploy password |
+| `EVERLEAP_CONNECTION_STRING` | SQL connection for the sharing database on Everleap. End it with `Encrypt=yes;TrustServerCertificate=true` when the host certificate is self-signed |
+
+The workflow publishes a self-contained 32-bit build (Everleap app pools are 32-bit unless a Power Pack ticket enables 64-bit) and writes the connection string into `web.config` as `Sharing__ConnectionString`. Production does not read `appsettings.Development.json`. Without that secret the site would use a SQLite file on the web server. The workflow fails before publish if any of the four secrets is empty. It does not print the password.
+
+On the Everleap SQL database, run `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. Shared SQL often cannot `CREATE DATABASE`. Create the database in the panel, name it `ProjectNestSharing` when the panel allows that name, and run the rest of the script inside it. If the panel assigns a different name, set `Sharing__Database` to that name (the workflow currently sets it to `ProjectNestSharing`).
+
+HTTPS for `project-nest.com` is a panel step this workflow cannot do. Bind a certificate whose name is `project-nest.com` (Control Panel → Services → SSL Certificates). The root name and `www` are separate bindings. Until that certificate matches the name, the desktop app stays on the local server (`http://localhost:5088` or the LAN address). Pointing Share at `https://project-nest.com` before the certificate matches fails the TLS check.
+
 ## Left out on purpose
 
 - Accounts, passwords, and "this nest belongs to this person."
