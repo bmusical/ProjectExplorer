@@ -7,7 +7,7 @@ Releases tagged `<version>` (no `v` prefix).
 ## [Unreleased]
 
 - The sharing server writes each contact and each share request to its console: method, path, status, and caller address.
-- GitHub Actions workflow **Deploy sharing server** publishes `ProjectNest.Server` to the Everleap site for project-nest.com. Run it after the Web Deploy and SQL connection secrets are set. The desktop app still defaults to the local server until that site's certificate is for project-nest.com.
+- GitHub Actions workflow **Deploy sharing server** publishes `ProjectNest.Server` to the SmarterASP.net site for project-nest.com. Run it after the Web Deploy and SQL connection secrets are set. The desktop app still defaults to the local server until that site's certificate is for project-nest.com.
 
 ## [1.1.0] — 2026-09-23
 
