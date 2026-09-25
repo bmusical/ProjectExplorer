@@ -23,6 +23,7 @@ public class SharingSqlScriptTests
         var sql = File.ReadAllText(path);
 
         Assert.Contains("CREATE DATABASE ProjectNestSharing", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CallerAddress", sql, StringComparison.Ordinal);
         foreach (var procedure in new[]
         {
             "dbo.usp_Share_CodeExists",

@@ -40,7 +40,7 @@ internal sealed class SqliteShareDatabase : IShareDatabase
     public void CreateShare(
         Guid eggId, Guid shareId, Guid eventId, int schemaVersion, DateTime createdUtc, DateTime expiresUtc,
         string senderLabel, string projectName, Guid sourceProjectId, string payloadJson, string payloadSha256,
-        int byteLength, string code)
+        int byteLength, string code, string? callerAddress)
     {
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
@@ -75,7 +75,7 @@ internal sealed class SqliteShareDatabase : IShareDatabase
             ExpiresUtc = expiresUtc.ToString("O")
         }, transaction);
 
-        InsertEvent(connection, transaction, eventId, shareId, eggId, "Created", createdUtc, senderLabel, projectName);
+        InsertEvent(connection, transaction, eventId, shareId, eggId, "Created", createdUtc, senderLabel, projectName, callerAddress);
         transaction.Commit();
     }
 
@@ -92,48 +92,48 @@ internal sealed class SqliteShareDatabase : IShareDatabase
             """, new { Code = canonicalCode });
     }
 
-    public void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail)
+    public void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress)
     {
         using var connection = Open();
-        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, eventType, occurredUtc, machineLabel, detail);
+        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, eventType, occurredUtc, machineLabel, detail, callerAddress);
     }
 
-    public void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel)
+    public void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("UPDATE Shares SET FetchCount = FetchCount + 1 WHERE Id = @Id", new { Id = shareId.ToString() });
-        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Fetched", occurredUtc, machineLabel, null);
+        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Fetched", occurredUtc, machineLabel, null, callerAddress);
     }
 
-    public void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail)
+    public void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("UPDATE Shares SET ImportCount = ImportCount + 1 WHERE Id = @Id", new { Id = shareId.ToString() });
-        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Imported", occurredUtc, machineLabel, detail);
+        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Imported", occurredUtc, machineLabel, detail, callerAddress);
     }
 
-    public void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel)
+    public void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("UPDATE Shares SET RevokedUtc = @RevokedUtc WHERE Id = @Id",
             new { RevokedUtc = occurredUtc.ToString("O"), Id = shareId.ToString() });
-        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Revoked", occurredUtc, machineLabel, null);
+        InsertEvent(connection, null, Guid.NewGuid(), shareId, eggId, "Revoked", occurredUtc, machineLabel, null, callerAddress);
     }
 
     public IReadOnlyList<StoredEvent> ListEvents(Guid shareId)
     {
         using var connection = Open();
         return connection.Query<StoredEvent>(
-            "SELECT EventType, OccurredUtc, MachineLabel, Detail FROM ShareEvents WHERE ShareId = @ShareId ORDER BY OccurredUtc",
+            "SELECT EventType, OccurredUtc, MachineLabel, Detail, CallerAddress FROM ShareEvents WHERE ShareId = @ShareId ORDER BY OccurredUtc",
             new { ShareId = shareId.ToString() }).ToList();
     }
 
     private static void InsertEvent(SqliteConnection connection, SqliteTransaction? transaction,
-        Guid eventId, Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail)
+        Guid eventId, Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress)
     {
         connection.Execute("""
-            INSERT INTO ShareEvents (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
-            VALUES (@Id, @ShareId, @EggId, @EventType, @OccurredUtc, @MachineLabel, @Detail)
+            INSERT INTO ShareEvents (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
+            VALUES (@Id, @ShareId, @EggId, @EventType, @OccurredUtc, @MachineLabel, @Detail, @CallerAddress)
             """, new
         {
             Id = eventId.ToString(),
@@ -142,7 +142,8 @@ internal sealed class SqliteShareDatabase : IShareDatabase
             EventType = eventType,
             OccurredUtc = occurredUtc.ToString("O"),
             MachineLabel = machineLabel,
-            Detail = detail
+            Detail = detail,
+            CallerAddress = callerAddress
         }, transaction);
     }
 
@@ -179,7 +180,8 @@ internal sealed class SqliteShareDatabase : IShareDatabase
                 EventType TEXT NOT NULL,
                 OccurredUtc TEXT NOT NULL,
                 MachineLabel TEXT NULL,
-                Detail TEXT NULL
+                Detail TEXT NULL,
+                CallerAddress TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS IX_ShareEvents_ShareId ON ShareEvents(ShareId);
             """);

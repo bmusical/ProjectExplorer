@@ -62,7 +62,7 @@ app.MapGet("/", () => Results.Text(
 
 app.MapGet("/api/health", () => Results.Ok(new { service = "project-nest-sharing", phase = 1 }));
 
-app.MapPost("/api/shares", (PublishShareRequest? request) =>
+app.MapPost("/api/shares", (PublishShareRequest? request, HttpContext http) =>
 {
     if (request?.Egg == null)
         return Results.BadRequest(new ShareApiError { Error = "The request is missing the Nest Egg." });
@@ -84,21 +84,21 @@ app.MapPost("/api/shares", (PublishShareRequest? request) =>
     if (Encoding.UTF8.GetByteCount(json) > NestEggLimits.MaxJsonBytes)
         return Results.BadRequest(new ShareApiError { Error = $"The Nest Egg is larger than {NestEggLimits.MaxJsonBytes:N0} bytes." });
 
-    var published = store.Create(request.Egg, json, machineLabel, options.ExpiresFrom(DateTime.UtcNow));
+    var published = store.Create(request.Egg, json, machineLabel, options.ExpiresFrom(DateTime.UtcNow), CallerAddress(http));
     app.Logger.LogInformation("Share {Code} stored for {ProjectName} ({Bytes} bytes)",
         published.Code, published.ProjectName, published.ByteLength);
     return Results.Ok(published);
 });
 
-app.MapGet("/api/shares/{code}", (string code, string? machine) =>
-    Lookup(code, store.Preview, machine));
+app.MapGet("/api/shares/{code}", (string code, string? machine, HttpContext http) =>
+    Lookup(code, (canonical, label) => store.Preview(canonical, label, CallerAddress(http)), machine));
 
-app.MapGet("/api/shares/{code}/egg", (string code, string? machine, HttpResponse response) =>
+app.MapGet("/api/shares/{code}/egg", (string code, string? machine, HttpContext http, HttpResponse response) =>
 {
     if (!TryCanonical(code, out var canonical, out var error))
         return error!;
 
-    var lookup = store.Fetch(canonical, machine);
+    var lookup = store.Fetch(canonical, machine, CallerAddress(http));
     if (lookup.Status != ShareStatus.Available || lookup.Value == null)
         return StatusFor(lookup.Status, lookup.Error);
 
@@ -110,18 +110,18 @@ app.MapGet("/api/shares/{code}/egg", (string code, string? machine, HttpResponse
 app.MapGet("/api/shares/{code}/events", (string code) =>
     Lookup(code, (canonical, _) => store.Events(canonical), null));
 
-app.MapPost("/api/shares/{code}/events", (string code, ShareEventRequest? request) =>
+app.MapPost("/api/shares/{code}/events", (string code, ShareEventRequest? request, HttpContext http) =>
 {
     if (!ShareEventTypes.IsClientReportable(request?.EventType))
         return Results.BadRequest(new ShareApiError { Error = "Only an Imported event can be reported by a client." });
-    return Lookup(code, (canonical, machine) => store.ReportImported(canonical, machine ?? request?.MachineLabel, request?.Detail), request?.MachineLabel);
+    return Lookup(code, (canonical, machine) => store.ReportImported(canonical, machine ?? request?.MachineLabel, request?.Detail, CallerAddress(http)), request?.MachineLabel);
 });
 
-app.MapDelete("/api/shares/{code}", (string code, string? machine) =>
+app.MapDelete("/api/shares/{code}", (string code, string? machine, HttpContext http) =>
 {
     if (!TryCanonical(code, out var canonical, out var error))
         return error!;
-    var lookup = store.Revoke(canonical, machine);
+    var lookup = store.Revoke(canonical, machine, CallerAddress(http));
     if (lookup.Status != ShareStatus.Available)
         return StatusFor(lookup.Status, lookup.Error);
     app.Logger.LogInformation("Share {Code} revoked", ShareCodes.Format(canonical));
@@ -129,6 +129,8 @@ app.MapDelete("/api/shares/{code}", (string code, string? machine) =>
 });
 
 app.Run();
+
+static string? CallerAddress(HttpContext http) => http.Connection.RemoteIpAddress?.ToString();
 
 static SqlConnectionChoice? ResolveSqlConnection(SharingOptions options, IConfiguration configuration)
 {

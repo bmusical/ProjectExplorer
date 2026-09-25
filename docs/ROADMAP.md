@@ -18,7 +18,22 @@ Version 2 focuses on going online, making sharing between nests successful end t
 
 Nest Eggs are packages of information that can be shared from one nest to another. Version 2 covers both the packages and the supporting capabilities needed to make that sharing useful to the recipient, not just exporting a file.
 
-The first slice is a two-computer experiment, specified in [`SHARING_PHASE1.md`](SHARING_PHASE1.md). One project is packed as a Nest Egg, stored on a small sharing server, and imported on the other computer as a new project when someone enters a short code. Paths are copied as stored. File contents, accounts, and merging are left out so that using the slice can show what the package and the server tables need to become. For this slice the egg is the earlier `.peproj` handoff; a second format stays open only if a later slice needs one. `File ▸ Export All My Data...` remains a one-user personal-data export, not the sharing workflow.
+The first slice is a two-computer experiment, specified in [`SHARING_PHASE1.md`](SHARING_PHASE1.md). One project is packed as a Nest Egg, stored on a small sharing server, and imported on the other computer as a new project when someone enters a short code. Paths are copied as stored. File contents, accounts, and merging are left out so that using the slice can show what the package and the server tables need to become. For this slice the egg is the earlier `.peproj` handoff; a second format stays open only if a later slice needs one. `File ▸ Export All My Data...` remains a one-user personal-data export, not the sharing workflow. That slice has been run between two computers (1.1.0).
+
+### Version 2 order
+
+Work top to bottom. Each item is usable before the next one starts.
+
+1. **Host the sharing server** at `https://project-nest.com` on EVERLEAP, with the `ProjectNestSharing` database and SSL. The desktop share and receive boxes use that address. No port 5088.
+2. **Record the caller address** on each share event. The console already prints it. The row keeps it for the management site. The activity list shown to someone who has the code does not include it.
+3. **Staff membership and the management site** on `project-nest.com`. Staff sign in to see live shares, expiry, fetch and import counts, and to revoke a code. A share code does not open those pages.
+4. **Deny list**, staff-only, keyed by a caller address. Refusing a person, rather than one code or one address, waits until that person is a registered member.
+5. **Customer portal**, only for someone who registers for a hosted service. The desktop app keeps working with a license key and no website account. Receiving a code does not require a portal login.
+6. **Import from clipboard.** Paste a folder path or a URL and create the matching child.
+7. **Localization scaffolding.** Move UI strings into `Strings.resx`. No translations yet.
+8. **Explorer menu on a real path.** Host the Windows `IContextMenu` for a folder or file reference, as an Explorer submenu. Nest commands stay on the app menu.
+9. **Recent panel**, then a `.peproj` file export for an offline handoff.
+10. **Shell extension DLL** so File Explorer can add a folder or file to a nest. A small C++ in-proc server, separate from the menu host in step 8.
 
 ### Deeper Explorer integration
 

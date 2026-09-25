@@ -70,6 +70,7 @@ BEGIN
         OccurredUtc   DATETIME2(3)     NOT NULL,
         MachineLabel  NVARCHAR(80)     NULL,
         Detail        NVARCHAR(500)    NULL,
+        CallerAddress NVARCHAR(64)     NULL,
         CONSTRAINT FK_ShareEvents_Shares FOREIGN KEY (ShareId) REFERENCES dbo.Shares (Id),
         CONSTRAINT FK_ShareEvents_NestEggs FOREIGN KEY (EggId) REFERENCES dbo.NestEggs (Id)
     );
@@ -85,6 +86,10 @@ BEGIN
     CREATE INDEX IX_ShareEvents_ShareId_OccurredUtc
         ON dbo.ShareEvents (ShareId, OccurredUtc);
 END
+GO
+
+IF COL_LENGTH(N'dbo.ShareEvents', N'CallerAddress') IS NULL
+    ALTER TABLE dbo.ShareEvents ADD CallerAddress NVARCHAR(64) NULL;
 GO
 
 SET ANSI_NULLS ON;
@@ -132,7 +137,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Share_Create
     @PayloadJson      NVARCHAR(MAX),
     @PayloadSha256    CHAR(64),
     @ByteLength       INT,
-    @Code             NVARCHAR(8)
+    @Code             NVARCHAR(8),
+    @CallerAddress    NVARCHAR(64) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -152,9 +158,9 @@ BEGIN
             (@ShareId, @EggId, @Code, @CreatedUtc, @ExpiresUtc, 0, 0);
 
         INSERT INTO dbo.ShareEvents
-            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
+            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
         VALUES
-            (@EventId, @ShareId, @EggId, N'Created', @CreatedUtc, @SenderLabel, @ProjectName);
+            (@EventId, @ShareId, @EggId, N'Created', @CreatedUtc, @SenderLabel, @ProjectName, @CallerAddress);
 
         COMMIT TRANSACTION;
         RETURN 0;
@@ -215,7 +221,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_ShareEvent_Insert
     @EventType     NVARCHAR(20),
     @OccurredUtc   DATETIME2(3),
     @MachineLabel  NVARCHAR(80) = NULL,
-    @Detail        NVARCHAR(500) = NULL
+    @Detail        NVARCHAR(500) = NULL,
+    @CallerAddress NVARCHAR(64) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -223,9 +230,9 @@ BEGIN
 
     BEGIN TRY
         INSERT INTO dbo.ShareEvents
-            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
+            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
         VALUES
-            (@EventId, @ShareId, @EggId, @EventType, @OccurredUtc, @MachineLabel, @Detail);
+            (@EventId, @ShareId, @EggId, @EventType, @OccurredUtc, @MachineLabel, @Detail, @CallerAddress);
 
         RETURN 0;
     END TRY
@@ -248,7 +255,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Share_RecordFetch
     @EggId         UNIQUEIDENTIFIER,
     @EventId       UNIQUEIDENTIFIER,
     @OccurredUtc   DATETIME2(3),
-    @MachineLabel  NVARCHAR(80) = NULL
+    @MachineLabel  NVARCHAR(80) = NULL,
+    @CallerAddress NVARCHAR(64) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -262,9 +270,9 @@ BEGIN
         WHERE Id = @ShareId;
 
         INSERT INTO dbo.ShareEvents
-            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
+            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
         VALUES
-            (@EventId, @ShareId, @EggId, N'Fetched', @OccurredUtc, @MachineLabel, NULL);
+            (@EventId, @ShareId, @EggId, N'Fetched', @OccurredUtc, @MachineLabel, NULL, @CallerAddress);
 
         COMMIT TRANSACTION;
         RETURN 0;
@@ -291,7 +299,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Share_RecordImport
     @EventId       UNIQUEIDENTIFIER,
     @OccurredUtc   DATETIME2(3),
     @MachineLabel  NVARCHAR(80) = NULL,
-    @Detail        NVARCHAR(500) = NULL
+    @Detail        NVARCHAR(500) = NULL,
+    @CallerAddress NVARCHAR(64) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -305,9 +314,9 @@ BEGIN
         WHERE Id = @ShareId;
 
         INSERT INTO dbo.ShareEvents
-            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
+            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
         VALUES
-            (@EventId, @ShareId, @EggId, N'Imported', @OccurredUtc, @MachineLabel, @Detail);
+            (@EventId, @ShareId, @EggId, N'Imported', @OccurredUtc, @MachineLabel, @Detail, @CallerAddress);
 
         COMMIT TRANSACTION;
         RETURN 0;
@@ -334,7 +343,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Share_Revoke
     @EggId         UNIQUEIDENTIFIER,
     @EventId       UNIQUEIDENTIFIER,
     @OccurredUtc   DATETIME2(3),
-    @MachineLabel  NVARCHAR(80) = NULL
+    @MachineLabel  NVARCHAR(80) = NULL,
+    @CallerAddress NVARCHAR(64) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -355,9 +365,9 @@ BEGIN
         END
 
         INSERT INTO dbo.ShareEvents
-            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail)
+            (Id, ShareId, EggId, EventType, OccurredUtc, MachineLabel, Detail, CallerAddress)
         VALUES
-            (@EventId, @ShareId, @EggId, N'Revoked', @OccurredUtc, @MachineLabel, NULL);
+            (@EventId, @ShareId, @EggId, N'Revoked', @OccurredUtc, @MachineLabel, NULL, @CallerAddress);
 
         COMMIT TRANSACTION;
         RETURN 0;

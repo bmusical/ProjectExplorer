@@ -21,7 +21,7 @@ public sealed class SharingStore
     public static SharingStore SqlServer(string connectionString, string? database = null) =>
         new(new SqlShareDatabase(SharingConnection.UseDatabase(connectionString, database)));
 
-    public PublishedShare Create(NestEggDocument egg, string canonicalJson, string machineLabel, DateTime expiresUtc)
+    public PublishedShare Create(NestEggDocument egg, string canonicalJson, string machineLabel, DateTime expiresUtc, string? callerAddress = null)
     {
         var now = DateTime.UtcNow;
         var eggId = Guid.NewGuid();
@@ -33,7 +33,7 @@ public sealed class SharingStore
         _database.CreateShare(
             eggId, shareId, eventId, egg.SchemaVersion, now, expiresUtc,
             machineLabel, egg.Project.Name, egg.Project.SourceId, canonicalJson, hash,
-            Encoding.UTF8.GetByteCount(canonicalJson), code);
+            Encoding.UTF8.GetByteCount(canonicalJson), code, TrimCaller(callerAddress));
 
         return new PublishedShare
         {
@@ -45,15 +45,15 @@ public sealed class SharingStore
         };
     }
 
-    public ShareLookup<SharePreview> Preview(string canonicalCode, string? machineLabel)
+    public ShareLookup<SharePreview> Preview(string canonicalCode, string? machineLabel, string? callerAddress = null)
     {
-        var row = Find(canonicalCode);
+        var row = Find(canonicalCode, callerAddress);
         if (row.Status != ShareStatus.Available || row.Value == null)
             return new ShareLookup<SharePreview>(row.Status, null, row.Error);
 
         var egg = NestEggCodec.Parse(row.Value.PayloadJson);
         var summary = NestEggCodec.Summarize(egg);
-        Log(row.Value, ShareEventTypes.Previewed, machineLabel, null);
+        Log(row.Value, ShareEventTypes.Previewed, machineLabel, null, callerAddress);
         return new ShareLookup<SharePreview>(ShareStatus.Available, new SharePreview
         {
             Code = ShareCodes.Format(row.Value.Code),
@@ -74,31 +74,31 @@ public sealed class SharingStore
         }, null);
     }
 
-    public ShareLookup<EggPayload> Fetch(string canonicalCode, string? machineLabel)
+    public ShareLookup<EggPayload> Fetch(string canonicalCode, string? machineLabel, string? callerAddress = null)
     {
-        var row = Find(canonicalCode);
+        var row = Find(canonicalCode, callerAddress);
         if (row.Status != ShareStatus.Available || row.Value == null)
             return new ShareLookup<EggPayload>(row.Status, null, row.Error);
 
-        _database.RecordFetch(Guid.Parse(row.Value.ShareId), Guid.Parse(row.Value.EggId), DateTime.UtcNow, TrimLabel(machineLabel));
+        _database.RecordFetch(Guid.Parse(row.Value.ShareId), Guid.Parse(row.Value.EggId), DateTime.UtcNow, TrimLabel(machineLabel), TrimCaller(callerAddress));
         return new ShareLookup<EggPayload>(ShareStatus.Available, new EggPayload(row.Value.PayloadJson, row.Value.PayloadSha256), null);
     }
 
-    public ShareLookup<bool> ReportImported(string canonicalCode, string? machineLabel, string? detail)
+    public ShareLookup<bool> ReportImported(string canonicalCode, string? machineLabel, string? detail, string? callerAddress = null)
     {
-        var row = Find(canonicalCode);
+        var row = Find(canonicalCode, callerAddress);
         if (row.Status != ShareStatus.Available || row.Value == null)
             return new ShareLookup<bool>(row.Status, false, row.Error);
 
         _database.RecordImport(
             Guid.Parse(row.Value.ShareId), Guid.Parse(row.Value.EggId), DateTime.UtcNow,
-            TrimLabel(machineLabel), TrimDetail(detail));
+            TrimLabel(machineLabel), TrimDetail(detail), TrimCaller(callerAddress));
         return new ShareLookup<bool>(ShareStatus.Available, true, null);
     }
 
     public ShareLookup<IReadOnlyList<ShareEventRecord>> Events(string canonicalCode)
     {
-        var row = Find(canonicalCode, recordRejection: false);
+        var row = Find(canonicalCode, callerAddress: null, recordRejection: false);
         if (row.Value == null)
             return new ShareLookup<IReadOnlyList<ShareEventRecord>>(row.Status, null, row.Error);
 
@@ -113,19 +113,26 @@ public sealed class SharingStore
         return new ShareLookup<IReadOnlyList<ShareEventRecord>>(ShareStatus.Available, events, null);
     }
 
-    public ShareLookup<bool> Revoke(string canonicalCode, string? machineLabel)
+    public ShareLookup<bool> Revoke(string canonicalCode, string? machineLabel, string? callerAddress = null)
     {
-        var row = Find(canonicalCode, recordRejection: false);
+        var row = Find(canonicalCode, callerAddress, recordRejection: false);
         if (row.Status == ShareStatus.NotFound || row.Value == null)
             return new ShareLookup<bool>(ShareStatus.NotFound, false, row.Error);
         if (row.Value.RevokedUtc != null)
             return new ShareLookup<bool>(ShareStatus.Revoked, false, "This share was already revoked.");
 
-        _database.Revoke(Guid.Parse(row.Value.ShareId), Guid.Parse(row.Value.EggId), DateTime.UtcNow, TrimLabel(machineLabel));
+        _database.Revoke(Guid.Parse(row.Value.ShareId), Guid.Parse(row.Value.EggId), DateTime.UtcNow, TrimLabel(machineLabel), TrimCaller(callerAddress));
         return new ShareLookup<bool>(ShareStatus.Available, true, null);
     }
 
-    private ShareLookup<StoredShare> Find(string canonicalCode, bool recordRejection = true)
+    internal IReadOnlyList<StoredEvent> ReadEvents(string canonicalCode)
+    {
+        var row = _database.FindByCode(canonicalCode);
+        if (row == null) return [];
+        return _database.ListEvents(Guid.Parse(row.ShareId));
+    }
+
+    private ShareLookup<StoredShare> Find(string canonicalCode, string? callerAddress, bool recordRejection = true)
     {
         var row = _database.FindByCode(canonicalCode);
         if (row == null)
@@ -134,25 +141,25 @@ public sealed class SharingStore
         if (row.RevokedUtc != null)
         {
             if (recordRejection)
-                Log(row, ShareEventTypes.Rejected, null, "revoked");
+                Log(row, ShareEventTypes.Rejected, null, "revoked", callerAddress);
             return new ShareLookup<StoredShare>(ShareStatus.Revoked, row, "This share was revoked.");
         }
 
         if (DateTime.UtcNow >= ParseUtc(row.ExpiresUtc))
         {
             if (recordRejection)
-                Log(row, ShareEventTypes.Rejected, null, "expired");
+                Log(row, ShareEventTypes.Rejected, null, "expired", callerAddress);
             return new ShareLookup<StoredShare>(ShareStatus.Expired, row, "This share has expired.");
         }
 
         return new ShareLookup<StoredShare>(ShareStatus.Available, row, null);
     }
 
-    private void Log(StoredShare row, string eventType, string? machineLabel, string? detail)
+    private void Log(StoredShare row, string eventType, string? machineLabel, string? detail, string? callerAddress)
     {
         _database.InsertEvent(
             Guid.Parse(row.ShareId), Guid.Parse(row.EggId), eventType, DateTime.UtcNow,
-            TrimLabel(machineLabel), TrimDetail(detail));
+            TrimLabel(machineLabel), TrimDetail(detail), TrimCaller(callerAddress));
     }
 
     private static DateTime ParseUtc(string text)
@@ -168,6 +175,13 @@ public sealed class SharingStore
         return trimmed.Length <= NestEggLimits.MaxMachineLabelLength
             ? trimmed
             : trimmed[..NestEggLimits.MaxMachineLabelLength];
+    }
+
+    private static string? TrimCaller(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return trimmed.Length <= 64 ? trimmed : trimmed[..64];
     }
 
     private static string? TrimDetail(string? value)
