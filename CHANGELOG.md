@@ -7,6 +7,7 @@ Releases tagged `<version>` (no `v` prefix).
 ## [Unreleased]
 
 - The sharing server writes each contact and each share request to its console: method, path, status, and caller address.
+- Each share event also stores that caller address. The activity list a share code can read does not include it.
 
 ## [1.1.0] — 2026-09-23
 

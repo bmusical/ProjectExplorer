@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ProjectExplorer.Tests" />
     <ProjectReference Include="..\ProjectExplorer.Core\ProjectExplorer.Core.csproj" />
   </ItemGroup>
 
