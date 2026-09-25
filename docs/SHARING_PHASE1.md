@@ -223,6 +223,26 @@ After a real send between two machines, the useful notes are:
 
 Those answers are the input to accounts, merge, and any later Blazor or MAUI host. They are not settled here.
 
+## Publishing to project-nest.com
+
+The public address is `https://project-nest.com`. SmarterASP.net hosts that site. The sharing server is not inside the desktop installer. GitHub Actions workflow **Deploy sharing server** (`.github/workflows/deploy-sharing.yml`) publishes `ProjectNest.Server` there when you run it from the Actions tab.
+
+Enable Web Deploy first: Control Panel → Websites → the site → Manage Website → VS Webdeploy. Copy the values from that page into these repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `SMARTERASP_SITE` | Site/Application name, for example `username-001-site1` |
+| `SMARTERASP_SERVICE_URL` | Service URL, for example `https://winxxxx.site4now.net:8172/MsDeploy.axd?site=username-001-site1` |
+| `SMARTERASP_USERNAME` | Web Deploy user, for example `username-001` |
+| `SMARTERASP_PASSWORD` | Web Deploy password |
+| `SMARTERASP_CONNECTION_STRING` | SQL connection from Database Manager → MSSQL Manager. End it with `Encrypt=yes;TrustServerCertificate=true` when the host certificate is self-signed |
+
+The workflow publishes a self-contained 64-bit build, because the SmarterASP server may not have the .NET 10 runtime, and writes the connection string into `web.config` as `Sharing__ConnectionString`. Production does not read `appsettings.Development.json`. Without that secret the site would use a SQLite file on the web server. The workflow fails before publish if any of the five secrets is empty. It does not print the password. Web Deploy follows SmarterASP's own flags: allow the host certificate, take the site offline during the sync, and do not delete files already on the site.
+
+On the SmarterASP SQL database, run `src/ProjectNest.Server/Sql/001_CreateSharingDatabase.sql`. Shared SQL often cannot `CREATE DATABASE`. Create the database in the panel, name it `ProjectNestSharing` when the panel allows that name, and run the rest of the script inside it. If the panel assigns a different name, set `Sharing__Database` to that name (the workflow currently sets it to `ProjectNestSharing`).
+
+Point `project-nest.com` at this SmarterASP site and bind a certificate for that name in the control panel. Until HTTPS for that name succeeds, the desktop app stays on the local server (`http://localhost:5088` or the LAN address).
+
 ## Left out on purpose
 
 - Accounts, passwords, and "this nest belongs to this person."
