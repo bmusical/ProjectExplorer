@@ -73,7 +73,10 @@ app.MapPost("/api/shares", (PublishShareRequest? request) =>
         machineLabel = NestEggCodec.RequireMachineLabel(request.MachineLabel);
         request.Egg.Source ??= new NestEggSource();
         request.Egg.Source.MachineLabel = machineLabel;
-        NestEggCodec.Validate(request.Egg);
+        if (NestEggOutline.IsOutline(request.Egg))
+            NestEggOutline.Validate(request.Egg);
+        else
+            NestEggCodec.Validate(request.Egg);
     }
     catch (NestEggFormatException ex)
     {

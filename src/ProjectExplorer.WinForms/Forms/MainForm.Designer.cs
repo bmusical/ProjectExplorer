@@ -63,6 +63,7 @@ partial class MainForm
     private ToolStripMenuItem menuFileExportMyData;
     private ToolStripMenuItem menuFileShareProject;
     private ToolStripMenuItem menuFileReceiveShare;
+    private ToolStripMenuItem menuFileImportNestEgg;
     private ToolStripMenuItem menuFileExit;
     private ToolStripMenuItem menuView;
     private ToolStripMenuItem menuViewDetails;
@@ -281,10 +282,11 @@ partial class MainForm
         this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
         this.menuFileShareProject = new ToolStripMenuItem { Text = "&Share Project..." };
         this.menuFileReceiveShare = new ToolStripMenuItem { Text = "&Receive Shared Project..." };
+        this.menuFileImportNestEgg = new ToolStripMenuItem { Text = "Nest &Import..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
         this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
             menuFileNewProject, menuFileSearch, new ToolStripSeparator(),
-            menuFileShareProject, menuFileReceiveShare, new ToolStripSeparator(),
+            menuFileShareProject, menuFileReceiveShare, menuFileImportNestEgg, new ToolStripSeparator(),
             menuFileExportMyData, new ToolStripSeparator(), menuFileExit
         });
 
@@ -330,6 +332,7 @@ partial class MainForm
         this.menuFileExportMyData.Click += MenuFileExportMyData_Click;
         this.menuFileShareProject.Click += MenuFileShareProject_Click;
         this.menuFileReceiveShare.Click += MenuFileReceiveShare_Click;
+        this.menuFileImportNestEgg.Click += MenuFileImportNestEgg_Click;
         this.menuFileExit.Click += (s, e) => Close();
         this.menuProjectNewCollection.Click += MenuProjectNewCollection_Click;
         this.menuProjectAddFolder.Click += MenuProjectAddFolder_Click;
