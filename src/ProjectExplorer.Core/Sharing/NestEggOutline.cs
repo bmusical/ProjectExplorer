@@ -1,10 +1,10 @@
 namespace ProjectExplorer.Core.Sharing;
 
 /// <summary>
-/// The outline profile of a schema-1 Nest Egg: a project made only of empty
-/// collections. Identified by <see cref="NestEggSource.AppVersion"/> equal to
-/// <see cref="ProfileVersion"/>. A later egg that hangs resources on those
-/// collections uses a different app version and is not checked here.
+/// Nest Import's collections-only profile. Identified by
+/// <see cref="NestEggSource.AppVersion"/> equal to <see cref="ProfileVersion"/>.
+/// A later egg that hangs resources on those collections uses a different app
+/// version and is not checked here.
 /// </summary>
 public static class NestEggOutline
 {
@@ -40,87 +40,110 @@ public static class NestEggOutline
             .GroupBy(n => n.ParentSourceId)
             .ToDictionary(g => g.Key, g => g.OrderBy(n => n.SortOrder).ToList());
 
-        CheckSiblings(childrenByParent, project.SourceId, parentRole: null);
+        CheckSiblings(childrenByParent, project.SourceId, parentRole: null, underProject: true);
         foreach (var node in nodes)
         {
-            var role = node.Metadata[RoleMetadataKey];
+            var role = RoleOf(node);
             if (role == "beat" && childrenByParent.ContainsKey(node.SourceId))
                 throw new NestEggFormatException("A beat cannot contain other collections.");
 
-            if (node.ParentSourceId == project.SourceId)
-            {
-                if (role != "chapter")
-                    throw new NestEggFormatException("The project's children are chapters.");
-            }
-            else if (!byId.TryGetValue(node.ParentSourceId, out var parent))
-            {
-                throw new NestEggFormatException("An item points at a parent that is not in the Nest Egg.");
-            }
-            else
-            {
-                var parentRole = parent.Metadata[RoleMetadataKey];
-                switch (role)
-                {
-                    case "chapter":
-                        throw new NestEggFormatException("A chapter's parent is the project.");
-                    case "section" when parentRole != "chapter":
-                        throw new NestEggFormatException("A section's parent is a chapter.");
-                    case "beat" when parentRole is not ("chapter" or "section"):
-                        throw new NestEggFormatException("A beat's parent is a chapter or a section.");
-                }
-            }
+            if (role != null)
+                CheckRoleParent(node, role, project.SourceId, byId);
 
-            CheckSiblings(childrenByParent, node.SourceId, parentRole: role);
+            CheckSiblings(childrenByParent, node.SourceId, role, underProject: false);
         }
     }
 
     private static void ValidateCollection(NestEggNode node, HashSet<string> keys)
     {
-        if (!string.Equals(node.ChildType, "collection", StringComparison.Ordinal))
-            throw new NestEggFormatException("An outline Nest Egg can contain only collections.");
         if (!string.IsNullOrEmpty(node.RealPath) || !string.IsNullOrEmpty(node.Url) || !string.IsNullOrEmpty(node.FilePath))
             throw new NestEggFormatException("An outline collection cannot carry a path or URL.");
         if (node.OpenExternalOnly)
             throw new NestEggFormatException("An outline collection cannot be set to open in an external browser.");
 
-        Require(node, ProfileMetadataKey, ProfileMetadataValue,
-            "An outline collection needs metadata outline.profile = collections-only.");
+        foreach (var metaKey in node.Metadata.Keys)
+        {
+            if (metaKey.StartsWith(SharedImportMetadata.Prefix, StringComparison.Ordinal))
+                throw new NestEggFormatException("An outline collection cannot carry shared. metadata.");
+        }
 
-        var role = Require(node, RoleMetadataKey, expected: null,
-            "An outline collection needs a role of chapter, section, or beat.");
-        if (role is not ("chapter" or "section" or "beat"))
-            throw new NestEggFormatException("An outline collection needs a role of chapter, section, or beat.");
+        if (node.Metadata.TryGetValue(ProfileMetadataKey, out var profile)
+            && !string.IsNullOrEmpty(profile)
+            && !string.Equals(profile, ProfileMetadataValue, StringComparison.Ordinal))
+            throw new NestEggFormatException("outline.profile must be collections-only.");
 
-        var key = Require(node, KeyMetadataKey, expected: null, "An outline collection needs an outline.key.");
-        if (!IsOutlineKey(key))
-            throw new NestEggFormatException(
-                $"The outline key '{key}' must be a lowercase slug, 1–64 characters, with single hyphens.");
-        if (!keys.Add(key))
-            throw new NestEggFormatException($"Two collections share the outline key '{key}'.");
+        var role = RoleOf(node);
+        if (role != null && role is not ("chapter" or "section" or "beat"))
+            throw new NestEggFormatException("An outline.role is chapter, section, or beat.");
 
-        if (node.Metadata.Count != 3)
-            throw new NestEggFormatException(
-                "An outline collection's metadata is only outline.profile, outline.role, and outline.key.");
+        if (node.Metadata.TryGetValue(KeyMetadataKey, out var key) && !string.IsNullOrEmpty(key))
+        {
+            if (!IsOutlineKey(key))
+                throw new NestEggFormatException(
+                    $"The outline key '{key}' must be a lowercase slug, 1–64 characters, with single hyphens.");
+            if (!keys.Add(key))
+                throw new NestEggFormatException($"Two collections share the outline key '{key}'.");
+        }
+    }
+
+    private static void CheckRoleParent(
+        NestEggNode node,
+        string role,
+        Guid projectId,
+        Dictionary<Guid, NestEggNode> byId)
+    {
+        if (node.ParentSourceId == projectId)
+        {
+            if (role != "chapter")
+                throw new NestEggFormatException(
+                    "A collection directly under the project, when it has an outline.role, is a chapter.");
+            return;
+        }
+
+        if (!byId.TryGetValue(node.ParentSourceId, out var parent))
+            throw new NestEggFormatException("An item points at a parent that is not in the Nest Egg.");
+
+        var parentRole = RoleOf(parent);
+        switch (role)
+        {
+            case "chapter":
+                throw new NestEggFormatException("A chapter's parent is the project.");
+            case "section" when parentRole != "chapter":
+                throw new NestEggFormatException("A section's parent is a chapter.");
+            case "beat" when parentRole is not ("chapter" or "section"):
+                throw new NestEggFormatException("A beat's parent is a chapter or a section.");
+        }
     }
 
     private static void CheckSiblings(
         Dictionary<Guid, List<NestEggNode>> childrenByParent,
         Guid parentId,
-        string? parentRole)
+        string? parentRole,
+        bool underProject)
     {
         if (!childrenByParent.TryGetValue(parentId, out var kids))
             return;
 
-        var roles = kids.Select(k => k.Metadata[RoleMetadataKey]).Distinct(StringComparer.Ordinal).ToList();
+        var specified = kids
+            .Select(RoleOf)
+            .Where(r => r != null)
+            .Select(r => r!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (underProject && specified.Any(r => r != "chapter"))
+            throw new NestEggFormatException(
+                "A collection directly under the project, when it has an outline.role, is a chapter.");
+
         switch (parentRole)
         {
-            case null when roles.Any(r => r != "chapter"):
-                throw new NestEggFormatException("The project's children are chapters.");
-            case "chapter" when roles.Count > 1:
+            case "chapter" when specified.Count > 1:
                 throw new NestEggFormatException("A chapter's children are all sections or all beats.");
-            case "section" when roles.Any(r => r != "beat"):
+            case "chapter" when specified.Any(r => r is not ("section" or "beat")):
+                throw new NestEggFormatException("A chapter's children are sections or beats.");
+            case "section" when specified.Any(r => r != "beat"):
                 throw new NestEggFormatException("A section's children are beats.");
-            case "beat":
+            case "beat" when kids.Count > 0:
                 throw new NestEggFormatException("A beat cannot contain other collections.");
         }
 
@@ -132,13 +155,11 @@ public static class NestEggOutline
         }
     }
 
-    private static string Require(NestEggNode node, string key, string? expected, string message)
+    private static string? RoleOf(NestEggNode node)
     {
-        if (!node.Metadata.TryGetValue(key, out var value) || string.IsNullOrEmpty(value))
-            throw new NestEggFormatException(message);
-        if (expected != null && !string.Equals(value, expected, StringComparison.Ordinal))
-            throw new NestEggFormatException(message);
-        return value;
+        if (!node.Metadata.TryGetValue(RoleMetadataKey, out var role) || string.IsNullOrEmpty(role))
+            return null;
+        return role;
     }
 
     private static bool IsOutlineKey(string key)

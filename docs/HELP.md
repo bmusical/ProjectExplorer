@@ -166,7 +166,8 @@ names or URLs.
 **File ▸ Nest Import…** reads a Nest Egg file you already have — a `.nestegg.json`, or any
 `.json` file in that format — and adds it as a new project. Nothing already in your nest is
 replaced. If you already have a project with the same name, the new one is named with
-" (shared)" on the end. Importing the same file again is another copy.
+" (2)" on the end. Importing the same file again is another copy. No share code is
+used.
 
 An outline file is a tree of empty collections: the chapters, sections, and beats of a video,
 with no folders, files, or web links yet. How to write that file is `docs/NEST_IMPORT.md`

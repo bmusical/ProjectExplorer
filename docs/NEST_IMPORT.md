@@ -51,22 +51,20 @@ The worked example is [`examples/video-chapter-outline.nestegg.json`](examples/v
 | `schemaVersion` | `1`. Any other value is rejected. |
 | `kind` | `project-nest-egg`. Any other value is rejected. |
 | `createdUtc` | When this file was written, UTC, ISO-8601, with a `Z`. |
-| `source.machineLabel` | `outliner`. Required. 1–80 characters after trimming. |
-| `source.appVersion` | `outline-1`. This marks the profile. The sharing server does not read it. It is not stored on the imported project. |
+| `source.machineLabel` | Required. 1–80 characters after trimming. The video tool uses `outliner`. |
+| `source.appVersion` | `outline-1` for this version. That marks the file as collections only. It is not stored on the imported project. |
 
 ## Project
 
 | Field | Rule |
 |---|---|
 | `sourceId` | A new GUID for this file. Not `00000000-0000-0000-0000-000000000000`. |
-| `name` | The video title. Required after trimming. 1–200 characters. This is the project label in the tree. |
+| `name` | The project name. Required after trimming. 1–200 characters. This is the label in the tree. For a video, use the video title. |
 | `description` | Optional one-paragraph note (logline, who the video is for). Omit or `null` when there is nothing to say. Max 4,000 characters. |
 | `color` | `null` or omit. |
 | `iconKey` | `null` or omit. |
 | `createdUtc`, `modifiedUtc` | UTC timestamps for this file. Use the same instant as the envelope `createdUtc` unless you have a real earlier draft time. |
-| `nodes` | The flat collection list. May be empty only for a title with no chapters yet. A finished outline has at least one chapter. |
-
-There is no metadata bag on the project. Profile markers live on each collection.
+| `nodes` | The flat collection list. May be empty. A finished outline has at least one collection. |
 
 ## Collections
 
@@ -97,46 +95,44 @@ Every element of `nodes` is one collection. The list is a preorder walk: a colle
 | Field | Rule |
 |---|---|
 | `sourceId` | A new GUID, unique in this file, different from `project.sourceId`. |
-| `parentSourceId` | The project's `sourceId` for a chapter. Otherwise the parent collection's `sourceId`. |
+| `parentSourceId` | The project's `sourceId` for a top-level collection. Otherwise the parent collection's `sourceId`. |
 | `childType` | `collection` only. `folderReference`, `fileReference`, and `webResource` are valid in a full Nest Egg and are forbidden in this profile. |
 | `sortOrder` | `0`, `1`, `2`, … among **siblings**. Restart at `0` for each parent. Unique within the parent. The first sibling is the first thing the viewer hits. |
-| `name` | The heading shown in the tree. Required after trimming. 1–200 characters. One line. If the heading includes a number ("1. Cold open"), that number must agree with `sortOrder` (`0` is chapter 1, or section 1, or beat 1). |
+| `name` | The heading shown in the tree. Required after trimming. 1–200 characters. One line. |
 | `displayName` | `null` or omit. The tree uses `name` for collections. |
-| `description` | Optional note for this branch: what the chapter has to accomplish, not the script. Omit or `null` when empty. Max 4,000 characters. Shown as the tooltip. |
+| `description` | Optional note for this branch. Omit or `null` when empty. Max 4,000 characters. Shown as the tooltip. |
 | `color` | `null` or omit. |
 | `realPath`, `url`, `filePath` | `null` or omit. |
 | `openExternalOnly` | `false` or omit. |
-| `metadata` | The three `outline.*` entries below. No other keys in this profile. |
+| `metadata` | Optional. A general outline can omit it. Do not use keys that start with `shared.` |
 
 Do not nest a `nodes` array inside a collection. Parent and child are linked only by `parentSourceId`.
 
-### `outline.profile`
+Nesting depth is not capped, beyond the 5,000-node limit. A video outline should stop at three levels under the project. The importer does not require that.
 
-Every collection's metadata contains `outline.profile` = `collections-only`.
+### Optional metadata
 
-Import copies metadata onto the collection. This key is how a later tool recognizes an outline branch after the egg's ids have been replaced. Keys that start with `shared.` are stripped the next time that project is shared onward; `outline.` keys are kept. Do not invent `shared.` keys.
+Import copies metadata onto the collection. Omit the whole object when there is nothing to record.
 
-### `outline.role`
+| Key | When to write it |
+|---|---|
+| `outline.profile` | `collections-only`, if you want the branch marked after import. |
+| `outline.role` | `chapter`, `section`, or `beat`. The video tool writes this. A general outline leaves it off. |
+| `outline.key` | A stable slug so a later pass can find the branch after ids are replaced. |
 
-One of `chapter`, `section`, `beat`.
+When `outline.role` is set, these rules apply to the nodes that have it:
 
 - `chapter` — parent is the project.
 - `section` — parent role is `chapter`.
 - `beat` — parent role is `chapter` or `section`, and this collection has no children.
+- A chapter's children that have roles are all sections, or all beats. Do not mix them.
+- A section's children that have roles are beats.
 
-A chapter's children are all sections, or all beats, or there are none. Do not mix sections and beats under one chapter. A section's children are all beats, or there are none. A beat has no child collections.
+When `outline.key` is set:
 
-Three levels under the project is the maximum this profile uses: chapter, then section, then beat. Stop earlier when a branch does not need the extra level. An eight-chapter video with no interior breakdown is eight chapter collections and nothing else.
-
-### `outline.key`
-
-A stable slug for this branch, unique in the file.
-
-- 1–64 characters.
-- Lowercase ASCII letters, digits, and hyphens: `cold-open`, `02-where-the-database-lives`.
-- Does not start or end with a hyphen. No doubled hyphen.
-
-Mint new `sourceId` values every time you write a file. Keep `outline.key` stable when you regenerate the same video, so a person can match "Cold open" across two imported copies. Import replaces every GUID. The imported collection's metadata `shared.sourceNodeId` is the `sourceId` from the file; `outline.key` is the handle that survives a rewrite of the file.
+- 1–64 characters. Lowercase ASCII letters, digits, and single hyphens: `cold-open`.
+- Unique in the file. Does not start or end with a hyphen.
+- Mint new `sourceId` values every time you write a file. Keep `outline.key` stable when you regenerate the same outline. Import replaces every GUID. The imported collection's `shared.sourceNodeId` is the file's `sourceId`. `outline.key` is the handle that survives a rewrite.
 
 ## Shape the tree for the resource pass
 
@@ -150,7 +146,7 @@ The outliner decides the branches. It does not fill them.
 
 ## Limits the codec already enforces
 
-Stay inside these. The sharing server rejects an egg that breaks them.
+Stay inside these. Nest Import rejects an egg that breaks them.
 
 | Limit | Value |
 |---|---|
@@ -216,46 +212,32 @@ Chapter 2 mixes nothing: its children are both sections. "Collections are not fo
 
 ## Import
 
-**File ▸ Nest Import…** opens a `.nestegg.json` (or any `.json`) file and adds it as a new project. The sharing server is not involved. Nothing already in the nest is replaced.
+**File ▸ Nest Import…** opens a `.nestegg.json` (or any `.json`) file and adds it as a new project in the local tree. Nothing already in the nest is replaced. There is no share code.
 
 `NestEggFile.Read` reads the UTF-8 file. `NestEggImporter.MaterializeFromFile` builds the project. `ProjectManager.ImportSharedProjectAsync` applies the free-tier check and saves that one project.
 
-When `source.appVersion` is `outline-1`, import runs `NestEggOutline.Validate` before saving. A folder, file, or web node, a missing `outline.key`, a mixed chapter, or a broken `sortOrder` refuses the whole file. The message is the reason. No partial tree is written.
+When `source.appVersion` is `outline-1`, import runs `NestEggOutline.Validate` before saving. A folder, file, or web node, a path or URL on a collection, a broken `outline.role`, or a broken `sortOrder` refuses the whole file. The message is the reason. No partial tree is written. Missing `outline.role` and `outline.key` are allowed.
 
-A file whose `appVersion` is anything else is a normal Nest Egg. Import keeps its folders, files, and URLs and does not apply the outline rules. That is the door the later resource pass will use.
+A file whose `appVersion` is anything else is a normal Nest Egg. Import keeps its folders, files, and URLs and does not apply the collections-only rules. That is the door a later Nest Import will use when a file hangs resources on these branches.
 
-If a project named `Cutting a release` already exists, the new one is named `Cutting a release (shared)`, then `Cutting a release (shared 2)`. Importing the same file again is another copy.
+If a project named `Cutting a release` already exists, the new one is named `Cutting a release (2)`, then `Cutting a release (3)`. Importing the same file again is another copy.
 
-Ids in the file are not the ids stored in `projects.db`. Each imported collection keeps `outline.profile`, `outline.role`, and `outline.key`, and gains `shared.sourceNodeId` (the file's `sourceId`). The project gains:
+Ids in the file are not the ids stored in `projects.db`. Each imported collection keeps whatever `outline.*` keys the file included, and gains `shared.sourceNodeId` (the file's `sourceId`). The project gains:
 
 | Key | Value |
 |---|---|
 | `shared.sourceProjectId` | `project.sourceId` from the file |
-| `shared.senderLabel` | `source.machineLabel` (`outliner`) |
+| `shared.senderLabel` | `source.machineLabel` |
 | `shared.importedUtc` | When this computer imported it |
 | `shared.importFile` | The file name only, not the directory |
 
-There is no `shared.shareCode` on a file import. Keys that start with `shared.` are stripped if that project is later sent with **File ▸ Share Project…**. The `outline.*` keys stay.
+Nest Import does not write `shared.shareCode`.
 
 This is not a restore of **File ▸ Export All My Data…**. That zip is still one-way.
 
-### Sending the same file to another computer
+## Out of this version
 
-The phase-1 server still accepts this document. POST the file as the `egg` property. The server copies `machineLabel` onto `source.machineLabel`, then runs the same outline check when `appVersion` is `outline-1`.
-
-```bash
-jq -n --slurpfile egg cutting-a-release.nestegg.json \
-  '{machineLabel:"outliner", egg:$egg[0]}' \
-| curl -s -X POST http://localhost:5088/api/shares \
-    -H "Content-Type: application/json" \
-    --data-binary @-
-```
-
-A success body includes `code` (`ABCD-EFGH`). A `400` body is `{ "error": "..." }`. On the other computer, **File ▸ Receive Shared Project…** imports a new project, the same way a file import does, and records `shared.shareCode` instead of `shared.importFile`.
-
-## Out of this profile
-
-- Folder, file, and web references, including the resource pass that will attach them to leaf collections. Those files are still Nest Eggs; they are not `outline-1`.
+- Folder, file, and web references. A later Nest Import can add them to this same JSON. Those files are not `outline-1`.
 - File bytes, scripts stored as documents, and license or window data.
 - Updating or merging a project that is already imported.
-- Accounts, and any marker that this outline belongs to a person. `source.machineLabel` is the producer name `outliner`.
+- A plugin. The other program writes the file. Project Nest Explorer imports it.

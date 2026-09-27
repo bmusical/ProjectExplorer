@@ -40,7 +40,9 @@ public class NestEggOutlineTests
         Assert.Empty(chapters[3].Children);
 
         var taken = NestEggImporter.MaterializeFromFile(egg, path, [imported.Name]);
-        Assert.Equal("Cutting a release (shared)", taken.Name);
+        Assert.Equal("Cutting a release (2)", taken.Name);
+        var takenAgain = NestEggImporter.MaterializeFromFile(egg, path, [imported.Name, taken.Name]);
+        Assert.Equal("Cutting a release (3)", takenAgain.Name);
 
         var dir = Path.Combine(Path.GetTempPath(), "nest-outline-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -99,6 +101,49 @@ public class NestEggOutlineTests
         mixed.Project.Nodes.Add(Collection(chapterId, 1, "beat", "punchline"));
         var mixedError = Assert.Throws<NestEggFormatException>(() => NestEggImporter.MaterializeFromFile(mixed, "outline.nestegg.json", []));
         Assert.Contains("all sections or all beats", mixedError.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Outline_WithoutRoles_ImportsAPlainCollectionTree()
+    {
+        var projectId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+        var egg = new NestEggDocument
+        {
+            Source = new NestEggSource { MachineLabel = "outliner", AppVersion = NestEggOutline.ProfileVersion },
+            Project = new NestEggProject
+            {
+                SourceId = projectId,
+                Name = "Notes",
+                Nodes =
+                [
+                    new NestEggNode
+                    {
+                        SourceId = parentId,
+                        ParentSourceId = projectId,
+                        ChildType = "collection",
+                        SortOrder = 0,
+                        Name = "Opening"
+                    },
+                    new NestEggNode
+                    {
+                        SourceId = Guid.NewGuid(),
+                        ParentSourceId = parentId,
+                        ChildType = "collection",
+                        SortOrder = 0,
+                        Name = "First point"
+                    }
+                ]
+            }
+        };
+
+        var imported = NestEggImporter.MaterializeFromFile(egg, "notes.nestegg.json", []);
+
+        Assert.Equal("Notes", imported.Name);
+        var opening = Assert.IsType<Collection>(Assert.Single(imported.Children));
+        Assert.Equal("Opening", opening.Name);
+        Assert.False(opening.Metadata.ContainsKey(NestEggOutline.RoleMetadataKey));
+        Assert.Equal("First point", Assert.IsType<Collection>(Assert.Single(opening.Children)).Name);
     }
 
     [Fact]
