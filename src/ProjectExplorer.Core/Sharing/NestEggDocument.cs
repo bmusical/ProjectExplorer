@@ -96,6 +96,7 @@ public static class SharedImportMetadata
     public const string ShareCode = "shared.shareCode";
     public const string SenderLabel = "shared.senderLabel";
     public const string ImportedUtc = "shared.importedUtc";
+    public const string ImportFile = "shared.importFile";
     public const string SourceNodeId = "shared.sourceNodeId";
 }
 

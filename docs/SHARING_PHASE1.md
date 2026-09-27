@@ -91,6 +91,7 @@ Append-only. This is the log you read with Refresh activity.
 | `OccurredUtc` | When the server wrote the row |
 | `MachineLabel` | Computer name, when the caller sent one. Truncated at 80 characters |
 | `Detail` | Short note (project name on create, "expired"/"revoked" on reject, the new project id on import). Truncated at 500 characters |
+| `CallerAddress` | The caller's IP address, kept for the management site. It is not returned on the activity list that a share code can read |
 
 `IX_ShareEvents_ShareId_OccurredUtc` supports the activity list.
 
@@ -136,6 +137,8 @@ Schema 1, kind `project-nest-egg`. Built by `NestEggCodec` in `ProjectExplorer.C
 ```
 
 `childType` is `collection`, `folderReference`, `webResource`, or `fileReference`. Nodes are a flat list. A node's parent is the project or a collection in the same list. The server rejects a missing parent, a cycle, a duplicate id, an unknown type, and payloads over the size limit (5,000 nodes, 2 MB).
+
+**Nest Import** of a collections-only egg — headings, with no folder, file, or web nodes — is specified in [`NEST_IMPORT.md`](NEST_IMPORT.md). **File ▸ Nest Import…** loads that file on one computer and does not use a share code.
 
 Keys that start with `shared.` are bookkeeping from an earlier import. They are stripped before the egg is built, so a project that was itself received can be sent onward without dragging the previous share's ids along. Other metadata (for example "stop auto-retry") is kept.
 

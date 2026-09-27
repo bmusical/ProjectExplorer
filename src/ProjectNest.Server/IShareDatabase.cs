@@ -22,17 +22,18 @@ internal interface IShareDatabase
         string payloadJson,
         string payloadSha256,
         int byteLength,
-        string code);
+        string code,
+        string? callerAddress);
 
     StoredShare? FindByCode(string canonicalCode);
 
-    void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail);
+    void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress);
 
-    void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel);
+    void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress);
 
-    void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail);
+    void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress);
 
-    void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel);
+    void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress);
 
     IReadOnlyList<StoredEvent> ListEvents(Guid shareId);
 }
@@ -59,4 +60,5 @@ internal sealed class StoredEvent
     public string OccurredUtc { get; set; } = "";
     public string? MachineLabel { get; set; }
     public string? Detail { get; set; }
+    public string? CallerAddress { get; set; }
 }

@@ -32,7 +32,7 @@ internal sealed class SqlShareDatabase : IShareDatabase
     public void CreateShare(
         Guid eggId, Guid shareId, Guid eventId, int schemaVersion, DateTime createdUtc, DateTime expiresUtc,
         string senderLabel, string projectName, Guid sourceProjectId, string payloadJson, string payloadSha256,
-        int byteLength, string code)
+        int byteLength, string code, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("dbo.usp_Share_Create", new
@@ -49,7 +49,8 @@ internal sealed class SqlShareDatabase : IShareDatabase
             PayloadJson = payloadJson,
             PayloadSha256 = payloadSha256,
             ByteLength = byteLength,
-            Code = code
+            Code = code,
+            CallerAddress = callerAddress
         }, commandType: CommandType.StoredProcedure);
     }
 
@@ -63,7 +64,7 @@ internal sealed class SqlShareDatabase : IShareDatabase
         return row == null ? null : ToStored(row);
     }
 
-    public void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail)
+    public void InsertEvent(Guid shareId, Guid eggId, string eventType, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("dbo.usp_ShareEvent_Insert", new
@@ -74,11 +75,12 @@ internal sealed class SqlShareDatabase : IShareDatabase
             EventType = eventType,
             OccurredUtc = AsUtc(occurredUtc),
             MachineLabel = machineLabel,
-            Detail = detail
+            Detail = detail,
+            CallerAddress = callerAddress
         }, commandType: CommandType.StoredProcedure);
     }
 
-    public void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel)
+    public void RecordFetch(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("dbo.usp_Share_RecordFetch", new
@@ -87,11 +89,12 @@ internal sealed class SqlShareDatabase : IShareDatabase
             EggId = eggId,
             EventId = Guid.NewGuid(),
             OccurredUtc = AsUtc(occurredUtc),
-            MachineLabel = machineLabel
+            MachineLabel = machineLabel,
+            CallerAddress = callerAddress
         }, commandType: CommandType.StoredProcedure);
     }
 
-    public void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail)
+    public void RecordImport(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? detail, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("dbo.usp_Share_RecordImport", new
@@ -101,11 +104,12 @@ internal sealed class SqlShareDatabase : IShareDatabase
             EventId = Guid.NewGuid(),
             OccurredUtc = AsUtc(occurredUtc),
             MachineLabel = machineLabel,
-            Detail = detail
+            Detail = detail,
+            CallerAddress = callerAddress
         }, commandType: CommandType.StoredProcedure);
     }
 
-    public void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel)
+    public void Revoke(Guid shareId, Guid eggId, DateTime occurredUtc, string? machineLabel, string? callerAddress)
     {
         using var connection = Open();
         connection.Execute("dbo.usp_Share_Revoke", new
@@ -114,7 +118,8 @@ internal sealed class SqlShareDatabase : IShareDatabase
             EggId = eggId,
             EventId = Guid.NewGuid(),
             OccurredUtc = AsUtc(occurredUtc),
-            MachineLabel = machineLabel
+            MachineLabel = machineLabel,
+            CallerAddress = callerAddress
         }, commandType: CommandType.StoredProcedure);
     }
 

@@ -217,6 +217,19 @@ public class SharingPhase1Tests : IClassFixture<SharingPhase1Tests.SharingServer
     }
 
     [Fact]
+    public async Task Publish_RejectsAnOutlineThatContainsAFolder()
+    {
+        using var http = _server.CreateClient();
+        var api = new NestShareClient(http);
+        var egg = NestEggCodec.Create(SampleProject(), "outliner", NestEggOutline.ProfileVersion);
+
+        var rejected = await Assert.ThrowsAsync<NestShareException>(
+            () => api.PublishAsync(http.BaseAddress!, egg, "outliner"));
+
+        Assert.Contains("only collections", rejected.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExpiredShare_IsRejected()
     {
         await using var expired = new SharingServerFixture { LifetimeDays = 0 };
