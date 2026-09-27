@@ -137,7 +137,7 @@ Schema 1, kind `project-nest-egg`. Built by `NestEggCodec` in `ProjectExplorer.C
 
 `childType` is `collection`, `folderReference`, `webResource`, or `fileReference`. Nodes are a flat list. A node's parent is the project or a collection in the same list. The server rejects a missing parent, a cycle, a duplicate id, an unknown type, and payloads over the size limit (5,000 nodes, 2 MB).
 
-A collection-only outline of this same document — chapters, sections, and beats, with no folder, file, or web nodes — is specified in [`NEST_EGG_OUTLINE.md`](NEST_EGG_OUTLINE.md). **File ▸ Import Nest Egg…** loads that file on one computer. When `source.appVersion` is `outline-1`, publish on this server runs the same outline check.
+**Nest Import** of this same document — this version is collections only, chapters and other headings, with no folder, file, or web nodes — is specified in [`NEST_IMPORT.md`](NEST_IMPORT.md). **File ▸ Nest Import…** loads that file on one computer. No share code. When `source.appVersion` is `outline-1`, publish on this server runs the same outline check.
 
 Keys that start with `shared.` are bookkeeping from an earlier import. They are stripped before the egg is built, so a project that was itself received can be sent onward without dragging the previous share's ids along. Other metadata (for example "stop auto-retry") is kept.
 

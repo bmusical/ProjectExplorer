@@ -2918,7 +2918,7 @@ public partial class MainForm : Form
     {
         using var dlg = new OpenFileDialog
         {
-            Title = "Import Nest Egg",
+            Title = "Nest Import",
             Filter = "Nest Egg (*.nestegg.json;*.json)|*.nestegg.json;*.json|All files (*.*)|*.*"
         };
         if (dlg.ShowDialog(this) != DialogResult.OK)
@@ -2938,7 +2938,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex) when (ex is NestEggFormatException or InvalidOperationException)
         {
-            MessageBox.Show(this, ex.Message, "Import Nest Egg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, ex.Message, "Nest Import", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 

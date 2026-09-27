@@ -20,7 +20,7 @@ Nest Eggs are packages of information that can be shared from one nest to anothe
 
 The first slice is a two-computer experiment, specified in [`SHARING_PHASE1.md`](SHARING_PHASE1.md). One project is packed as a Nest Egg, stored on a small sharing server, and imported on the other computer as a new project when someone enters a short code. Paths are copied as stored. File contents, accounts, and merging are left out so that using the slice can show what the package and the server tables need to become. For this slice the egg is the earlier `.peproj` handoff; a second format stays open only if a later slice needs one. `File ▸ Export All My Data...` remains a one-user personal-data export, not the sharing workflow.
 
-An outline profile of that same egg — empty collections only, so a program can write a video's chapters before any folder, file, or web reference exists — is specified in [`NEST_EGG_OUTLINE.md`](NEST_EGG_OUTLINE.md). **File ▸ Import Nest Egg…** loads that file, or any other schema-1 egg, as a new project.
+**Nest Import** — a JSON Nest Egg loaded from a file into the local tree, with no share code — is specified in [`NEST_IMPORT.md`](NEST_IMPORT.md). This version of the file is empty collections only, so a program can write a video's chapters before any folder, file, or web reference exists. **File ▸ Nest Import…** loads that file, or any other schema-1 egg, as a new project.
 
 ### Deeper Explorer integration
 

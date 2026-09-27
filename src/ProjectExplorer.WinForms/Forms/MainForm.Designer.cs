@@ -282,7 +282,7 @@ partial class MainForm
         this.menuFileExportMyData = new ToolStripMenuItem { Text = "Export All My &Data..." };
         this.menuFileShareProject = new ToolStripMenuItem { Text = "&Share Project..." };
         this.menuFileReceiveShare = new ToolStripMenuItem { Text = "&Receive Shared Project..." };
-        this.menuFileImportNestEgg = new ToolStripMenuItem { Text = "&Import Nest Egg..." };
+        this.menuFileImportNestEgg = new ToolStripMenuItem { Text = "Nest &Import..." };
         this.menuFileExit = new ToolStripMenuItem { Text = "E&xit" };
         this.menuFile.DropDownItems.AddRange(new ToolStripItem[] {
             menuFileNewProject, menuFileSearch, new ToolStripSeparator(),

@@ -1,12 +1,14 @@
-# Nest Egg outline profile — empty collections only
+# Nest Import
 
-This is a producer contract for a program (an outliner) that builds a video's chapter tree and writes it as a Nest Egg. The egg is a project made entirely of collections. It has no folder references, no file references, and no web resources. Those come later, hung on the branches this profile creates.
+This spec defines **Nest Import**: a JSON file another program can write, and **File ▸ Nest Import…** to add that file to the local tree. No share code.
+
+This version of the file is an outline. The egg is a project made entirely of collections. It has no folder references, no file references, and no web resources. Those come later, hung on the branches this profile creates. A video's chapters are the first use. The same import is a general tree of collections.
 
 This is not a new format. It is schema 1, kind `project-nest-egg`, the same document [`SHARING_PHASE1.md`](SHARING_PHASE1.md) already imports. A second kind or schema version would be rejected.
 
-**File ▸ Import Nest Egg…** reads the file and creates a new project. When `source.appVersion` is `outline-1`, import checks the rules in this document and refuses the file if any node is not an empty collection. Any other valid Nest Egg — including a later file that has hung resources on these branches — uses the same command and skips those extra checks.
+**File ▸ Nest Import…** reads the file and creates a new project. When `source.appVersion` is `outline-1`, import checks the rules in this document and refuses the file if any node is not an empty collection. Any other valid Nest Egg — including a later file that has hung resources on these branches — uses the same command and skips those extra checks.
 
-One file is one video. Import always creates a new project. Writing the file again and importing it again does not update the project already on disk.
+One file is one project. Import always creates a new project. Writing the file again and importing it again does not update the project already on disk.
 
 ## What the tree means
 
@@ -214,7 +216,7 @@ Chapter 2 mixes nothing: its children are both sections. "Collections are not fo
 
 ## Import
 
-**File ▸ Import Nest Egg…** opens a `.nestegg.json` (or any `.json`) file and adds it as a new project. The sharing server is not involved. Nothing already in the nest is replaced.
+**File ▸ Nest Import…** opens a `.nestegg.json` (or any `.json`) file and adds it as a new project. The sharing server is not involved. Nothing already in the nest is replaced.
 
 `NestEggFile.Read` reads the UTF-8 file. `NestEggImporter.MaterializeFromFile` builds the project. `ProjectManager.ImportSharedProjectAsync` applies the free-tier check and saves that one project.
 

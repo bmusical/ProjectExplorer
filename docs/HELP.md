@@ -161,15 +161,15 @@ source repository. A share code is the only key: anyone who has the code can fet
 project until it expires or you revoke it, so don't share a project that has secrets in its
 names or URLs.
 
-## Importing a Nest Egg
+## Nest Import
 
-**File ▸ Import Nest Egg…** reads a Nest Egg file you already have — a `.nestegg.json`, or any
+**File ▸ Nest Import…** reads a Nest Egg file you already have — a `.nestegg.json`, or any
 `.json` file in that format — and adds it as a new project. Nothing already in your nest is
 replaced. If you already have a project with the same name, the new one is named with
 " (shared)" on the end. Importing the same file again is another copy.
 
 An outline file is a tree of empty collections: the chapters, sections, and beats of a video,
-with no folders, files, or web links yet. How to write that file is `docs/NEST_EGG_OUTLINE.md`
+with no folders, files, or web links yet. How to write that file is `docs/NEST_IMPORT.md`
 in the source repository. The same menu command also imports a Nest Egg that does contain
 folders, files, and links. The file is read from disk; the sharing server is not contacted.
 
@@ -204,7 +204,7 @@ limit entirely.
 and loading Web Resource previews you've added, the only other automatic network activity is
 checking whether a Web Resource is currently reachable (see **Unavailable folders, files, and web
 resources** above). **File ▸ Share Project…** and **Receive Shared Project…** contact your
-sharing server only when you use them. **File ▸ Import Nest Egg…** reads a file on this
+sharing server only when you use them. **File ▸ Nest Import…** reads a file on this
 computer and does not use the network. Everything else works fully offline.
 
 ## Getting help

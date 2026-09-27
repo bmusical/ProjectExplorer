@@ -6,7 +6,7 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
-- **Import a Nest Egg from a file.** File ▸ Import Nest Egg… reads a `.nestegg.json` (or other `.json`) file and adds it as a new project. An outline file is a tree of empty collections — chapters, sections, and beats — with no folder, file, or web references yet. The shape of that file is `docs/NEST_EGG_OUTLINE.md`. The worked example is `docs/examples/video-chapter-outline.nestegg.json`.
+- **Nest Import.** File ▸ Nest Import… reads a `.nestegg.json` (or other `.json`) file and adds it as a new project. No share code. This version of the file is a tree of empty collections. The shape is `docs/NEST_IMPORT.md`. The worked example is `docs/examples/video-chapter-outline.nestegg.json`.
 - The sharing server writes each contact and each share request to its console: method, path, status, and caller address.
 
 ## [1.1.0] — 2026-09-23
