@@ -13,7 +13,36 @@ public static class NestEggImporter
 {
     public static Project Materialize(NestEggDocument egg, string shareCode, IEnumerable<string> existingProjectNames)
     {
-        NestEggCodec.Validate(egg);
+        var project = Build(egg, existingProjectNames);
+        project.Metadata[SharedImportMetadata.ShareCode] = shareCode;
+        return project;
+    }
+
+    /// <summary>
+    /// Same new-project import as <see cref="Materialize"/>, for a file chosen on
+    /// this computer. Records the file name (not the directory) and no share code.
+    /// An outline egg is checked against the collection-only profile first.
+    /// </summary>
+    public static Project MaterializeFromFile(NestEggDocument egg, string filePath, IEnumerable<string> existingProjectNames)
+    {
+        var fileName = Path.GetFileName(filePath ?? "");
+        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or "..")
+            throw new NestEggFormatException("The Nest Egg file needs a name.");
+        if (fileName.Length > NestEggLimits.MaxMetadataValueLength)
+            throw new NestEggFormatException("The Nest Egg file name is too long.");
+
+        var project = Build(egg, existingProjectNames);
+        project.Metadata[SharedImportMetadata.ImportFile] = fileName;
+        return project;
+    }
+
+    private static Project Build(NestEggDocument egg, IEnumerable<string> existingProjectNames)
+    {
+        if (NestEggOutline.IsOutline(egg))
+            NestEggOutline.Validate(egg);
+        else
+            NestEggCodec.Validate(egg);
+
         var source = egg.Project;
         var project = new Project
         {
@@ -26,7 +55,6 @@ public static class NestEggImporter
             Modified = DateTime.UtcNow
         };
         project.Metadata[SharedImportMetadata.SourceProjectId] = source.SourceId.ToString();
-        project.Metadata[SharedImportMetadata.ShareCode] = shareCode;
         project.Metadata[SharedImportMetadata.SenderLabel] = egg.Source.MachineLabel;
         project.Metadata[SharedImportMetadata.ImportedUtc] = project.Created.ToString("O");
 

@@ -274,6 +274,18 @@ public class HelpForm : Form
             "Nothing is shared until you use one of these commands. A share code is the only " +
             "key: anyone who has it can fetch that project until it expires or you revoke it.");
 
+        AppendHeading("Importing a Nest Egg");
+        AppendParagraph(
+            "File ▸ Import Nest Egg… reads a Nest Egg file you already have — a .nestegg.json, " +
+            "or any .json file in that format — and adds it as a new project. Nothing already " +
+            "in your nest is replaced. If you already have a project with the same name, the " +
+            "new one is named with \" (shared)\" on the end.");
+        AppendBullet(
+            "An outline file is a tree of empty collections (chapters, sections, and beats) " +
+            "with no folders, files, or web links yet. The same command also imports a Nest " +
+            "Egg that does contain those. The file is read from disk; the sharing server is " +
+            "not contacted. This is not a way to restore Export All My Data.");
+
         AppendHeading("Exporting your data");
         AppendParagraph(
             "File ▸ Export All My Data… bundles everything Project Nest Explorer has written to " +

@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "kind": "project-nest-egg",
+  "createdUtc": "2026-09-27T19:00:00.0000000Z",
+  "source": {
+    "machineLabel": "outliner",
+    "appVersion": "outline-1"
+  },
+  "project": {
+    "sourceId": "11111111-1111-4111-8111-111111111111",
+    "name": "Cutting a release",
+    "description": "A short video on packing one project and handing it to another computer.",
+    "color": null,
+    "iconKey": null,
+    "createdUtc": "2026-09-27T19:00:00.0000000Z",
+    "modifiedUtc": "2026-09-27T19:00:00.0000000Z",
+    "nodes": [
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222201",
+        "parentSourceId": "11111111-1111-4111-8111-111111111111",
+        "childType": "collection",
+        "sortOrder": 0,
+        "displayName": null,
+        "name": "1. Cold open",
+        "description": "State the problem in one sentence, then the payoff.",
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "chapter",
+          "outline.key": "cold-open"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222211",
+        "parentSourceId": "22222222-2222-4222-8222-222222222201",
+        "childType": "collection",
+        "sortOrder": 0,
+        "displayName": null,
+        "name": "The problem",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "cold-open-problem"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222212",
+        "parentSourceId": "22222222-2222-4222-8222-222222222201",
+        "childType": "collection",
+        "sortOrder": 1,
+        "displayName": null,
+        "name": "The payoff",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "cold-open-payoff"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222202",
+        "parentSourceId": "11111111-1111-4111-8111-111111111111",
+        "childType": "collection",
+        "sortOrder": 1,
+        "displayName": null,
+        "name": "2. Where the nest lives",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "chapter",
+          "outline.key": "where-the-nest-lives"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222221",
+        "parentSourceId": "22222222-2222-4222-8222-222222222202",
+        "childType": "collection",
+        "sortOrder": 0,
+        "displayName": null,
+        "name": "The database file",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "section",
+          "outline.key": "database-file"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222231",
+        "parentSourceId": "22222222-2222-4222-8222-222222222221",
+        "childType": "collection",
+        "sortOrder": 0,
+        "displayName": null,
+        "name": "projects.db",
+        "description": "Show the file under %APPDATA%\\ProjectExplorer, not the source tree.",
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "projects-db"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222222",
+        "parentSourceId": "22222222-2222-4222-8222-222222222202",
+        "childType": "collection",
+        "sortOrder": 1,
+        "displayName": null,
+        "name": "Collections are not folders",
+        "description": "A collection is a heading in the nest. It is not a directory on disk.",
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "section",
+          "outline.key": "collections-are-not-folders"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222203",
+        "parentSourceId": "11111111-1111-4111-8111-111111111111",
+        "childType": "collection",
+        "sortOrder": 2,
+        "displayName": null,
+        "name": "3. Hand it to the other computer",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "chapter",
+          "outline.key": "hand-it-over"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222241",
+        "parentSourceId": "22222222-2222-4222-8222-222222222203",
+        "childType": "collection",
+        "sortOrder": 0,
+        "displayName": null,
+        "name": "Start the sharing server",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "start-the-server"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222242",
+        "parentSourceId": "22222222-2222-4222-8222-222222222203",
+        "childType": "collection",
+        "sortOrder": 1,
+        "displayName": null,
+        "name": "Send the code",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "send-the-code"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222243",
+        "parentSourceId": "22222222-2222-4222-8222-222222222203",
+        "childType": "collection",
+        "sortOrder": 2,
+        "displayName": null,
+        "name": "Receive it",
+        "description": null,
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "beat",
+          "outline.key": "receive-it"
+        }
+      },
+      {
+        "sourceId": "22222222-2222-4222-8222-222222222204",
+        "parentSourceId": "11111111-1111-4111-8111-111111111111",
+        "childType": "collection",
+        "sortOrder": 3,
+        "displayName": null,
+        "name": "4. Close",
+        "description": "One sentence on what the other computer now has.",
+        "color": null,
+        "realPath": null,
+        "url": null,
+        "filePath": null,
+        "openExternalOnly": false,
+        "metadata": {
+          "outline.profile": "collections-only",
+          "outline.role": "chapter",
+          "outline.key": "close"
+        }
+      }
+    ]
+  }
+}

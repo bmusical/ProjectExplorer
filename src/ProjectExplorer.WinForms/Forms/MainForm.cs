@@ -2914,6 +2914,34 @@ public partial class MainForm : Form
         }
     }
 
+    private async void MenuFileImportNestEgg_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = "Import Nest Egg",
+            Filter = "Nest Egg (*.nestegg.json;*.json)|*.nestegg.json;*.json|All files (*.*)|*.*"
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        try
+        {
+            var egg = NestEggFile.Read(dlg.FileName);
+            var project = NestEggImporter.MaterializeFromFile(
+                egg, dlg.FileName, _projectManager.Projects.Select(p => p.Name));
+            RefreshLicense();
+            var saved = await _projectManager.ImportSharedProjectAsync(project, _license);
+            RefreshLicense();
+            UpdateLicenseUi();
+            RefreshTreeView();
+            SelectTreeNodeByTag(TagProject + saved.Id);
+        }
+        catch (Exception ex) when (ex is NestEggFormatException or InvalidOperationException)
+        {
+            MessageBox.Show(this, ex.Message, "Import Nest Egg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
     private void SaveShareSettings(string serverUrl, string machineLabel)
     {
         var settings = _appSettingsManager.Load();
