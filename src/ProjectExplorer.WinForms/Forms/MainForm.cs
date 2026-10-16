@@ -2936,9 +2936,10 @@ public partial class MainForm : Form
             RefreshTreeView();
             SelectTreeNodeByTag(TagProject + saved.Id);
         }
-        catch (Exception ex) when (ex is NestEggFormatException or InvalidOperationException)
+        catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Nest Import", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, NestEggErrors.ForImportDialog(ex, dlg.FileName),
+                "Nest Import", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
