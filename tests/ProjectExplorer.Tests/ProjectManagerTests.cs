@@ -574,6 +574,52 @@ public class ProjectManagerTests
     }
 
     [Fact]
+    public async Task ConvertProjectToCollectionAsync_OnSqlite_PreservesChildIdsUnderTarget()
+    {
+        var mgr = new ProjectManager(new SqliteProjectRepository(_tempDir));
+        await mgr.InitializeAsync();
+
+        var source = await mgr.CreateProjectAsync("Source");
+        var folder = await mgr.AddFolderReferenceAsync(source.Id, @"C:\Assets", displayName: "Assets");
+        var nested = await mgr.CreateCollectionAsync(source.Id, "Nested");
+        var file = await mgr.AddFileReferenceAsync(source.Id, @"C:\Notes.txt", parentCollectionId: nested.Id);
+        var target = await mgr.CreateProjectAsync("Target");
+        var host = await mgr.CreateCollectionAsync(target.Id, "Archive");
+
+        var collection = await mgr.ConvertProjectToCollectionAsync(source.Id, target.Id, host.Id);
+
+        Assert.Equal(source.Id, collection.Id);
+        Assert.Null(mgr.GetProject(source.Id));
+
+        var reloaded = new ProjectManager(new SqliteProjectRepository(_tempDir));
+        await reloaded.InitializeAsync();
+
+        Assert.Null(reloaded.GetProject(source.Id));
+        var targetReloaded = reloaded.GetProject(target.Id);
+        Assert.NotNull(targetReloaded);
+        var hostReloaded = targetReloaded.FindCollection(host.Id);
+        Assert.NotNull(hostReloaded);
+        var moved = Assert.Single(hostReloaded.Children.OfType<Collection>());
+        Assert.Equal(source.Id, moved.Id);
+
+        var movedFolder = Assert.Single(moved.Children.OfType<FolderReference>());
+        Assert.Equal(folder.Id, movedFolder.Id);
+        var movedNested = Assert.Single(moved.Children.OfType<Collection>());
+        Assert.Equal(nested.Id, movedNested.Id);
+        var movedFile = Assert.Single(movedNested.Children.OfType<FileReference>());
+        Assert.Equal(file.Id, movedFile.Id);
+
+        var childIds = new[] { folder.Id, nested.Id, file.Id };
+        foreach (var childId in childIds)
+        {
+            var hits = targetReloaded.Children.SelectMany(Flatten).Count(c => c.Id == childId);
+            Assert.Equal(1, hits);
+        }
+
+        Assert.DoesNotContain(reloaded.Projects.Where(p => p.Id != target.Id), p => Flatten(p).Any(c => childIds.Contains(c.Id)));
+    }
+
+    [Fact]
     public async Task ConvertProjectToCollectionAsync_IntoOwnCollection_Throws()
     {
         var mgr = await CreateManagerAsync();
@@ -604,5 +650,17 @@ public class ProjectManagerTests
 
         var reloadedFromDisk = await new JsonProjectRepository(_tempDir).LoadAllAsync();
         Assert.Contains(reloadedFromDisk, p => p.Id == newProject.Id);
+    }
+
+    private static IEnumerable<ProjectChild> Flatten(Project project) => project.Children.SelectMany(Flatten);
+
+    private static IEnumerable<ProjectChild> Flatten(ProjectChild child)
+    {
+        yield return child;
+        if (child is Collection collection)
+        {
+            foreach (var descendant in collection.Children.SelectMany(Flatten))
+                yield return descendant;
+        }
     }
 }

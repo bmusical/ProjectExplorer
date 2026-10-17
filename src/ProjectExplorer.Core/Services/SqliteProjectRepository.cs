@@ -180,9 +180,43 @@ public class SqliteProjectRepository : IProjectRepository
 
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+        await UpsertProjectAsync(connection, transaction, project);
+        transaction.Commit();
+    }
 
+    public async Task SaveProjectReplacingAsync(Project project, Guid replacedProjectId)
+    {
+        project.Modified = DateTime.UtcNow;
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        // Drop the replaced project's rows first. Its children are about to be inserted under
+        // project, and ProjectChildren.Id is a table-wide primary key.
+        await DeleteProjectRowsAsync(connection, transaction, replacedProjectId);
+        await UpsertProjectAsync(connection, transaction, project);
+        transaction.Commit();
+    }
+
+    public async Task DeleteProjectAsync(Guid projectId)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        await DeleteProjectRowsAsync(connection, transaction, projectId);
+        transaction.Commit();
+    }
+
+    private static async Task DeleteProjectRowsAsync(SqliteConnection connection, SqliteTransaction transaction, Guid projectId)
+    {
+        await connection.ExecuteAsync("DELETE FROM ProjectChildren WHERE ProjectId = @Id",
+            new { Id = projectId.ToString() }, transaction);
+        await connection.ExecuteAsync("DELETE FROM Projects WHERE Id = @Id",
+            new { Id = projectId.ToString() }, transaction);
+    }
+
+    private static async Task UpsertProjectAsync(SqliteConnection connection, SqliteTransaction transaction, Project project)
+    {
         // Preserve the project's existing top-level position; only a brand-new project gets
-        // appended at the end. SaveAllAsync (above) is the only path that actually reorders projects.
+        // appended at the end. SaveAllAsync is the only path that actually reorders projects.
         var existingSortOrder = await connection.QuerySingleOrDefaultAsync<int?>(
             "SELECT SortOrder FROM Projects WHERE Id = @Id", new { Id = project.Id.ToString() }, transaction);
         var sortOrder = existingSortOrder
@@ -202,19 +236,6 @@ public class SqliteProjectRepository : IProjectRepository
         await connection.ExecuteAsync("DELETE FROM ProjectChildren WHERE ProjectId = @ProjectId",
             new { ProjectId = project.Id.ToString() }, transaction);
         await InsertChildrenAsync(connection, transaction, project.Id, project.Id, project.Children);
-
-        transaction.Commit();
-    }
-
-    public async Task DeleteProjectAsync(Guid projectId)
-    {
-        using var connection = OpenConnection();
-        using var transaction = connection.BeginTransaction();
-        await connection.ExecuteAsync("DELETE FROM ProjectChildren WHERE ProjectId = @Id",
-            new { Id = projectId.ToString() }, transaction);
-        await connection.ExecuteAsync("DELETE FROM Projects WHERE Id = @Id",
-            new { Id = projectId.ToString() }, transaction);
-        transaction.Commit();
     }
 
     // ── Row <-> Model mapping ──
