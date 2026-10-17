@@ -78,6 +78,20 @@ public class JsonProjectRepository : IProjectRepository
         await SaveAllAsync(projects);
     }
 
+    public async Task SaveProjectReplacingAsync(Project project, Guid replacedProjectId)
+    {
+        var projects = await LoadAllAsync();
+        projects.RemoveAll(p => p.Id == replacedProjectId);
+        var existingIndex = projects.FindIndex(p => p.Id == project.Id);
+        if (existingIndex >= 0)
+            projects[existingIndex] = project;
+        else
+            projects.Add(project);
+
+        project.Modified = DateTime.UtcNow;
+        await SaveAllAsync(projects);
+    }
+
     public async Task DeleteProjectAsync(Guid projectId)
     {
         var projects = await LoadAllAsync();

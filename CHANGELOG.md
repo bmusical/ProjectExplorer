@@ -6,6 +6,7 @@ Releases tagged `<version>` (no `v` prefix).
 
 ## [Unreleased]
 
+- Fix dragging a project onto a collection (or onto another project) when the dragged project already contains folders, files, web links, or nested collections. Those items now move with it instead of the drop failing with a database error.
 - **Nest Import.** File ▸ Nest Import… reads a `.nestegg.json` (or other `.json`) file and adds it as a new project. No share code. This version of the file is a tree of empty collections; chapter, section, and beat labels are optional. A second copy of the same name is `Name (2)`. When a file is rejected, the message names the file, the `nodes[n]` entry, and the field that failed. The shape is `docs/NEST_IMPORT.md`. The worked example is `docs/examples/video-chapter-outline.nestegg.json`.
 - The sharing server writes each contact and each share request to its console: method, path, status, and caller address.
 - GitHub Actions workflow **Deploy sharing server** publishes `ProjectNest.Server` to the SmarterASP.net site for project-nest.com. Run it after the Web Deploy and SQL connection secrets are set. The desktop app still defaults to the local server until that site's certificate is for project-nest.com.

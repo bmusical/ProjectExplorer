@@ -21,6 +21,14 @@ public interface IProjectRepository
     Task SaveProjectAsync(Models.Project project);
 
     /// <summary>
+    /// Delete <paramref name="replacedProjectId"/> and save <paramref name="project"/> as one
+    /// commit. The deleted project's child rows are removed before the saved project's children
+    /// are inserted, so child ids that move between them do not collide. If the save fails, the
+    /// deleted project is left unchanged.
+    /// </summary>
+    Task SaveProjectReplacingAsync(Models.Project project, Guid replacedProjectId);
+
+    /// <summary>
     /// Delete a project by Id.
     /// </summary>
     Task DeleteProjectAsync(Guid projectId);

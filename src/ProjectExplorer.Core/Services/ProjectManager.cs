@@ -503,8 +503,10 @@ public class ProjectManager
 
         _projects.Remove(project);
         targetProject.Modified = DateTime.UtcNow;
-        await _repository.SaveProjectAsync(targetProject);
-        await _repository.DeleteProjectAsync(project.Id);
+        // One commit: the source project's child rows still hold these ids, and ProjectChildren.Id
+        // is unique across the whole store. Deleting that project in the same transaction as the
+        // target save removes them before they are inserted again. A failed save rolls both back.
+        await _repository.SaveProjectReplacingAsync(targetProject, project.Id);
         return collection;
     }
 
